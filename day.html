@@ -1,2 +1,19 @@
-<h1> "hello" </h1>
-<p> "conten" </p>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Wave Predictions</title>
+</head>
+<body>
+    <h1>Wave Predictions</h1>
+    <ul>
+        {{range .}}
+        <li>
+            <h2>Prediction in {{.Counter}} day(s)</h2>
+            <p>Wave Height: {{.WaveHeight}}</p>
+            <p>Wave Direction: {{.Direction}}</p>
+            <p>Wave Period: {{.Period}}</p>
+        </li>
+        {{end}}
+    </ul>
+</body>
+</html>
