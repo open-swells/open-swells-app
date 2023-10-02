@@ -101,10 +101,9 @@ func getCurrentReport() (CurrentReport, error) {
     //remove first 5 values of labels and first 4 values of values and replace with current date 
 
     //create variable lastupdate from the first 4 values of values. 
-    lastupdate := values[1] + " " + values[2] + " " + values[3] + ":" + values[4] + " " + values[0]
+    lastupdate := values[2] + " " + values[1] + " " + values[3] + ":" + values[4] + " " + values[0]
     fmt.Println(lastupdate)
-    //turn this into a date type and format it
-    t, err := time.Parse("10 02 14:34 2023", lastupdate)
+    t, err := time.Parse("02 01 15:04 2006", lastupdate)
     fmt.Println(t)
 
     
@@ -156,7 +155,7 @@ func main() {
 
         for i:= 1; i < 4; i++ {
 
-            predictionDate := currentDate.AddDate(0, 0, i+1)
+            predictionDate := currentDate.AddDate(0, 0, i)
 
             // Format the title for the prediction (e.g., "Mon, Oct 2")
             title := predictionDate.Format("Mon, Jan 2")
