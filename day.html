@@ -1,19 +1,83 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Wave Predictions</title>
+    <title>El Porto Buoy Forecast</title>
+    <style>
+        /* Common styles for both desktop and mobile */
+        h1 {
+            text-align: center;
+        }
+
+        p
+        { 
+            text-align: center;
+        }
+
+        /* Mobile styles */
+        .predictions-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 10px; /* Padding for mobile */
+        }
+
+        .prediction-item {
+            flex: 0 0 calc(100% - 20px);
+            margin: 10px;
+            padding-left: 10px;
+            padding-right: 10px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+            background-color: #f9f9f9;
+        }
+
+        .current-report {
+            padding: 20px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+        }
+
+        /* Desktop styles */
+        @media (min-width: 768px) {
+            .predictions-container {
+                padding: 0 15%; /* Padding for desktop */
+            }
+
+            .prediction-item {
+                flex: 0 0 calc(23.33% - 20px);
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Wave Predictions</h1>
-    <ul>
-        {{range .}}
-        <li>
-            <h2>Prediction in {{.Counter}} day(s)</h2>
-            <p>Wave Height: {{.WaveHeight}}</p>
-            <p>Wave Direction: {{.Direction}}</p>
-            <p>Wave Period: {{.Period}}</p>
-        </li>
+    <h1>El Porto Buoy Forecast </h1>
+    <p>El Porto, Manhattan Beach is known for its consistent waves and is a popular surfing spot in Southern California.</p>
+    <div class="current-report">
+        <h2>Current Report</h2>
+        <table>
+            <tr>
+                {{range .CurrentReport.Labels}}
+                <th>{{.}}</th>
+                {{end}}
+            </tr>
+            <tr>
+                {{range .CurrentReport.Values}}
+                <td>{{.}}</td>
+                {{end}}
+            </tr>
+        </table>
+    </div>
+
+    <div class="predictions-container">
+        {{range .Predictions}}
+         <div class="prediction-item">
+            <h2>{{.Title}}</h2>
+            <p>{{printf "%.2fm" .WaveHeight}} at {{printf "%.2fsec" .Period}}</p>
+            <p>Direction: {{.DirectionLabel}}</p>
+        </div>
         {{end}}
-    </ul>
+    </div>
+
 </body>
 </html>
+
