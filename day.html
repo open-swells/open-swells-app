@@ -14,6 +14,13 @@
             text-align: center;
         }
 
+        body { 
+            padding-left: 10%;
+            padding-right: 10%;
+
+        }
+            
+
         /* Mobile styles */
         .predictions-container {
             padding-left: 10%;
@@ -34,7 +41,17 @@
             background-color: #f9f9f9;
         }
 
+        .report-container { 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 10px; /* Padding for mobile */
+        }
+
         .current-report {
+            justify-content: center;
+            align-items: center;
             padding: 20px;
             background-color: #f0f0f0;
             border: 1px solid #ccc;
@@ -43,7 +60,6 @@
         /* Desktop styles */
         @media (min-width: 768px) {
             .predictions-container {
-                padding: 0 15%; /* Padding for desktop */
             }
 
             .prediction-item {
@@ -55,6 +71,7 @@
 <body>
     <h1>El Porto Buoy Report {{.CurrentReport.Values.Date}}</h1>
     <p>El Porto, Manhattan Beach is known for its consistent waves and is a popular surfing spot in Southern California.</p>
+    <div class="report-container">
     <div class="current-report">
     <h2>Current Report</h2>
     <table>
@@ -86,13 +103,15 @@
         </tr>
     </table>
 </div>
+</div>
 
+<h2>Predictions</h2>
     <div class="predictions-container">
         {{range .Predictions}}
          <div class="prediction-item">
             <h2>{{.Title}}</h2>
             <p>{{printf "%.2fm" .WaveHeight}} at {{printf "%.2fsec" .Period}}</p>
-            <p>Direction: {{.DirectionLabel}}</p>
+            <p>Direction: {{printf "%.2fº" .DirectionDegrees}}  {{.DirectionLabel}}</p>
         </div>
         {{end}}
     </div>

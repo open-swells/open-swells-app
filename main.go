@@ -138,7 +138,6 @@ func main() {
     router.ForwardedByClientIP = true
     router.SetTrustedProxies([]string{"127.0.0.1","192.168.1.250", "192.168.1.1"})
 
-
 	// Define a route to handle requests
 	router.GET("/", func(c *gin.Context) {
 		// Query the database to get the latest prediction data
@@ -206,6 +205,6 @@ func main() {
 	})
 
 	// Start the web server
-     router.Run("127.0.0.1:8080")
+    router.Run("127.0.0.1:8080")
 	//router.Run(":8080")
 }
