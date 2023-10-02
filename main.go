@@ -41,6 +41,7 @@ type ValuesStruct struct {
     APD float64
     MWD float64
     Date string
+    UpdateDate string
 }
 
 type CurrentReport struct {
@@ -83,9 +84,9 @@ func getCurrentReport() (CurrentReport, error) {
         // Split the first row by spaces to store labels
         if rowCounter == 0 {
             labels = strings.Fields(line)
-        } else if rowCounter == 2 {
+        } else if rowCounter == 1 {
             // Skip the second row
-        } else if rowCounter == 3 {
+        } else if rowCounter == 2 {
             // Split the third row by spaces to store values
             values = strings.Fields(line)
             break // Stop reading after finding the values
@@ -98,6 +99,15 @@ func getCurrentReport() (CurrentReport, error) {
         return CurrentReport{}, err
     }
     //remove first 5 values of labels and first 4 values of values and replace with current date 
+
+    //create variable lastupdate from the first 4 values of values. 
+    lastupdate := values[1] + " " + values[2] + " " + values[3] + ":" + values[4] + " " + values[0]
+    fmt.Println(lastupdate)
+    //turn this into a date type and format it
+    t, err := time.Parse("10 02 14:34 2023", lastupdate)
+    fmt.Println(t)
+
+    
     labels = append(labels[:0], labels[5:]...)
     values = append(values[:0], values[5:]...)
     // add a field "Date" in labels, and add current date in values
@@ -105,6 +115,7 @@ func getCurrentReport() (CurrentReport, error) {
     currentDate := time.Now()
     values = append(values, currentDate.Format("Mon, Jan 2 15:04"))
     // put values into type valuesStruct and return
+    fmt.Println(values[10])
 
     var valuesStruct ValuesStruct
     valuesStruct.WvHT, _ = strconv.ParseFloat(values[0], 64)
@@ -118,8 +129,7 @@ func getCurrentReport() (CurrentReport, error) {
     valuesStruct.APD, _ = strconv.ParseFloat(values[8], 64)
     valuesStruct.MWD, _ = strconv.ParseFloat(values[9], 64)
     valuesStruct.Date = values[10]
-    fmt.Println(valuesStruct.Date)
-    fmt.Println(valuesStruct)
+    valuesStruct.UpdateDate = t.Format("Oct 2 14:35")
 
     return CurrentReport{Labels: labels, Values: valuesStruct}, nil
 }

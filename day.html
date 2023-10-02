@@ -71,9 +71,10 @@
 <body>
     <h1>El Porto Buoy Report {{.CurrentReport.Values.Date}}</h1>
     <p>El Porto, Manhattan Beach is known for its consistent waves and is a popular surfing spot in Southern California.</p>
+    <h2>Current Report</h2>
+    <h3>Buoy 46221 last reading at {{.CurrentReport.Values.UpdateDate}}</h3>
     <div class="report-container">
     <div class="current-report">
-    <h2>Current Report</h2>
     <table>
         <tr>
             <th>WvHT</th>
@@ -86,7 +87,6 @@
             <th>STEEPNESS</th>
             <th>APD</th>
             <th>MWD</th>
-            <th>Date</th>
         </tr>
         <tr>
             <td>{{printf "%.2f" .CurrentReport.Values.WvHT}}</td>
@@ -99,11 +99,11 @@
             <td>{{.CurrentReport.Values.STEEPNESS}}</td>
             <td>{{printf "%.2f" .CurrentReport.Values.APD}}</td>
             <td>{{printf "%.2f" .CurrentReport.Values.MWD}}</td>
-            <td>{{.CurrentReport.Values.Date}}</td>
         </tr>
     </table>
 </div>
 </div>
+<h3> Weather </h3>
 
 <h2>Predictions</h2>
     <div class="predictions-container">
