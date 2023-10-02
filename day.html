@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -15,6 +16,8 @@
 
         /* Mobile styles */
         .predictions-container {
+            padding-left: 10%;
+            padding-right: 10%;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -50,23 +53,39 @@
     </style>
 </head>
 <body>
-    <h1>El Porto Buoy Forecast </h1>
+    <h1>El Porto Buoy Report {{.CurrentReport.Values.Date}}</h1>
     <p>El Porto, Manhattan Beach is known for its consistent waves and is a popular surfing spot in Southern California.</p>
     <div class="current-report">
-        <h2>Current Report</h2>
-        <table>
-            <tr>
-                {{range .CurrentReport.Labels}}
-                <th>{{.}}</th>
-                {{end}}
-            </tr>
-            <tr>
-                {{range .CurrentReport.Values}}
-                <td>{{.}}</td>
-                {{end}}
-            </tr>
-        </table>
-    </div>
+    <h2>Current Report</h2>
+    <table>
+        <tr>
+            <th>WvHT</th>
+            <th>SwH</th>
+            <th>SwP</th>
+            <th>WWH</th>
+            <th>WWP</th>
+            <th>SwD</th>
+            <th>WWD</th>
+            <th>STEEPNESS</th>
+            <th>APD</th>
+            <th>MWD</th>
+            <th>Date</th>
+        </tr>
+        <tr>
+            <td>{{printf "%.2f" .CurrentReport.Values.WvHT}}</td>
+            <td>{{printf "%.2f" .CurrentReport.Values.SwH}}</td>
+            <td>{{printf "%.2f" .CurrentReport.Values.SwP}}</td>
+            <td>{{printf "%.2f" .CurrentReport.Values.WWH}}</td>
+            <td>{{printf "%.2f" .CurrentReport.Values.WWP}}</td>
+            <td>{{.CurrentReport.Values.SwD}}</td>
+            <td>{{.CurrentReport.Values.WWD}}</td>
+            <td>{{.CurrentReport.Values.STEEPNESS}}</td>
+            <td>{{printf "%.2f" .CurrentReport.Values.APD}}</td>
+            <td>{{printf "%.2f" .CurrentReport.Values.MWD}}</td>
+            <td>{{.CurrentReport.Values.Date}}</td>
+        </tr>
+    </table>
+</div>
 
     <div class="predictions-container">
         {{range .Predictions}}
@@ -80,4 +99,5 @@
 
 </body>
 </html>
+
 

@@ -3,6 +3,7 @@ package main
 
 import (
     //"regexp"
+    "strconv"
     "strings"
     "bufio"
     "time"
@@ -28,9 +29,24 @@ type Prediction struct {
 	Period     float64
 }
 
+type ValuesStruct struct { 
+    WvHT float64
+    SwH float64
+    SwP float64
+    WWH float64
+    WWP float64
+    SwD string
+    WWD string
+    STEEPNESS string
+    APD float64
+    MWD float64
+    Date string
+}
+
 type CurrentReport struct {
     Labels []string
-    Values []string
+    Values ValuesStruct
+    //Values []string
 }
 
 func degreesToCompassLabel(degrees float64) string {
@@ -83,13 +99,29 @@ func getCurrentReport() (CurrentReport, error) {
     }
     //remove first 5 values of labels and first 4 values of values and replace with current date 
     labels = append(labels[:0], labels[5:]...)
-    values = append(values[:0], values[4:]...)
+    values = append(values[:0], values[5:]...)
     // add a field "Date" in labels, and add current date in values
     labels = append(labels, "Date")
     currentDate := time.Now()
     values = append(values, currentDate.Format("Mon, Jan 2 15:04"))
+    // put values into type valuesStruct and return
 
-    return CurrentReport{Labels: labels, Values: values}, nil
+    var valuesStruct ValuesStruct
+    valuesStruct.WvHT, _ = strconv.ParseFloat(values[0], 64)
+    valuesStruct.SwH, _ = strconv.ParseFloat(values[1], 64)
+    valuesStruct.SwP, _ = strconv.ParseFloat(values[2], 64)
+    valuesStruct.WWH, _ = strconv.ParseFloat(values[3], 64)
+    valuesStruct.WWP, _ = strconv.ParseFloat(values[4], 64)
+    valuesStruct.SwD = values[5]
+    valuesStruct.WWD = values[6]
+    valuesStruct.STEEPNESS = values[7]
+    valuesStruct.APD, _ = strconv.ParseFloat(values[8], 64)
+    valuesStruct.MWD, _ = strconv.ParseFloat(values[9], 64)
+    valuesStruct.Date = values[10]
+    fmt.Println(valuesStruct.Date)
+    fmt.Println(valuesStruct)
+
+    return CurrentReport{Labels: labels, Values: valuesStruct}, nil
 }
 
 func main() {
