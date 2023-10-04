@@ -114,7 +114,7 @@ func getCurrentReport() (CurrentReport, error) {
     currentDate := time.Now()
     values = append(values, currentDate.Format("Mon, Jan 2 15:04"))
     // put values into type valuesStruct and return
-    fmt.Println(values[10])
+    //fmt.Println(values[10])
 
     var valuesStruct ValuesStruct
     valuesStruct.WvHT, _ = strconv.ParseFloat(values[0], 64)
@@ -128,7 +128,7 @@ func getCurrentReport() (CurrentReport, error) {
     valuesStruct.APD, _ = strconv.ParseFloat(values[8], 64)
     valuesStruct.MWD, _ = strconv.ParseFloat(values[9], 64)
     valuesStruct.Date = values[10]
-    valuesStruct.UpdateDate = t.Format("Oct 2 14:35")
+    valuesStruct.UpdateDate = t.Format("Mon, Jan 2 15:04")
 
     return CurrentReport{Labels: labels, Values: valuesStruct}, nil
 }

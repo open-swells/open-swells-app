@@ -55,6 +55,7 @@
             padding: 20px;
             background-color: #f0f0f0;
             border: 1px solid #ccc;
+            flex-wrap: wrap;
         }
 
         .report-table { 
@@ -84,7 +85,7 @@
     <h1>El Porto Buoy Report {{.CurrentReport.Values.Date}}</h1>
     <p>El Porto, Manhattan Beach is known for its consistent waves and is a popular surfing spot in Southern California.</p>
     <h2>Current Report</h2>
-    <h3>Buoy 46221 last reading at {{.CurrentReport.Values.UpdateDate}}</h3>
+    <h3>Buoy 46221 - last reading at {{.CurrentReport.Values.UpdateDate}} UTC</h3>
     <div class="report-container">
     <div class="current-report">
     <table class = "report-table">
@@ -101,16 +102,16 @@
             <th class = "report-table-item">Dominant Wave Direction</th>
         </tr>
         <tr>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WvHT}}</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.SwH}}</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.SwP}}</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WWH}}</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WWP}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WvHT}}m</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.SwH}}m</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.SwP}}s</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WWH}}m</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WWP}}s</td>
             <td class = "report-table-item">{{.CurrentReport.Values.SwD}}</td>
             <td class = "report-table-item">{{.CurrentReport.Values.WWD}}</td>
             <td class = "report-table-item">{{.CurrentReport.Values.STEEPNESS}}</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.APD}}</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.MWD}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.APD}}s</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.MWD}}º</td>
         </tr>
     </table>
 </div>
