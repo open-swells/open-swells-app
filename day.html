@@ -57,6 +57,18 @@
             border: 1px solid #ccc;
         }
 
+        .report-table { 
+            border-collapse: collapse;
+            width: 100%;
+            text-align: center;
+            margin: 0 auto
+        }
+
+        .report-table-item { 
+            border: 1px solid #000;
+            padding: 8px;
+        }
+
         /* Desktop styles */
         @media (min-width: 768px) {
             .predictions-container {
@@ -75,30 +87,30 @@
     <h3>Buoy 46221 last reading at {{.CurrentReport.Values.UpdateDate}}</h3>
     <div class="report-container">
     <div class="current-report">
-    <table>
+    <table class = "report-table">
         <tr>
-            <th>WvHT</th>
-            <th>SwH</th>
-            <th>SwP</th>
-            <th>WWH</th>
-            <th>WWP</th>
-            <th>SwD</th>
-            <th>WWD</th>
-            <th>STEEPNESS</th>
-            <th>APD</th>
-            <th>MWD</th>
+            <th class = "report-table-item">Wave Height</th>
+            <th class = "report-table-item">Swell Height</th>
+            <th class = "report-table-item">Swell Period</th>
+            <th class = "report-table-item">Wind Wave Height</th>
+            <th class = "report-table-item">Wind Wave Period</th>
+            <th class = "report-table-item">Swell Direction</th>
+            <th class = "report-table-item">Wind Wave Direction</th>
+            <th class = "report-table-item">Steepness</th>
+            <th class = "report-table-item">Avaerage Period</th>
+            <th class = "report-table-item">Dominant Wave Direction</th>
         </tr>
         <tr>
-            <td>{{printf "%.2f" .CurrentReport.Values.WvHT}}</td>
-            <td>{{printf "%.2f" .CurrentReport.Values.SwH}}</td>
-            <td>{{printf "%.2f" .CurrentReport.Values.SwP}}</td>
-            <td>{{printf "%.2f" .CurrentReport.Values.WWH}}</td>
-            <td>{{printf "%.2f" .CurrentReport.Values.WWP}}</td>
-            <td>{{.CurrentReport.Values.SwD}}</td>
-            <td>{{.CurrentReport.Values.WWD}}</td>
-            <td>{{.CurrentReport.Values.STEEPNESS}}</td>
-            <td>{{printf "%.2f" .CurrentReport.Values.APD}}</td>
-            <td>{{printf "%.2f" .CurrentReport.Values.MWD}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WvHT}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.SwH}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.SwP}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WWH}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WWP}}</td>
+            <td class = "report-table-item">{{.CurrentReport.Values.SwD}}</td>
+            <td class = "report-table-item">{{.CurrentReport.Values.WWD}}</td>
+            <td class = "report-table-item">{{.CurrentReport.Values.STEEPNESS}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.APD}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.MWD}}</td>
         </tr>
     </table>
 </div>
