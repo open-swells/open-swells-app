@@ -5,13 +5,23 @@
     <title>El Porto Buoy Forecast</title>
     <style>
         /* Common styles for both desktop and mobile */
-        h1 {
+        .description { 
+            text-align: center;
+            font-size: 1.1em;
+            padding: 10px;
+            padding-left: 10%;
+            padding-right: 10%;
+        }
+
+        h1 
+        {
             text-align: center;
         }
 
         p
         { 
             text-align: center;
+            font-size: 1.1em;
         }
 
         body { 
@@ -34,7 +44,7 @@
 
         .prediction-item {
             flex: 0 0 calc(100% - 20px);
-            margin: 10px;
+            margin: 11px;
             padding-left: 10px;
             padding-right: 10px;
             box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
@@ -62,7 +72,11 @@
             border-collapse: collapse;
             width: 100%;
             text-align: center;
-            margin: 0 auto
+            margin: 0 auto;
+            padding: 10px;
+            font-size: 1.1em;
+            
+
         }
 
         .report-table-item { 
@@ -82,10 +96,10 @@
     </style>
 </head>
 <body>
-    <h1>El Porto Buoy Report {{.CurrentReport.Values.Date}}</h1>
+    <h1>El Porto Buoy Report {{.CurrentReport.Date}}</h1>
     <p>El Porto, Manhattan Beach is known for its consistent waves and is a popular surfing spot in Southern California.</p>
     <h2>Current Report</h2>
-    <h3>Buoy 46221 - last reading at {{.CurrentReport.Values.UpdateDate}} UTC</h3>
+    <h3>Buoy 46221 - last reading at {{.CurrentReport.UpdateDate}} UTC</h3>
     <div class="report-container">
     <div class="current-report">
     <table class = "report-table">
@@ -95,40 +109,57 @@
             <th class = "report-table-item">Swell Period</th>
             <th class = "report-table-item">Wind Wave Height</th>
             <th class = "report-table-item">Wind Wave Period</th>
+
+        </tr>
+        <tr>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.WvHT}}m</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.SwH}}m</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.SwP}}s</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.WWH}}m</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.WWP}}s</td>
+        </tr>
+        <tr>
             <th class = "report-table-item">Swell Direction</th>
             <th class = "report-table-item">Wind Wave Direction</th>
             <th class = "report-table-item">Steepness</th>
-            <th class = "report-table-item">Avaerage Period</th>
+            <th class = "report-table-item">Average Period</th>
             <th class = "report-table-item">Dominant Wave Direction</th>
         </tr>
         <tr>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WvHT}}m</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.SwH}}m</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.SwP}}s</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WWH}}m</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.WWP}}s</td>
-            <td class = "report-table-item">{{.CurrentReport.Values.SwD}}</td>
-            <td class = "report-table-item">{{.CurrentReport.Values.WWD}}</td>
-            <td class = "report-table-item">{{.CurrentReport.Values.STEEPNESS}}</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.APD}}s</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.Values.MWD}}º</td>
+            <td class = "report-table-item">{{.CurrentReport.SwD}}</td>
+            <td class = "report-table-item">{{.CurrentReport.WWD}}</td>
+            <td class = "report-table-item">{{.CurrentReport.STEEPNESS}}</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.APD}}s</td>
+            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.MWD}}º</td>
         </tr>
     </table>
+    <a href = "https://www.ndbc.noaa.gov/faq/measdes.shtml" target = "_blank">data key</a>
 </div>
 </div>
-<h3> Weather </h3>
 
 <h2>3 Day Forecast</h2>
     <div class="predictions-container">
         {{range .Predictions}}
          <div class="prediction-item">
-            <h2>{{.Title}}</h2>
-            <p>{{printf "%.2fm" .WaveHeight}} at {{printf "%.2fsec" .Period}}</p>
-            <p>Direction: {{printf "%.2fº" .DirectionDegrees}}  {{.DirectionLabel}}</p>
+            <h3>{{.Title}}</h3>
+            <p><b>{{printf "%.2fm" .WaveHeight}}</b> at <b>{{printf "%.2fsec" .Period}}</b></p>
+            <p>Direction: <b>{{printf "%.2fº" .DirectionDegrees}}  {{.DirectionLabel}}</b></p>
         </div>
         {{end}}
     </div>
-
+    <div class = "description">
+        <p>
+        This forecast was found using a neural network trained on public buoy data since September 2023. Data collection is ongoing; accuracy will improve as training continues.
+        Current prediction accuracy for north swells is poor due to lack of training on winter data. 
+        Built with 
+        <a href = "https://pytorch.org/"> PyTorch </a>,  
+        <a href = "https://go.dev/"> golang </a>, 
+        <a href = "https://www.ndbc.noaa.gov/"> NOAA </a> data, 
+        <a href = "https://github.com/gin-gonic/gin"> gin </a>,
+        and <a href = "https://www.sqlite.org/index.html"> sqlite3 </a>
+        </p>
+        <p> <a href = "https://github.com/evancoons22/nbdc-buoydata" target = "_blank" > Github </a> </p>
+    </div>
 </body>
 </html>
 

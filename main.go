@@ -50,6 +50,16 @@ type CurrentReport struct {
     //Values []string
 }
 
+type CurrentWeather struct { 
+    Temperature string
+    WindSpeed string
+    WindDirection string
+    WindGust string
+    Pressure string
+    TodaysHigh string
+    TodaysLow string
+}
+
 func degreesToCompassLabel(degrees float64) string {
     // Define the 16-wind compass directions
     compassLabels := []string{"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}
@@ -63,16 +73,17 @@ func degreesToCompassLabel(degrees float64) string {
     return compassLabels[index]
 }
 
-func getCurrentReport() (CurrentReport, error) {
+
+func getCurrentReport() (ValuesStruct, error) {
     // Make an HTTP GET request to fetch data from the provided link
     resp, err := http.Get("https://www.ndbc.noaa.gov/data/realtime2/46221.spec")
     if err != nil {
-        return CurrentReport{}, err
+        return ValuesStruct{}, err
     }
     defer resp.Body.Close()
 
     // Initialize variables to store labels and values
-    var labels []string
+    //var labels []string
     var values []string
 
     // Read the response line by line
@@ -83,7 +94,8 @@ func getCurrentReport() (CurrentReport, error) {
 
         // Split the first row by spaces to store labels
         if rowCounter == 0 {
-            labels = strings.Fields(line)
+            //labels = strings.Fields(line)
+            //skip the first row
         } else if rowCounter == 1 {
             // Skip the second row
         } else if rowCounter == 2 {
@@ -96,7 +108,7 @@ func getCurrentReport() (CurrentReport, error) {
     }
 
     if err := scanner.Err(); err != nil {
-        return CurrentReport{}, err
+        return ValuesStruct{}, err
     }
     //remove first 5 values of labels and first 4 values of values and replace with current date 
 
@@ -107,10 +119,10 @@ func getCurrentReport() (CurrentReport, error) {
     fmt.Println(t)
 
     
-    labels = append(labels[:0], labels[5:]...)
+    //labels = append(labels[:0], labels[5:]...)
     values = append(values[:0], values[5:]...)
     // add a field "Date" in labels, and add current date in values
-    labels = append(labels, "Date")
+    //labels = append(labels, "Date")
     currentDate := time.Now()
     values = append(values, currentDate.Format("Mon, Jan 2 15:04"))
     // put values into type valuesStruct and return
@@ -130,8 +142,10 @@ func getCurrentReport() (CurrentReport, error) {
     valuesStruct.Date = values[10]
     valuesStruct.UpdateDate = t.Format("Mon, Jan 2 15:04")
 
-    return CurrentReport{Labels: labels, Values: valuesStruct}, nil
+    //return CurrentReport{Labels: labels, Values: valuesStruct}, nil
+    return valuesStruct, nil
 }
+
 
 func main() {
 	// Initialize the SQLite3 database connection
