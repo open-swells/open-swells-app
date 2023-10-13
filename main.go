@@ -154,6 +154,7 @@ func main() {
 
     // var dbUrl = "../nbdc-buoydata/db.db"
     API_KEY := os.Getenv("API_KEY")
+    API_URL := os.Getenv("API_URL")
 
     if API_KEY == "" {
         fmt.Println("API_KEY environment variable not set.")
@@ -161,7 +162,7 @@ func main() {
     }
 
     // var dbUrl = "libsql://database-evancoons22.turso.io?authToken=${envVarValue}"
-    var dbUrl = fmt.Sprintf("https://database-evancoons22.turso.io?authToken=%s", API_KEY)
+    var dbUrl = fmt.Sprintf(API_URL, API_KEY)
 
 	//db, err := sql.Open("sqlite3", dbUrl)
 	db, err := sql.Open("libsql", dbUrl)
