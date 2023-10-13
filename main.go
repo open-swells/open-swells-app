@@ -3,6 +3,7 @@ package main
 
 import (
     //"regexp"
+    "os"
     "strconv"
     "strings"
     "bufio"
@@ -18,6 +19,7 @@ import (
     // "github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
     _ "github.com/mattn/go-sqlite3"
+    _ "github.com/libsql/libsql-client-go/libsql"
     "math"
 )
 
@@ -149,7 +151,20 @@ func getCurrentReport() (ValuesStruct, error) {
 
 func main() {
 	// Initialize the SQLite3 database connection
-	db, err := sql.Open("sqlite3", "../nbdc-buoydata/db.db")
+
+    // var dbUrl = "../nbdc-buoydata/db.db"
+    API_KEY := os.Getenv("API_KEY")
+
+    if API_KEY == "" {
+        fmt.Println("API_KEY environment variable not set.")
+        return
+    }
+
+    // var dbUrl = "libsql://database-evancoons22.turso.io?authToken=${envVarValue}"
+    var dbUrl = fmt.Sprintf("https://database-evancoons22.turso.io?authToken=%s", API_KEY)
+
+	//db, err := sql.Open("sqlite3", dbUrl)
+	db, err := sql.Open("libsql", dbUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
