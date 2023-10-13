@@ -171,6 +171,7 @@ func main() {
 	}
 	defer db.Close()
 
+    gin.SetMode(gin.ReleaseMode)
 	// Initialize the Gin web framework
 	router := gin.Default()
 
@@ -243,7 +244,8 @@ func main() {
 		c.String(http.StatusOK, htmlBuffer.String())
 	})
 
-	// Start the web server
-    router.Run("127.0.0.1:8080")
-	//router.Run(":8080")
+    // Start the web server
+    // router.Run("127.0.0.1:8080")
+    //router.Run(":8080")
+    router.Run()
 }
