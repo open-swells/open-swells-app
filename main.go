@@ -163,6 +163,7 @@ func main() {
 
     // var dbUrl = "libsql://database-evancoons22.turso.io?authToken=${envVarValue}"
     var dbUrl = fmt.Sprintf(API_URL, API_KEY)
+    println(dbUrl)
 
 	//db, err := sql.Open("sqlite3", dbUrl)
 	db, err := sql.Open("libsql", dbUrl)
@@ -246,6 +247,6 @@ func main() {
 
     // Start the web server
     // router.Run("127.0.0.1:8080")
-    //router.Run(":8080")
-    router.Run()
+    router.Run(":8080")
+    //router.Run()
 }
