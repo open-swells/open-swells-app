@@ -1,10 +1,8 @@
 package main
 
 import (
-    //"regexp"
     "os"
     "strconv"
-    //"encoding/json"
     "strings"
     "bufio"
     "time"
@@ -14,9 +12,6 @@ import (
 	"log"
 	"net/http"
     "bytes"
-//	"path/filepath"
-
-    // "github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
     _ "github.com/mattn/go-sqlite3"
     _ "github.com/libsql/libsql-client-go/libsql"
