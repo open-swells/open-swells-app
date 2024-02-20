@@ -209,7 +209,8 @@ func main() {
     }
 
     // var dbUrl = "libsql://database-evancoons22.turso.io?authToken=${envVarValue}"
-    var dbUrl = fmt.Sprintf("%s?authToken=%s", API_URL, API_KEY)
+    //var dbUrl = fmt.Sprintf("%s?authToken=%s", API_URL, API_KEY)
+    var dbUrl = fmt.Sprintf(API_URL, API_KEY)
     println(dbUrl)
 
 	//db, err := sql.Open("sqlite3", dbUrl)

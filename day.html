@@ -120,7 +120,8 @@
 
 
     <h1>Surffffff Forecast</h1>
-    <h3> {{.CurrentReport.Date}}</h3>
+    <!-- I want this to be todays date, not from template --> 
+    <h3 class="datetime"> default</h3>
 
     <div id="map"></div>
 
@@ -131,33 +132,16 @@
         // the link is https://www.ndbc.noaa.gov/data/stations/station_table.txt
         //where do i put async?
 
-        var wvht = {{.CurrentReport.WvHT}};
-        var swht = {{.CurrentReport.SwH}};
-        var swp = {{.CurrentReport.SwP}};
-        var wwh = {{.CurrentReport.WWH}};
-        var wwp = {{.CurrentReport.WWP}};
-        var swd = {{.CurrentReport.SwD}};
-        var wwd = {{.CurrentReport.WWD}};
-        var steepness = {{.CurrentReport.STEEPNESS}};
-        var apd = {{.CurrentReport.APD}};
-        var mwd = {{.CurrentReport.MWD}};
-
         // check if localmapdata was sent by the go server
-        var map = L.map('map').setView([33.86, 238.4171], 5);
-        var lat = 33.86;
-        var lon = 238.4171;
+
+        var map = L.map('map').setView([33.800832, -121.157227], 5);
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        L.marker([33.86, 238.4171]).addTo(map)
-            .bindPopup('A pretty CSS popup.<br> Easily customizable.')
-            .openPopup();
-
-
-        // json parse this local map data
-        let localMapData = {{.LocalMapData}};
+        // IMPORTAANT: this is the data from the server
+        //let localMapData = {{.LocalMapData}};
 
         popup = L.popup();
         
@@ -169,14 +153,10 @@
         }
 
         map.on('click', onMapClick);
-        // console log the .LocalMapData here to see what it
 
         async function getBuoys() {
-           // url = 'https://www.ndbc.noaa.gov/data/stations/station_table.txt';
-           // const response = await fetch(url);
-           // const data = await response.text();
-           // console.log(data);
-            //const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+            // this function will get all the buoys. This is too many, so we will only get the ones we want
+            // which is a list at the bottom of this page
             const proxyUrl = 'https://corsproxy.io/?';
             const targetUrl = 'https://www.ndbc.noaa.gov/data/stations/station_table.txt';
             const url = proxyUrl + targetUrl;
@@ -227,62 +207,53 @@
 
         }
 
-        async function getBuoyReport(stationId) {
-            // Fetch the buoy report based on stationId, then update the variables
-            // This is a placeholder for the fetch operation
-            //const response = await fetch(`/buoyreport?stationId=${stationId}`);
-
-            const proxyUrl = 'https://corsproxy.io/?';
-            const targetUrl = 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.spec';
-            const url = proxyUrl + targetUrl;
-
+        async function getBuoyReport(stationId, name) {
+            const url =  'https://corsproxy.io/?' + 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.spec';
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest'
                 }
             });
-            //const response = await fetch("https://www.ndbc.noaa.gov/data/realtime2/" + stationId + ".spec");
-            const data = await response.text();
-            const data2 = data.split('\n')[2];
-            const line = data2.split(' ');
-            console.log(line);
-           // var wvht = report.WvHT;
-           // var swht = report.SwH;
-           // var swp = report.SwP;
-           // var wwh = report.WWH;
-           // var wwp = report.WWP;
-           // var swd = report.SwD;
-           // var wwd = report.WWD;
-           // var steepness = report.STEEPNESS;
-           // var apd = report.APD;
-           // var mwd = report.MWD;
-            //replace elements in the html
-            document.getElementsByClassName("report-table-item1")[0].innerHTML = line[3];
-            document.getElementsByClassName("report-table-item2")[0].innerHTML = line[4];
-            document.getElementsByClassName("report-table-item3")[0].innerHTML = line[5];
-            document.getElementsByClassName("report-table-item4")[0].innerHTML = line[6];
-            document.getElementsByClassName("report-table-item5")[0].innerHTML = line[7];
 
-            // Update the UI or perform other actions with the fetched report data
-            //console.log(wvht, swht, swp, wwh, wwp, swd, wwd, steepness, apd, mwd);
-            // Note: For simplicity, this example logs the variables to the console.
-            // You would likely update the DOM or state in your actual implementation.
+            // raise an error to user if the fetch fails
+            if (!response.ok) {
+                // I don't want an alert, I want to display the error on the page
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.text()
+            const line = data.split('\n')[2].split(/\s+/);
+
+            // formate date from year, month, day, hour, minute
+            const date = new Date(line[0], line[1] - 1, line[2], line[3], line[4]);
+
+            document.getElementsByClassName("report-title")[0].innerHTML = "Buoy " + stationId + " " + name + " - last reading at " + date.toUTCString() + " UTC"; // date
+
+            document.getElementsByClassName("wvht")[0].innerHTML = line[5] + 'm';
+            document.getElementsByClassName("swh")[0].innerHTML = line[6] + 'm';
+            document.getElementsByClassName("swp")[0].innerHTML = line[7] + 's';
+            document.getElementsByClassName("wwh")[0].innerHTML = line[8] + 'm';
+            document.getElementsByClassName("wwp")[0].innerHTML = line[9] + 's';
+
+            document.getElementsByClassName("swd")[0].innerHTML = line[10];
+            document.getElementsByClassName("wwd")[0].innerHTML = line[11];
+            document.getElementsByClassName("steep")[0].innerHTML = line[12];
+            document.getElementsByClassName("apd")[0].innerHTML = line[13] + 's';
+            document.getElementsByClassName("mwd")[0].innerHTML = line[14] + 'º';
+
         }
 
 
         async function plotBuoys() {
             buoyData.forEach(buoy => {
-                const popupContent = `<div>${buoy.name}<br><button onclick="getBuoyReport('${buoy.stationId}')">Show Report</button></div>`;
+                const popupContent = `<div>${buoy.name}<br><button onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')">Show Report</button></div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
                     .bindPopup(popupContent, {minWidth: 200})
-                    .openPopup();
             });
         }
 
 
         const buoyData = [
-            { stationId: '46221', name: 'El Porto', latitude: 33.86, longitude: -118.4171 },
             { stationId: '46222', name: 'Santa Monica', latitude: 34.01, longitude: -118.5 },
             { stationId: '46223', name: 'Venice', latitude: 33.98, longitude: -118.47 },
             { stationId: '0y2w3', name: 'Sturgeon Bay CG Station, WI', latitude: 44.794, longitude: -87.313},
@@ -369,16 +340,25 @@
             {stationId: '46258', name: 'Mission Bay West, CA (220)', latitude: 32.749, longitude: -117.502},
             {stationId: '46259', name: 'Santa Lucia Escarpment, CA (222)', latitude: 34.767, longitude: -121.498},
             {stationId: '46260', name: 'Lakeside, OR (231)', latitude: 43.586, longitude: -124.29},
+            { stationId: '46221', name: 'El Porto', latitude: 33.86, longitude: -118.4171 },
         ];
 
         plotBuoys();
+
+        // on load, click buoy 46221 and request its data
+        getBuoyReport('46221', 'El Porto');
+
+        //center the map
+        map.setView([33.101608, -119.069824], 6);
+
+        document.getElementsByClassName("datetime")[0].innerHTML = new Date().toUTCString();    
 
 
     </script>
     
 
     <h2>Current Report</h2>
-    <h3>Buoy 46221 - last reading at {{.CurrentReport.UpdateDate}} UTC</h3>
+    <h3 class = "report-title">Null</h3>
     <div class="report-container">
     <div class="current-report">
     <table class = "report-table">
@@ -391,11 +371,12 @@
 
         </tr>
         <tr>
-            <td class = "report-table-item1">{{printf "%.2f" .CurrentReport.WvHT}}m</td>
-            <td class = "report-table-item2">{{printf "%.2f" .CurrentReport.SwH}}m</td>
-            <td class = "report-table-item3">{{printf "%.2f" .CurrentReport.SwP}}s</td>
-            <td class = "report-table-item4">{{printf "%.2f" .CurrentReport.WWH}}m</td>
-            <td class = "report-table-item5">{{printf "%.2f" .CurrentReport.WWP}}s</td>
+
+            <td class = "wvht"></td>
+            <td class = "swh"></td>
+            <td class = "swp"></td>
+            <td class = "wwh"></td>
+            <td class = "wwp"></td>
 
         </tr>
         <tr>
@@ -406,17 +387,18 @@
             <th class = "report-table-item">Dominant Wave Direction</th>
         </tr>
         <tr>
-            <td class = "report-table-item">{{.CurrentReport.SwD}}</td>
-            <td class = "report-table-item">{{.CurrentReport.WWD}}</td>
-            <td class = "report-table-item">{{.CurrentReport.STEEPNESS}}</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.APD}}s</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.MWD}}º</td>
+            <td class = "swd">{{.CurrentReport.SwD}}</td>
+            <td class = "wwd">{{.CurrentReport.WWD}}</td>
+            <td class = "steep">{{.CurrentReport.STEEPNESS}}</td>
+            <td class = "apd">{{printf "%.2f" .CurrentReport.APD}}s</td>
+            <td class = "mwd">{{printf "%.2f" .CurrentReport.MWD}}º</td>
         </tr>
     </table>
     <a href = "https://www.ndbc.noaa.gov/faq/measdes.shtml" target = "_blank">data key</a>
 </div>
 </div>
 
+<!-- 
 <h2>3 Day Forecast</h2>
     <div class="predictions-container">
         {{range .Predictions}}
@@ -442,9 +424,7 @@
         </p>
         <p> <a href = "https://github.com/evancoons22/nbdc-buoydata" target = "_blank" > Github </a> </p>
     </div>
-    <!-- want to show the map data received here -->
-
-<h2>Coordinate Forecast</h2>
+-->
 
 
 </body>
