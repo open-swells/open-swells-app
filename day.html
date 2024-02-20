@@ -94,6 +94,8 @@
             padding: 8px;
         }
 
+        #map { height: 400px; }
+
         /* Desktop styles */
         @media (min-width: 768px) {
             .predictions-container {
@@ -107,13 +109,274 @@
 </head>
 <body>
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+                           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+                           crossorigin=""/>
+    <!-- Make sure you put this AFTER Leaflet's CSS -->
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+
     <h1>Surffffff Forecast</h1>
     <h3> {{.CurrentReport.Date}}</h3>
 
+    <div id="map"></div>
 
-    {{template "map.html" .}}
 
+    <script> 
+        // get all buoys and their coordinates from nbdc buoy data center
+        // the columns are # STATION_ID | OWNER | TTYPE | HULL | NAME | PAYLOAD | LOCATION | TIMEZONE | FORECAST | NOTE
+        // the link is https://www.ndbc.noaa.gov/data/stations/station_table.txt
+        //where do i put async?
+
+        var wvht = {{.CurrentReport.WvHT}};
+        var swht = {{.CurrentReport.SwH}};
+        var swp = {{.CurrentReport.SwP}};
+        var wwh = {{.CurrentReport.WWH}};
+        var wwp = {{.CurrentReport.WWP}};
+        var swd = {{.CurrentReport.SwD}};
+        var wwd = {{.CurrentReport.WWD}};
+        var steepness = {{.CurrentReport.STEEPNESS}};
+        var apd = {{.CurrentReport.APD}};
+        var mwd = {{.CurrentReport.MWD}};
+
+        // check if localmapdata was sent by the go server
+        var map = L.map('map').setView([33.86, 238.4171], 5);
+        var lat = 33.86;
+        var lon = 238.4171;
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        L.marker([33.86, 238.4171]).addTo(map)
+            .bindPopup('A pretty CSS popup.<br> Easily customizable.')
+            .openPopup();
+
+
+        // json parse this local map data
+        let localMapData = {{.LocalMapData}};
+
+        popup = L.popup();
+        
+        function onMapClick(e) {
+            popup
+                .setLatLng(e.latlng)
+                .setContent("Lat, Lon : " + e.latlng.toString())
+                .openOn(map);
+        }
+
+        map.on('click', onMapClick);
+        // console log the .LocalMapData here to see what it
+
+        async function getBuoys() {
+           // url = 'https://www.ndbc.noaa.gov/data/stations/station_table.txt';
+           // const response = await fetch(url);
+           // const data = await response.text();
+           // console.log(data);
+            //const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+            const proxyUrl = 'https://corsproxy.io/?';
+            const targetUrl = 'https://www.ndbc.noaa.gov/data/stations/station_table.txt';
+            const url = proxyUrl + targetUrl;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            const data = await response.text();
+
+            const pattern = /(\d+\.\d+)\s*([NS])\s*(\d+\.\d+)\s*([EW])/;
+            const lines = data.split('\n');
+            const buoys = [];
+
+            lines.forEach(line => {
+                if (line && !line.startsWith('#')) { // Skip comments and empty lines
+                    const parts = line.split('|');
+                    const match = pattern.exec(parts[6]); // Assuming the LOCATION is at index 6
+                    if (match) {
+                        const latitude = parseFloat(match[1]) * (match[2] === 'N' ? 1 : -1);
+                        const longitude = parseFloat(match[3]) * (match[4] === 'E' ? 1 : -1);
+                        const buoy = {
+                            stationId: parts[0],
+                            name: parts[4],
+                            latitude,
+                            longitude
+                        };
+                        buoys.push(buoy);
+                        // L.marker([buoy.latitude, buoy.longitude], {icon: customIcon}).addTo(map)
+                        //     .bindPopup(buoy.name)
+                        //     .openPopup();
+                        // Add a circle marker for a buoy
+                        L.circle([buoy.latitude, buoy.longitude], {
+                            radius: 800, // Radius in meters
+                            fillColor: "#ff7800", // Fill color of the circle
+                            color: "#000", // Border color of the circle
+                            weight: 1, // Border width in pixels
+                            opacity: 1, // Border opacity
+                            fillOpacity: 0.8 // Fill opacity
+                        }).addTo(map).bindPopup(buoy.name).openPopup();
+
+                    }
+                }
+            });
+            console.log(buoys);
+
+        }
+
+        async function getBuoyReport(stationId) {
+            // Fetch the buoy report based on stationId, then update the variables
+            // This is a placeholder for the fetch operation
+            //const response = await fetch(`/buoyreport?stationId=${stationId}`);
+
+            const proxyUrl = 'https://corsproxy.io/?';
+            const targetUrl = 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.spec';
+            const url = proxyUrl + targetUrl;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            //const response = await fetch("https://www.ndbc.noaa.gov/data/realtime2/" + stationId + ".spec");
+            const data = await response.text();
+            const data2 = data.split('\n')[2];
+            const line = data2.split(' ');
+            console.log(line);
+           // var wvht = report.WvHT;
+           // var swht = report.SwH;
+           // var swp = report.SwP;
+           // var wwh = report.WWH;
+           // var wwp = report.WWP;
+           // var swd = report.SwD;
+           // var wwd = report.WWD;
+           // var steepness = report.STEEPNESS;
+           // var apd = report.APD;
+           // var mwd = report.MWD;
+            //replace elements in the html
+            document.getElementsByClassName("report-table-item1")[0].innerHTML = line[3];
+            document.getElementsByClassName("report-table-item2")[0].innerHTML = line[4];
+            document.getElementsByClassName("report-table-item3")[0].innerHTML = line[5];
+            document.getElementsByClassName("report-table-item4")[0].innerHTML = line[6];
+            document.getElementsByClassName("report-table-item5")[0].innerHTML = line[7];
+
+            // Update the UI or perform other actions with the fetched report data
+            //console.log(wvht, swht, swp, wwh, wwp, swd, wwd, steepness, apd, mwd);
+            // Note: For simplicity, this example logs the variables to the console.
+            // You would likely update the DOM or state in your actual implementation.
+        }
+
+
+        async function plotBuoys() {
+            buoyData.forEach(buoy => {
+                const popupContent = `<div>${buoy.name}<br><button onclick="getBuoyReport('${buoy.stationId}')">Show Report</button></div>`;
+                L.marker([buoy.latitude, buoy.longitude]).addTo(map)
+                    .bindPopup(popupContent, {minWidth: 200})
+                    .openPopup();
+            });
+        }
+
+
+        const buoyData = [
+            { stationId: '46221', name: 'El Porto', latitude: 33.86, longitude: -118.4171 },
+            { stationId: '46222', name: 'Santa Monica', latitude: 34.01, longitude: -118.5 },
+            { stationId: '46223', name: 'Venice', latitude: 33.98, longitude: -118.47 },
+            { stationId: '0y2w3', name: 'Sturgeon Bay CG Station, WI', latitude: 44.794, longitude: -87.313},
+            { stationId: '13001', name: 'NE Extension', latitude: 12.0, longitude: -23.0},
+            { stationId: '13002', name: 'NE Extension', latitude: 21.0, longitude: -23.0},
+            { stationId: '13008', name: 'Reggae', latitude: 15.0, longitude: -38.0},
+            { stationId: '13009', name: 'Lambada', latitude: 8.0, longitude: -38.0},
+            {stationId: '13010', name: 'Soul', latitude: 0.0, longitude: 0.0},
+            {stationId: '14040', name: '', latitude: -8.0, longitude: 67.0},
+            {stationId: '14041', name: '', latitude: -8.0, longitude: 55.0},
+            {stationId: '14043', name: '', latitude: -12.0, longitude: 67.0},
+            {stationId: '14047', name: '', latitude: -4.0, longitude: 57.0},
+            {stationId: '14048', name: '', latitude: -8.0, longitude: 65.0},
+            {stationId: '14049', name: '', latitude: -12.0, longitude: 65.0},
+            {stationId: '15001', name: 'Gavotte', latitude: -10.0, longitude: -10.0},
+            {stationId: '15002', name: 'Java', latitude: 0.0, longitude: -10.0},
+            {stationId: '15006', name: 'Valse', latitude: -6.0, longitude: -10.0},
+            {stationId: '15007', name: 'SE Extension', latitude: -6.0, longitude: 8.0},
+            {stationId: '15008', name: '', latitude: -20.0, longitude: -10.0},
+            {stationId: '15009', name: '', latitude: 0.0, longitude: -3.051},
+            {stationId: '1801589', name: 'SD 1073 - 24 NM SSW of San Francisco, CA (Site of 46012)', latitude: 37.356, longitude: -122.881},
+            {stationId: '18ci3', name: 'Michigan City CG Station, IN', latitude: 41.73, longitude: -86.91},
+            {stationId: '18cy3', name: 'Michigan City, IN', latitude: 41.73, longitude: -86.91},
+            {stationId: '20cm4', name: 'St. Joseph CG Station, MI', latitude: 42.09, longitude: -86.49},
+            {stationId: '21178', name: 'South of Shikoku', latitude: 33.12, longitude: 133.62},
+            {stationId: '21346', name: '21346  380km East of Iwate, Japan', latitude: 40.302, longitude: 146.192},
+            {stationId: '21347', name: '21347  320km East of Iwate, Japan', latitude: 39.601, longitude: 145.799},
+            {stationId: '21348', name: '21348   350km East of Miyagi, Japan', latitude: 38.816, longitude: 145.595},
+            {stationId: '21401', name: '250NM Southeast of Iturup Island', latitude: 42.617, longitude: 152.583},
+            {stationId: '21402', name: '286NM East of Simushir Island', latitude: 46.488, longitude: 158.343},
+            {stationId: '21413', name: 'SOUTHEAST TOKYO - 700NM ESE of Tokyo, JP', latitude: 30.514, longitude: 152.123},
+            {stationId: '21414', name: ' AMCHITKA - 170 NM South of Amchitka, AK', latitude: 48.963, longitude: 178.237},
+            {stationId: '21415', name: 'ATTU - 175 NM South of Attu, AK', latitude: 50.153, longitude: 171.897},
+            {stationId: '21416', name: 'KAMCHATKA PENINSULA - 240NM SE of Kamchatka Peninsula, RU ', latitude: 48.12, longitude: 163.43},
+            {stationId: '21417', name: '290NM SE of the Kuril Islands', latitude: 43.192, longitude: 157.142},
+            {stationId: '21418', name: 'NORTHEAST TOKYO - 450 NM NE of Tokyo, JP', latitude: 38.716, longitude: 148.847},
+            {stationId: '21419', name: 'KURIL ISLANDS - 209NM SE of Kuril Is. ', latitude: 44.401, longitude: 155.653},
+            {stationId: '21420', name: 'SOUTHEAST MIYAZAKI - 260NM Southeast of Miyazaki', latitude: 28.91, longitude: 134.999},
+            {stationId: '21595', name: 'Drifter', latitude: 36.7, longitude: -132.167},
+            {stationId: '21597', name: 'Drifter', latitude: 32.8, longitude: 155.2},
+            {stationId: '21598', name: 'Drifter', latitude: 31.3, longitude: 152.7},
+            {stationId: '21600', name: 'Drifter', latitude: 40.7, longitude: 154.5},
+            {stationId: '21636', name: 'Drifter', latitude: 31.5, longitude: 127.4},
+            {stationId: '21637', name: 'Drifter', latitude: 29.3, longitude: 141.25},
+            {stationId: '21640', name: 'Drifter', latitude: 28.3, longitude: 135.5},
+            {stationId: '46220', name: 'El Porto, CA (125)', latitude: 33.897, longitude: -118.446},
+            {stationId: '46221', name: 'Santa Monica Bay, CA (028)', latitude: 33.86, longitude: -118.641},
+            {stationId: '46222', name: 'San Pedro, CA (092)', latitude: 33.618, longitude: -118.317},
+            {stationId: '46223', name: 'Dana Point, CA (096)', latitude: 33.458, longitude: -117.767},
+            {stationId: '46224', name: 'Oceanside Offshore, CA (045)', latitude: 33.178, longitude: -117.472},
+            {stationId: '46225', name: 'Torrey Pines Outer, CA (100)', latitude: 32.933, longitude: -117.391},
+            {stationId: '46226', name: 'Point La Jolla, CA (095)', latitude: 32.848, longitude: -117.353},
+            {stationId: '46227', name: 'Point Loma, CA (091)', latitude: 32.632, longitude: -117.444},
+            {stationId: '46228', name: 'Pitas Point, CA (130)', latitude: 34.317, longitude: -119.417},
+            {stationId: '46229', name: 'UMPQUA OFFSHORE, OR (139)', latitude: 43.772, longitude: -124.549},
+            {stationId: '46230', name: 'Huntington Beach Nearshore, CA (172)', latitude: 33.623, longitude: -118.012},
+            {stationId: '46231', name: 'Mission Bay, CA (093)', latitude: 32.747, longitude: -117.37},
+            {stationId: '46232', name: 'Point Loma South, CA  (191)', latitude: 32.517, longitude: -117.425},
+            {stationId: '46233', name: 'SCCOOS San Diego Mooring', latitude: 32.936, longitude: -117.32},
+            {stationId: '46234', name: 'Port Hueneme Nearshore, CA (141)', latitude: 34.1, longitude: -119.168},
+            {stationId: '46235', name: 'Imperial Beach Nearshore, CA (155)', latitude: 32.57, longitude: -117.169},
+            {stationId: '46236', name: 'Monterey Canyon Outer, CA  (156)', latitude: 36.76, longitude: -121.949},
+            {stationId: '46237', name: 'San Francisco Bar, CA  (142)', latitude: 37.788, longitude: -122.634},
+            {stationId: '46238', name: 'Santa Cruz Basin, CA (167)', latitude: 33.76, longitude: -119.55},
+            {stationId: '46239', name: 'Point Sur, CA (157)', latitude: 36.335, longitude: -122.104},
+            {stationId: '46240', name: 'Cabrillo Point, Monterey Bay, CA  (158)', latitude: 36.626, longitude: -121.907},
+            {stationId: '46241', name: 'San Elijo Nearshore, CA (161)', latitude: 33.003, longitude: -117.292},
+            {stationId: '46242', name: 'Camp Pendleton Nearshore, CA  (043)', latitude: 33.22, longitude: -117.439},
+            {stationId: '46243', name: 'Clatsop Spit, OR (162)', latitude: 46.216, longitude: -124.128},
+            {stationId: '46244', name: 'Humboldt Bay, North Spit, CA (168)', latitude: 40.896, longitude: -124.357},
+            {stationId: '46245', name: 'Ventura Nearshore, CA - 169', latitude: 34.251, longitude: -119.308},
+            {stationId: '46246', name: 'Ocean Station PAPA  (166)', latitude: 49.899, longitude: -145.247},
+            {stationId: '46247', name: 'San Francisco Offshore, CA  (180)', latitude: 37.753, longitude: -122.833},
+            {stationId: '46248', name: 'Astoria Canyon, OR  (179)', latitude: 46.133, longitude: -124.64},
+            {stationId: '46249', name: 'Santa Cruz Island South, CA (182)', latitude: 33.821, longitude: -119.708},
+            {stationId: '46250', name: 'Point Mugu Offshore, CA - 184', latitude: 34.034, longitude: -119.09},
+            {stationId: '46251', name: 'Santa Cruz Basin, CA (203)', latitude: 33.769, longitude: -119.565},
+            {stationId: '46252', name: 'Anacapa Passage South, CA (212)', latitude: 33.953, longitude: -119.257},
+            {stationId: '46253', name: 'San Pedro South, CA (213)', latitude: 33.576, longitude: -118.181},
+            {stationId: '46254', name: 'SCRIPPS Nearshore, CA (201)', latitude: 32.868, longitude: -117.267},
+            {stationId: '46255', name: 'Begg Rock, CA  (138)', latitude: 33.4, longitude: -119.651},
+            {stationId: '46256', name: 'Long Beach Channel, CA (215)', latitude: 33.7, longitude: -118.201},
+            {stationId: '46257', name: 'Harvest Southeast, CA (216)', latitude: 34.439, longitude: -120.766},
+            {stationId: '46258', name: 'Mission Bay West, CA (220)', latitude: 32.749, longitude: -117.502},
+            {stationId: '46259', name: 'Santa Lucia Escarpment, CA (222)', latitude: 34.767, longitude: -121.498},
+            {stationId: '46260', name: 'Lakeside, OR (231)', latitude: 43.586, longitude: -124.29},
+        ];
+
+        plotBuoys();
+
+
+    </script>
     
+
     <h2>Current Report</h2>
     <h3>Buoy 46221 - last reading at {{.CurrentReport.UpdateDate}} UTC</h3>
     <div class="report-container">
@@ -128,11 +391,12 @@
 
         </tr>
         <tr>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.WvHT}}m</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.SwH}}m</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.SwP}}s</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.WWH}}m</td>
-            <td class = "report-table-item">{{printf "%.2f" .CurrentReport.WWP}}s</td>
+            <td class = "report-table-item1">{{printf "%.2f" .CurrentReport.WvHT}}m</td>
+            <td class = "report-table-item2">{{printf "%.2f" .CurrentReport.SwH}}m</td>
+            <td class = "report-table-item3">{{printf "%.2f" .CurrentReport.SwP}}s</td>
+            <td class = "report-table-item4">{{printf "%.2f" .CurrentReport.WWH}}m</td>
+            <td class = "report-table-item5">{{printf "%.2f" .CurrentReport.WWP}}s</td>
+
         </tr>
         <tr>
             <th class = "report-table-item">Swell Direction</th>
@@ -179,7 +443,9 @@
         <p> <a href = "https://github.com/evancoons22/nbdc-buoydata" target = "_blank" > Github </a> </p>
     </div>
     <!-- want to show the map data received here -->
+
+<h2>Coordinate Forecast</h2>
+
+
 </body>
 </html>
-
-

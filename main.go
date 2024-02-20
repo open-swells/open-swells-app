@@ -126,9 +126,9 @@ func getCurrentReport() (ValuesStruct, error) {
 
     //create variable lastupdate from the first 4 values of values. 
     lastupdate := values[2] + " " + values[1] + " " + values[3] + ":" + values[4] + " " + values[0]
-    fmt.Println(lastupdate)
+    //fmt.Println(lastupdate)
     t, err := time.Parse("02 01 15:04 2006", lastupdate)
-    fmt.Println(t)
+    //fmt.Println(t)
 
     
     //labels = append(labels[:0], labels[5:]...)
@@ -250,7 +250,7 @@ func main() {
                 return
             }
             prediction.DirectionLabel = degreesToCompassLabel(prediction.DirectionDegrees)
-            fmt.Println(prediction, "\n")
+            //fmt.Println(prediction, "\n")
 
             //fmt.Println(prediction.Title)
             predictions = append(predictions, prediction)
@@ -258,7 +258,7 @@ func main() {
 
         // get the current report
         currentReport, err := getCurrentReport()
-        fmt.Println(currentReport)
+        //fmt.Println(currentReport)
         if err != nil {
             log.Println(err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
@@ -267,7 +267,6 @@ func main() {
 
 
         // get the database from a local databse stored in libsql/local.db
-        println("querying local database")
         localMapData, err := queryLocalMapData()
         if err != nil {
             log.Println(err)
@@ -289,9 +288,6 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 			return
 		}
-
-        fmt.Println("predictions", predictions)
-        fmt.Println("map data", localMapData[0:5])
 
         // data to send to template
         data := map[string]interface{}{

@@ -35,13 +35,6 @@
     let localMapData = {{.LocalMapData}};
 
     popup = L.popup();
-
-    var circle = L.circle([lat, lon], {
-        color: 'red',
-        fillColor: '#f03',
-        fillOpacity: 0.5,
-        radius: 500
-    }).addTo(map);
     
     function onMapClick(e) {
         popup
