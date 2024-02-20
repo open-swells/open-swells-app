@@ -24,6 +24,7 @@ require (
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
+	github.com/libsql/go-libsql v0.0.0-20240219083324-cbcdf96c10a5 // indirect
 	github.com/libsql/libsql-client-go v0.0.0-20231009080222-ee74a605841b // indirect
 	github.com/libsql/sqlite-antlr4-parser v0.0.0-20230802215326-5cb5bb604475 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect

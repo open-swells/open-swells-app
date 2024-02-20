@@ -4,6 +4,7 @@ import (
     //"regexp"
     "os"
     "strconv"
+    //"encoding/json"
     "strings"
     "bufio"
     "time"
@@ -49,6 +50,16 @@ type CurrentReport struct {
     Labels []string
     Values ValuesStruct
     //Values []string
+}
+
+type MapData struct {
+    Datetime string
+    Latitude float64
+    Longitude float64
+    Waveheight float64
+    Period float64
+    Direction float64
+    Datapointsaverage int
 }
 
 type CurrentWeather struct { 
@@ -148,6 +159,43 @@ func getCurrentReport() (ValuesStruct, error) {
 }
 
 
+func queryLocalMapData() ([]MapData, error)  {
+    // Open the SQLite database
+    db, err := sql.Open("sqlite3", "libsql/local.db")
+    defer db.Close()
+
+    rows, err := db.Query("SELECT * FROM wave_predictions")
+
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "failed to execute query: %v\n", err)
+        os.Exit(1)
+    }
+
+    defer rows.Close()
+
+    var mapdata []MapData
+
+    for rows.Next() {
+        var point MapData
+
+        err := rows.Scan(&point.Datetime, &point.Latitude, &point.Longitude, &point.Waveheight, &point.Period, &point.Direction, &point.Datapointsaverage)
+
+        if err != nil {
+            fmt.Println("Error scanning row:", err)
+            return nil, err
+        }
+        //fmt.Println(point, "\n")
+
+        mapdata = append(mapdata, point)
+    }
+
+    if err := rows.Err(); err != nil {
+        fmt.Println("Error during rows iteration:", err)
+    }
+    return mapdata, nil
+}
+
+
 func main() {
 	// Initialize the SQLite3 database connection
 
@@ -161,7 +209,7 @@ func main() {
     }
 
     // var dbUrl = "libsql://database-evancoons22.turso.io?authToken=${envVarValue}"
-    var dbUrl = fmt.Sprintf(API_URL, API_KEY)
+    var dbUrl = fmt.Sprintf("%s?authToken=%s", API_URL, API_KEY)
     println(dbUrl)
 
 	//db, err := sql.Open("sqlite3", dbUrl)
@@ -202,6 +250,7 @@ func main() {
                 return
             }
             prediction.DirectionLabel = degreesToCompassLabel(prediction.DirectionDegrees)
+            fmt.Println(prediction, "\n")
 
             //fmt.Println(prediction.Title)
             predictions = append(predictions, prediction)
@@ -216,18 +265,40 @@ func main() {
             return
         }
 
+
+        // get the database from a local databse stored in libsql/local.db
+        println("querying local database")
+        localMapData, err := queryLocalMapData()
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+            return
+        }
+
+        //jsonData, err := json.Marshal(localMapData)
+
 		// Parse the HTML template
-		tmpl, err := template.ParseFiles("day.html")
+		// tmpl, err := template.ParseFiles("day.html")
+        tmpl, err := template.ParseFiles("day.html", "map.html")
+
+        //turn the localMapData into a string, then send it that way
+
+
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 			return
 		}
 
+        fmt.Println("predictions", predictions)
+        fmt.Println("map data", localMapData[0:5])
+
         // data to send to template
         data := map[string]interface{}{
             "Predictions":  predictions,
+            "LocalMapData": localMapData,
             "CurrentReport": currentReport,
+            // "LocalMapData": template.JS(jsonData),
         }
 
 		// Execute the template with the prediction data

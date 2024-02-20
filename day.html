@@ -13,7 +13,7 @@
             padding-right: 10%;
         }
 
-        h1 
+        h1,  h3
         {
             text-align: center;
         }
@@ -80,6 +80,15 @@
 
         }
 
+        /* center the map*/
+        #map { 
+            height: 400px; width: 600px; 
+            margin: 0 auto;
+            padding: 10px;
+            align-items: center;
+            
+        }
+
         .report-table-item { 
             border: 1px solid #000;
             padding: 8px;
@@ -97,8 +106,14 @@
     </style>
 </head>
 <body>
-    <h1>El Porto Buoy Report {{.CurrentReport.Date}}</h1>
-    <p>El Porto, Manhattan Beach is known for its consistent waves and is a popular surfing spot in Southern California.</p>
+
+    <h1>Surffffff Forecast</h1>
+    <h3> {{.CurrentReport.Date}}</h3>
+
+
+    {{template "map.html" .}}
+
+    
     <h2>Current Report</h2>
     <h3>Buoy 46221 - last reading at {{.CurrentReport.UpdateDate}} UTC</h3>
     <div class="report-container">
@@ -163,6 +178,7 @@
         </p>
         <p> <a href = "https://github.com/evancoons22/nbdc-buoydata" target = "_blank" > Github </a> </p>
     </div>
+    <!-- want to show the map data received here -->
 </body>
 </html>
 

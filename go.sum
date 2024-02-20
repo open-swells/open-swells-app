@@ -53,6 +53,8 @@ github.com/klauspost/cpuid/v2 v2.2.4/go.mod h1:RVVoqg1df56z8g3pUjL/3lE5UfnlrJX8t
 github.com/leodido/go-urn v1.2.0/go.mod h1:+8+nEpDfqqsY+g338gtMEUOtuK+4dEMhiQEgxpxOKII=
 github.com/leodido/go-urn v1.2.4 h1:XlAE/cm/ms7TE/VMVoduSpNBoyc2dOxHs5MZSwAN63Q=
 github.com/leodido/go-urn v1.2.4/go.mod h1:7ZrI8mTSeBSHl/UaRyKQW1qZeMgak41ANeCNaVckg+4=
+github.com/libsql/go-libsql v0.0.0-20240219083324-cbcdf96c10a5 h1:F5Ey920pCtHv24YbIU26HRBXdR762wFOm+QRwxOcCVs=
+github.com/libsql/go-libsql v0.0.0-20240219083324-cbcdf96c10a5/go.mod h1:XQ+tleHEFQoURJ8LJwmRmmFD9D2eqlv5TpwCFpnN9VM=
 github.com/libsql/libsql-client-go v0.0.0-20231009080222-ee74a605841b h1:/MaHrwaHIAD0k8D+EQ7iu1KYvJil+F/4A+2+hp5JVOM=
 github.com/libsql/libsql-client-go v0.0.0-20231009080222-ee74a605841b/go.mod h1:T+1lRvREkstNW7bmF1PTiDhV6hji0mrlfZkZuk/UPhw=
 github.com/libsql/sqlite-antlr4-parser v0.0.0-20230802215326-5cb5bb604475 h1:6PfEMwfInASh9hkN83aR0j4W/eKaAZt/AURtXAXlas0=
