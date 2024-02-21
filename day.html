@@ -13,7 +13,7 @@
             padding-right: 10%;
         }
 
-        h1,  h3
+        h1 , h3
         {
             text-align: center;
         }
@@ -24,9 +24,13 @@
             font-size: 1.1em;
         }
 
+        .datetime { 
+            font-size: 1.1em;
+        }
+
         body { 
-            padding-left: 10%;
-            padding-right: 10%;
+            padding-left: 15%;
+            padding-right: 15%;
 
         }
             
@@ -105,6 +109,57 @@
                 flex: 0 0 calc(23.33% - 20px);
             }
         }
+
+
+        .container {
+            display: flex;
+            justify-content: space-evenly;
+            padding: 20px;
+        }
+
+        .card {
+            border: 1px solid #000;
+            padding: 20px;
+            width: 200px;
+            box-sizing: border-box;
+        }
+
+        .card h2 {
+            font-size: 1.2em;
+            margin: 0 0 10px;
+        }
+
+        .content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .swellsymbol {
+            font-size: 4em;
+        }
+        .windswellsymbol {
+            font-size: 4em;
+        }
+        .windsymbol {
+            font-size: 4em;
+        }
+
+        .details p {
+            margin: 5px 0;
+            font-size: 1.1em;
+        }
+
+        .headercontainer {
+            /* display horizontally */
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+
     </style>
 </head>
 <body>
@@ -127,13 +182,6 @@
 
 
     <script> 
-        // get all buoys and their coordinates from nbdc buoy data center
-        // the columns are # STATION_ID | OWNER | TTYPE | HULL | NAME | PAYLOAD | LOCATION | TIMEZONE | FORECAST | NOTE
-        // the link is https://www.ndbc.noaa.gov/data/stations/station_table.txt
-        //where do i put async?
-
-        // check if localmapdata was sent by the go server
-
         var map = L.map('map').setView([33.800832, -121.157227], 5);
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -154,58 +202,24 @@
 
         map.on('click', onMapClick);
 
-        async function getBuoys() {
-            // this function will get all the buoys. This is too many, so we will only get the ones we want
-            // which is a list at the bottom of this page
-            const proxyUrl = 'https://corsproxy.io/?';
-            const targetUrl = 'https://www.ndbc.noaa.gov/data/stations/station_table.txt';
-            const url = proxyUrl + targetUrl;
-
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-            const data = await response.text();
-
-            const pattern = /(\d+\.\d+)\s*([NS])\s*(\d+\.\d+)\s*([EW])/;
-            const lines = data.split('\n');
-            const buoys = [];
-
-            lines.forEach(line => {
-                if (line && !line.startsWith('#')) { // Skip comments and empty lines
-                    const parts = line.split('|');
-                    const match = pattern.exec(parts[6]); // Assuming the LOCATION is at index 6
-                    if (match) {
-                        const latitude = parseFloat(match[1]) * (match[2] === 'N' ? 1 : -1);
-                        const longitude = parseFloat(match[3]) * (match[4] === 'E' ? 1 : -1);
-                        const buoy = {
-                            stationId: parts[0],
-                            name: parts[4],
-                            latitude,
-                            longitude
-                        };
-                        buoys.push(buoy);
-                        // L.marker([buoy.latitude, buoy.longitude], {icon: customIcon}).addTo(map)
-                        //     .bindPopup(buoy.name)
-                        //     .openPopup();
-                        // Add a circle marker for a buoy
-                        L.circle([buoy.latitude, buoy.longitude], {
-                            radius: 800, // Radius in meters
-                            fillColor: "#ff7800", // Fill color of the circle
-                            color: "#000", // Border color of the circle
-                            weight: 1, // Border width in pixels
-                            opacity: 1, // Border opacity
-                            fillOpacity: 0.8 // Fill opacity
-                        }).addTo(map).bindPopup(buoy.name).openPopup();
-
-                    }
-                }
-            });
-            console.log(buoys);
-
-        }
+        let directionmap = {
+            'N': 0,
+            'NNE': 22.5,
+            'NE': 45,
+            'ENE': 67.5,
+            'E': 90,
+            'ESE': 112.5,
+            'SE': 135,
+            'SSE': 157.5,   
+            'S': 180,
+            'SSW': 202.5,
+            'SW': 225,
+            'WSW': 247.5,
+            'W': 270,
+            'WNW': 292.5,
+            'NW': 315,
+            'NNW': 337.5
+        };
 
         async function getBuoyReport(stationId, name) {
             const url =  'https://corsproxy.io/?' + 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.spec';
@@ -227,19 +241,23 @@
             // formate date from year, month, day, hour, minute
             const date = new Date(line[0], line[1] - 1, line[2], line[3], line[4]);
 
-            document.getElementsByClassName("report-title")[0].innerHTML = "Buoy " + stationId + " " + name + " - last reading at " + date.toUTCString() + " UTC"; // date
+            // #YY  MM DD hh mm WVHT  SwH  SwP  WWH  WWP SwD WWD  STEEPNESS  APD MWD
 
-            document.getElementsByClassName("wvht")[0].innerHTML = line[5] + 'm';
-            document.getElementsByClassName("swh")[0].innerHTML = line[6] + 'm';
-            document.getElementsByClassName("swp")[0].innerHTML = line[7] + 's';
-            document.getElementsByClassName("wwh")[0].innerHTML = line[8] + 'm';
-            document.getElementsByClassName("wwp")[0].innerHTML = line[9] + 's';
+            // how can I translate the time to the users time zone
+            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const localdate = date.toLocaleString('en-US', { timeZone: timezone });    
 
-            document.getElementsByClassName("swd")[0].innerHTML = line[10];
+            document.getElementsByClassName("report-title")[0].innerHTML = "Current Report - Buoy " + stationId + " " + name + " - last reading at " + localdate + " " + timezone;
+
+            document.getElementsByClassName("swhswp")[0].innerHTML = line[6] + 'm' + ' ' + line[7] + 's';
+            document.getElementsByClassName("wwhwwp")[0].innerHTML = line[8] + 'm' + ' ' + line[9] + 's';
+
             document.getElementsByClassName("wwd")[0].innerHTML = line[11];
-            document.getElementsByClassName("steep")[0].innerHTML = line[12];
-            document.getElementsByClassName("apd")[0].innerHTML = line[13] + 's';
-            document.getElementsByClassName("mwd")[0].innerHTML = line[14] + 'º';
+            document.getElementsByClassName("mwdsteep")[0].innerHTML = line[14] + 'º' + ' ' + line[12];
+
+            // for each arrow, we need to change the direction. The first arrow is rotated based on line[14] (degrees) and the second arrow is rotated based on line[11] (direction)
+            document.getElementsByClassName("swellsymbol")[0].style.transform = "rotate(" + line[14] + "deg)";
+            document.getElementsByClassName("windswellsymbol")[0].style.transform = "rotate(" + directionmap[line[11]] + "deg)";
 
         }
 
@@ -255,21 +273,16 @@
 
         const buoyData = [
             { stationId: '46222', name: 'Santa Monica', latitude: 34.01, longitude: -118.5 },
-            { stationId: '46223', name: 'Venice', latitude: 33.98, longitude: -118.47 },
-            { stationId: '0y2w3', name: 'Sturgeon Bay CG Station, WI', latitude: 44.794, longitude: -87.313},
+            //{ stationId: '46223', name: 'Venice', latitude: 33.98, longitude: -118.47 },
+            //{ stationId: '0y2w3', name: 'Sturgeon Bay CG Station, WI', latitude: 44.794, longitude: -87.313},
+
+            {stationId: '41002', name: 'SOUTH HATTERAS - 225 NM South of Cape Hatteras', latitude: '31.759', longitude: '-74.936'},
+            {stationId: '41004', name: 'EDISTO - 41 NM Southeast of Charleston, SC', latitude: '32.502', longitude: '-79.099'},
+
+
+
+
             { stationId: '13001', name: 'NE Extension', latitude: 12.0, longitude: -23.0},
-            { stationId: '13002', name: 'NE Extension', latitude: 21.0, longitude: -23.0},
-            { stationId: '13008', name: 'Reggae', latitude: 15.0, longitude: -38.0},
-            { stationId: '13009', name: 'Lambada', latitude: 8.0, longitude: -38.0},
-            {stationId: '13010', name: 'Soul', latitude: 0.0, longitude: 0.0},
-            {stationId: '14040', name: '', latitude: -8.0, longitude: 67.0},
-            {stationId: '14041', name: '', latitude: -8.0, longitude: 55.0},
-            {stationId: '14043', name: '', latitude: -12.0, longitude: 67.0},
-            {stationId: '14047', name: '', latitude: -4.0, longitude: 57.0},
-            {stationId: '14048', name: '', latitude: -8.0, longitude: 65.0},
-            {stationId: '14049', name: '', latitude: -12.0, longitude: 65.0},
-            {stationId: '15001', name: 'Gavotte', latitude: -10.0, longitude: -10.0},
-            {stationId: '15002', name: 'Java', latitude: 0.0, longitude: -10.0},
             {stationId: '15006', name: 'Valse', latitude: -6.0, longitude: -10.0},
             {stationId: '15007', name: 'SE Extension', latitude: -6.0, longitude: 8.0},
             {stationId: '15008', name: '', latitude: -20.0, longitude: -10.0},
@@ -358,47 +371,83 @@
 
     </script>
     
+    <h3 class = "report-title">Choose buoy to begin</h3>
+    <div class="container">
+        <div class="card">
+            <h2>Primary Swell</h2>
+            <div class="content">
+                <div class="swellsymbol">&#8595;</div>
+                <div class="details">
+                    <p class= "swhswp" >N/A</p>
+                    <p class="mwdsteep">N/A</p>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Secondary Swell</h2>
+            <div class="content">
+                <div class="windswellsymbol">&#8595;</div>
+                <div class="details">
+                    <p class="wwhwwp">1ft 9s</p>
+                    <p class="wwd">W</p>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Wind</h2>
+            <div class="content">
+                <div class="windsymbol">&#8595;</div>
+                <div class="details">
+                    <p>5mph</p>
+                    <p>E</p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <h2>Current Report</h2>
-    <h3 class = "report-title">Null</h3>
-    <div class="report-container">
-    <div class="current-report">
-    <table class = "report-table">
+
+    <!--
+        <h2>Current Report</h2>
+        <h3 class = "report-title">Null</h3>
+        <div class="report-container">
+        <div class="current-report">
+        <table class = "report-table">
         <tr>
-            <th class = "report-table-item">Wave Height</th>
-            <th class = "report-table-item">Swell Height</th>
-            <th class = "report-table-item">Swell Period</th>
-            <th class = "report-table-item">Wind Wave Height</th>
-            <th class = "report-table-item">Wind Wave Period</th>
+        <th class = "report-table-item">Wave Height</th>
+        <th class = "report-table-item">Swell Height</th>
+        <th class = "report-table-item">Swell Period</th>
+        <th class = "report-table-item">Wind Wave Height</th>
+        <th class = "report-table-item">Wind Wave Period</th>
 
         </tr>
         <tr>
 
-            <td class = "wvht"></td>
-            <td class = "swh"></td>
-            <td class = "swp"></td>
-            <td class = "wwh"></td>
-            <td class = "wwp"></td>
+        <td class = "wvht"></td>
+        <td class = "swh"></td>
+        <td class = "swp"></td>
+        <td class = "wwh"></td>
+        <td class = "wwp"></td>
 
         </tr>
         <tr>
-            <th class = "report-table-item">Swell Direction</th>
-            <th class = "report-table-item">Wind Wave Direction</th>
-            <th class = "report-table-item">Steepness</th>
-            <th class = "report-table-item">Average Period</th>
-            <th class = "report-table-item">Dominant Wave Direction</th>
+        <th class = "report-table-item">Swell Direction</th>
+        <th class = "report-table-item">Wind Wave Direction</th>
+        <th class = "report-table-item">Steepness</th>
+        <th class = "report-table-item">Average Period</th>
+        <th class = "report-table-item">Dominant Wave Direction</th>
         </tr>
         <tr>
-            <td class = "swd">{{.CurrentReport.SwD}}</td>
-            <td class = "wwd">{{.CurrentReport.WWD}}</td>
-            <td class = "steep">{{.CurrentReport.STEEPNESS}}</td>
-            <td class = "apd">{{printf "%.2f" .CurrentReport.APD}}s</td>
-            <td class = "mwd">{{printf "%.2f" .CurrentReport.MWD}}º</td>
+        <td class = "swd">{{.CurrentReport.SwD}}</td>
+        <td class = "wwd">{{.CurrentReport.WWD}}</td>
+        <td class = "steep">{{.CurrentReport.STEEPNESS}}</td>
+        <td class = "apd">{{printf "%.2f" .CurrentReport.APD}}s</td>
+        <td class = "mwd">{{printf "%.2f" .CurrentReport.MWD}}º</td>
         </tr>
-    </table>
-    <a href = "https://www.ndbc.noaa.gov/faq/measdes.shtml" target = "_blank">data key</a>
-</div>
-</div>
+        </table>
+        <a href = "https://www.ndbc.noaa.gov/faq/measdes.shtml" target = "_blank">data key</a>
+        </div>
+        </div>
+    -->
 
 <!-- 
 <h2>3 Day Forecast</h2>

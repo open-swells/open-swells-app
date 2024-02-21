@@ -1,11 +1,10 @@
 module projects/gosurf
 
-go 1.21
-
-toolchain go1.21.3
+go 1.21.7
 
 require (
 	github.com/gin-gonic/gin v1.9.1
+	github.com/libsql/libsql-client-go v0.0.0-20231009080222-ee74a605841b
 	github.com/mattn/go-sqlite3 v1.14.17
 )
 
@@ -19,19 +18,15 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.14.0 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
-	github.com/libsql/go-libsql v0.0.0-20240219083324-cbcdf96c10a5 // indirect
-	github.com/libsql/libsql-client-go v0.0.0-20231009080222-ee74a605841b // indirect
 	github.com/libsql/sqlite-antlr4-parser v0.0.0-20230802215326-5cb5bb604475 // indirect
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
-	github.com/tursodatabase/libsql-client-go v0.0.0-20240208053015-5d6aa1e2196d // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	golang.org/x/arch v0.3.0 // indirect
