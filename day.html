@@ -120,7 +120,7 @@
         .card {
             border: 1px solid #000;
             padding: 20px;
-            width: 200px;
+            width: 250px;
             box-sizing: border-box;
         }
 
@@ -132,7 +132,7 @@
         .content {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            justify-content: space-evenly;
         }
 
         .swellsymbol {
@@ -157,6 +157,10 @@
             justify-content: center;
             align-items: center;
             padding: 10px;
+        }
+        .direction {
+            display: flex;
+            flex-direction: column;
         }
 
 
@@ -248,17 +252,44 @@
             const localdate = date.toLocaleString('en-US', { timeZone: timezone });    
 
             document.getElementsByClassName("report-title")[0].innerHTML = "Current Report - Buoy " + stationId + " " + name + " - last reading at " + localdate + " " + timezone;
-
-            document.getElementsByClassName("swhswp")[0].innerHTML = line[6] + 'm' + ' ' + line[7] + 's';
-            document.getElementsByClassName("wwhwwp")[0].innerHTML = line[8] + 'm' + ' ' + line[9] + 's';
-
+            document.getElementsByClassName("swhswp")[0].innerHTML = line[6] + 'm' + ' at ' + line[7] + 's';
+            document.getElementsByClassName("wwhwwp")[0].innerHTML = line[8] + 'm' + ' at ' + line[9] + 's';
             document.getElementsByClassName("wwd")[0].innerHTML = line[11];
-            document.getElementsByClassName("mwdsteep")[0].innerHTML = line[14] + 'º' + ' ' + line[12];
+            document.getElementsByClassName("mwd")[0].innerHTML = line[14] + 'º';
+            document.getElementsByClassName("steep")[0].innerHTML = line[12];
 
             // for each arrow, we need to change the direction. The first arrow is rotated based on line[14] (degrees) and the second arrow is rotated based on line[11] (direction)
             document.getElementsByClassName("swellsymbol")[0].style.transform = "rotate(" + line[14] + "deg)";
             document.getElementsByClassName("windswellsymbol")[0].style.transform = "rotate(" + directionmap[line[11]] + "deg)";
 
+            getWindReport(stationId);
+
+        }
+
+        async function getWindReport(stationId) {
+            const url = 'https://corsproxy.io/?' + 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.txt';
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const data = await response.text();
+            const line = data.split('\n')[2].split(/\s+/);
+
+            document.getElementsByClassName("wdspd")[0].innerHTML = line[6] + 'mph';
+            document.getElementsByClassName("wddir")[0].innerHTML = line[5] + 'º';
+            document.getElementsByClassName("gust")[0].innerHTML = line[7] + 'mph';
+            document.getElementsByClassName("temp")[0].innerHTML = "water temp: " + line[14] + 'ºC';
+            document.getElementsByClassName("airtemp")[0].innerHTML = "air temp: " + line[15] + 'ºC';
+            document.getElementsByClassName("windsymbol")[0].style.transform = "rotate(" + line[5] + "deg)";
+
+            // raise an error to user if the fetch fails
+            if (!response.ok) {
+                // I don't want an alert, I want to display the error on the page
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
         }
 
 
@@ -271,92 +302,188 @@
         }
 
 
+        // these are all the buoys that have "spectral" data
         const buoyData = [
-            { stationId: '46222', name: 'Santa Monica', latitude: 34.01, longitude: -118.5 },
-            //{ stationId: '46223', name: 'Venice', latitude: 33.98, longitude: -118.47 },
-            //{ stationId: '0y2w3', name: 'Sturgeon Bay CG Station, WI', latitude: 44.794, longitude: -87.313},
-
-            {stationId: '41002', name: 'SOUTH HATTERAS - 225 NM South of Cape Hatteras', latitude: '31.759', longitude: '-74.936'},
-            {stationId: '41004', name: 'EDISTO - 41 NM Southeast of Charleston, SC', latitude: '32.502', longitude: '-79.099'},
-
-
-
-
-            { stationId: '13001', name: 'NE Extension', latitude: 12.0, longitude: -23.0},
-            {stationId: '15006', name: 'Valse', latitude: -6.0, longitude: -10.0},
-            {stationId: '15007', name: 'SE Extension', latitude: -6.0, longitude: 8.0},
-            {stationId: '15008', name: '', latitude: -20.0, longitude: -10.0},
-            {stationId: '15009', name: '', latitude: 0.0, longitude: -3.051},
-            {stationId: '1801589', name: 'SD 1073 - 24 NM SSW of San Francisco, CA (Site of 46012)', latitude: 37.356, longitude: -122.881},
-            {stationId: '18ci3', name: 'Michigan City CG Station, IN', latitude: 41.73, longitude: -86.91},
-            {stationId: '18cy3', name: 'Michigan City, IN', latitude: 41.73, longitude: -86.91},
-            {stationId: '20cm4', name: 'St. Joseph CG Station, MI', latitude: 42.09, longitude: -86.49},
-            {stationId: '21178', name: 'South of Shikoku', latitude: 33.12, longitude: 133.62},
-            {stationId: '21346', name: '21346  380km East of Iwate, Japan', latitude: 40.302, longitude: 146.192},
-            {stationId: '21347', name: '21347  320km East of Iwate, Japan', latitude: 39.601, longitude: 145.799},
-            {stationId: '21348', name: '21348   350km East of Miyagi, Japan', latitude: 38.816, longitude: 145.595},
-            {stationId: '21401', name: '250NM Southeast of Iturup Island', latitude: 42.617, longitude: 152.583},
-            {stationId: '21402', name: '286NM East of Simushir Island', latitude: 46.488, longitude: 158.343},
-            {stationId: '21413', name: 'SOUTHEAST TOKYO - 700NM ESE of Tokyo, JP', latitude: 30.514, longitude: 152.123},
-            {stationId: '21414', name: ' AMCHITKA - 170 NM South of Amchitka, AK', latitude: 48.963, longitude: 178.237},
-            {stationId: '21415', name: 'ATTU - 175 NM South of Attu, AK', latitude: 50.153, longitude: 171.897},
-            {stationId: '21416', name: 'KAMCHATKA PENINSULA - 240NM SE of Kamchatka Peninsula, RU ', latitude: 48.12, longitude: 163.43},
-            {stationId: '21417', name: '290NM SE of the Kuril Islands', latitude: 43.192, longitude: 157.142},
-            {stationId: '21418', name: 'NORTHEAST TOKYO - 450 NM NE of Tokyo, JP', latitude: 38.716, longitude: 148.847},
-            {stationId: '21419', name: 'KURIL ISLANDS - 209NM SE of Kuril Is. ', latitude: 44.401, longitude: 155.653},
-            {stationId: '21420', name: 'SOUTHEAST MIYAZAKI - 260NM Southeast of Miyazaki', latitude: 28.91, longitude: 134.999},
-            {stationId: '21595', name: 'Drifter', latitude: 36.7, longitude: -132.167},
-            {stationId: '21597', name: 'Drifter', latitude: 32.8, longitude: 155.2},
-            {stationId: '21598', name: 'Drifter', latitude: 31.3, longitude: 152.7},
-            {stationId: '21600', name: 'Drifter', latitude: 40.7, longitude: 154.5},
-            {stationId: '21636', name: 'Drifter', latitude: 31.5, longitude: 127.4},
-            {stationId: '21637', name: 'Drifter', latitude: 29.3, longitude: 141.25},
-            {stationId: '21640', name: 'Drifter', latitude: 28.3, longitude: 135.5},
-            {stationId: '46220', name: 'El Porto, CA (125)', latitude: 33.897, longitude: -118.446},
-            {stationId: '46221', name: 'Santa Monica Bay, CA (028)', latitude: 33.86, longitude: -118.641},
-            {stationId: '46222', name: 'San Pedro, CA (092)', latitude: 33.618, longitude: -118.317},
-            {stationId: '46223', name: 'Dana Point, CA (096)', latitude: 33.458, longitude: -117.767},
-            {stationId: '46224', name: 'Oceanside Offshore, CA (045)', latitude: 33.178, longitude: -117.472},
-            {stationId: '46225', name: 'Torrey Pines Outer, CA (100)', latitude: 32.933, longitude: -117.391},
-            {stationId: '46226', name: 'Point La Jolla, CA (095)', latitude: 32.848, longitude: -117.353},
-            {stationId: '46227', name: 'Point Loma, CA (091)', latitude: 32.632, longitude: -117.444},
-            {stationId: '46228', name: 'Pitas Point, CA (130)', latitude: 34.317, longitude: -119.417},
-            {stationId: '46229', name: 'UMPQUA OFFSHORE, OR (139)', latitude: 43.772, longitude: -124.549},
-            {stationId: '46230', name: 'Huntington Beach Nearshore, CA (172)', latitude: 33.623, longitude: -118.012},
-            {stationId: '46231', name: 'Mission Bay, CA (093)', latitude: 32.747, longitude: -117.37},
-            {stationId: '46232', name: 'Point Loma South, CA  (191)', latitude: 32.517, longitude: -117.425},
-            {stationId: '46233', name: 'SCCOOS San Diego Mooring', latitude: 32.936, longitude: -117.32},
-            {stationId: '46234', name: 'Port Hueneme Nearshore, CA (141)', latitude: 34.1, longitude: -119.168},
-            {stationId: '46235', name: 'Imperial Beach Nearshore, CA (155)', latitude: 32.57, longitude: -117.169},
-            {stationId: '46236', name: 'Monterey Canyon Outer, CA  (156)', latitude: 36.76, longitude: -121.949},
-            {stationId: '46237', name: 'San Francisco Bar, CA  (142)', latitude: 37.788, longitude: -122.634},
-            {stationId: '46238', name: 'Santa Cruz Basin, CA (167)', latitude: 33.76, longitude: -119.55},
-            {stationId: '46239', name: 'Point Sur, CA (157)', latitude: 36.335, longitude: -122.104},
-            {stationId: '46240', name: 'Cabrillo Point, Monterey Bay, CA  (158)', latitude: 36.626, longitude: -121.907},
-            {stationId: '46241', name: 'San Elijo Nearshore, CA (161)', latitude: 33.003, longitude: -117.292},
-            {stationId: '46242', name: 'Camp Pendleton Nearshore, CA  (043)', latitude: 33.22, longitude: -117.439},
-            {stationId: '46243', name: 'Clatsop Spit, OR (162)', latitude: 46.216, longitude: -124.128},
-            {stationId: '46244', name: 'Humboldt Bay, North Spit, CA (168)', latitude: 40.896, longitude: -124.357},
-            {stationId: '46245', name: 'Ventura Nearshore, CA - 169', latitude: 34.251, longitude: -119.308},
-            {stationId: '46246', name: 'Ocean Station PAPA  (166)', latitude: 49.899, longitude: -145.247},
-            {stationId: '46247', name: 'San Francisco Offshore, CA  (180)', latitude: 37.753, longitude: -122.833},
-            {stationId: '46248', name: 'Astoria Canyon, OR  (179)', latitude: 46.133, longitude: -124.64},
-            {stationId: '46249', name: 'Santa Cruz Island South, CA (182)', latitude: 33.821, longitude: -119.708},
-            {stationId: '46250', name: 'Point Mugu Offshore, CA - 184', latitude: 34.034, longitude: -119.09},
-            {stationId: '46251', name: 'Santa Cruz Basin, CA (203)', latitude: 33.769, longitude: -119.565},
-            {stationId: '46252', name: 'Anacapa Passage South, CA (212)', latitude: 33.953, longitude: -119.257},
-            {stationId: '46253', name: 'San Pedro South, CA (213)', latitude: 33.576, longitude: -118.181},
-            {stationId: '46254', name: 'SCRIPPS Nearshore, CA (201)', latitude: 32.868, longitude: -117.267},
-            {stationId: '46255', name: 'Begg Rock, CA  (138)', latitude: 33.4, longitude: -119.651},
-            {stationId: '46256', name: 'Long Beach Channel, CA (215)', latitude: 33.7, longitude: -118.201},
-            {stationId: '46257', name: 'Harvest Southeast, CA (216)', latitude: 34.439, longitude: -120.766},
-            {stationId: '46258', name: 'Mission Bay West, CA (220)', latitude: 32.749, longitude: -117.502},
-            {stationId: '46259', name: 'Santa Lucia Escarpment, CA (222)', latitude: 34.767, longitude: -121.498},
-            {stationId: '46260', name: 'Lakeside, OR (231)', latitude: 43.586, longitude: -124.29},
-            {stationdId: '51000', name: 'NORTHERN HAWAII ONE - 245NM NE of Honolulu HI', latitude: 23.528, longitude: -153.7},
-            {stationId: '51001', name: '2.1-meter ionomer foam buoy', latitude: 24.451, longitude: -162.008},
-            { stationId: '46221', name: 'El Porto', latitude: 33.86, longitude: -118.4171 },
+            { stationId: '41002', name: 'SOUTH HATTERAS - 225 NM South of Cape Hatteras', latitude: 31.759, longitude: -74.936},
+            { stationId: '41004', name: 'EDISTO - 41 NM Southeast of Charleston, SC', latitude: 32.502, longitude: -79.099},
+            { stationId: '41008', name: 'GRAYS REEF - 40 NM Southeast of Savannah, GA', latitude: 31.4, longitude: -80.866},
+            { stationId: '41009', name: 'CANAVERAL 20 NM East of Cape Canaveral, FL', latitude: 28.508, longitude: -80.185},
+            { stationId: '41013', name: 'Frying Pan Shoals, NC', latitude: 33.441, longitude: -77.764},
+            { stationId: '41025', name: 'Diamond Shoals, NC', latitude: 35.01, longitude: -75.454},
+            { stationId: '41040', name: 'NORTH EQUATORIAL ONE- 470 NM East of Martinique', latitude: 14.541, longitude: -53.137},
+            { stationId: '41043', name: 'NE PUERTO RICO - 170 NM NNE of San Juan, PR', latitude: 21.026, longitude: -64.793},
+            { stationId: '41044', name: 'NE ST MARTIN - 330 NM NE St Martin Is', latitude: 21.582, longitude: -58.63},
+            { stationId: '41046', name: 'EAST BAHAMAS - 335 NM East of San Salvador Is,  Bahamas ', latitude: 23.822, longitude: -68.393},
+            { stationId: '41047', name: 'NE BAHAMAS - 350 NM ENE of Nassau, Bahamas', latitude: 27.465, longitude: -71.452},
+            { stationId: '41049', name: 'SOUTH BERMUDA - 300 NM SSE of Bermuda', latitude: 27.545, longitude: -63.012},
+            { stationId: '41052', name: 'South of St. John, VI', latitude: 18.249, longitude: -64.763},
+            { stationId: '41053', name: 'San Juan, PR', latitude: 18.474, longitude: -66.099},
+            { stationId: '41056', name: 'Vieques Island, PR', latitude: 18.261, longitude: -65.464},
+            { stationId: '41065', name: 'Capers Nearshore Waves (CAP2WAVE)', latitude: 32.802, longitude: -79.619},
+            { stationId: '41067', name: 'FRP2WAVE', latitude: 32.276, longitude: -80.406},
+            { stationId: '41070', name: 'Ponce de Leon Inlet Waves (PNCWAVE)', latitude: 29.289, longitude: -80.803},
+            { stationId: '41076', name: 'CHR60WAVE', latitude: 32.536, longitude: -79.659},
+            { stationId: '41108', name: 'Wilmington Harbor, NC - (200)', latitude: 33.721, longitude: -78.016},
+            { stationId: '41110', name: 'Masonboro Inlet, ILM2, NC (150)', latitude: 34.143, longitude: -77.716},
+            { stationId: '41112', name: 'Offshore Fernandina Beach, FL (132)', latitude: 30.709, longitude: -81.292},
+            { stationId: '41113', name: 'Cape Canaveral Nearshore, FL (143)', latitude: 28.4, longitude: -80.533},
+            { stationId: '41114', name: 'Fort Pierce, FL (134)', latitude: 27.552, longitude: -80.216},
+            { stationId: '41115', name: 'Rincon, Puerto Rico (181)', latitude: 18.376, longitude: -67.28},
+            { stationId: '41117', name: 'St. Augustine, FL (194)', latitude: 30.0, longitude: -81.08},
+            { stationId: '41120', name: 'Cape Hatteras East, NC (250)', latitude: 35.258, longitude: -75.285},
+            { stationId: '41121', name: 'Arecibo, Puerto Rico (249)', latitude: 18.49, longitude: -66.701},
+            { stationId: '41159', name: 'Onslow Bay Outer, NC (217)', latitude: 34.213, longitude: -76.949},
+            { stationId: '42001', name: 'MID GULF - 180 nm South of Southwest Pass, LA', latitude: 25.926, longitude: -89.662},
+            { stationId: '42002', name: 'WEST GULF - 207 NM East of Brownsville, TX', latitude: 26.055, longitude: -93.646},
+            { stationId: '42012', name: 'ORANGE BEACH - 44 NM SE of Mobile, AL', latitude: 30.06, longitude: -87.548},
+            { stationId: '42019', name: 'FREEPORT, TX - 60 NM South of Freeport, TX', latitude: 27.91, longitude: -95.345},
+            { stationId: '42036', name: 'WEST TAMPA  - 112 NM WNW of Tampa, FL', latitude: 28.501, longitude: -84.508},
+            { stationId: '42040', name: 'LUKE OFFSHORE TEST PLATFORM - 63 NM South of Dauphin Island, AL', latitude: 29.207, longitude: -88.237},
+            { stationId: '42055', name: 'BAY OF CAMPECHE - 214 NM NE of Veracruz, MX', latitude: 22.14, longitude: -94.112},
+            { stationId: '42056', name: ' Yucatan Basin - 120 NM ESE of Cozumel, MX', latitude: 19.82, longitude: -84.945},
+            { stationId: '42057', name: 'Western Caribbean - 195 NM WSW of Negril, Jamaica', latitude: 16.973, longitude: -81.575},
+            { stationId: '42058', name: 'Central Caribbean - 210 NM SSE of Kingston, Jamaica', latitude: 14.844, longitude: -75.061},
+            { stationId: '42059', name: 'Eastern Caribbean Sea - 180 NM SSW of Ponce, PR', latitude: 15.3, longitude: -67.483},
+            { stationId: '42060', name: 'Caribbean Valley - 63 NM WSW of Montserrat', latitude: 16.434, longitude: -63.329},
+            { stationId: '42084', name: 'Southwest Pass Entrance W, LA (256)', latitude: 28.988, longitude: -89.649},
+            { stationId: '42085', name: 'Southeast of Ponce, PR', latitude: 17.87, longitude: -66.537},
+            { stationId: '42091', name: 'Trinity Shoal, LA (255)', latitude: 29.087, longitude: -92.506},
+            { stationId: '42097', name: 'Pulley Ridge, FL (226)', latitude: 25.714, longitude: -83.65},
+            { stationId: '42098', name: 'Egmont Channel Entrance, FL (214)', latitude: 27.59, longitude: -82.931},
+            { stationId: '42099', name: 'Offshore St. Petersburg, FL (144)', latitude: 27.349, longitude: -84.275},
+            { stationId: '44005', name: 'GULF OF MAINE - 78 NM East of Portsmouth, NH', latitude: 43.201, longitude: -69.127},
+            { stationId: '44007', name: 'PORTLAND - 12 NM Southeast of Portland,ME', latitude: 43.525, longitude: -70.14},
+            { stationId: '44008', name: 'NANTUCKET 54 NM Southeast of Nantucket', latitude: 40.496, longitude: -69.25},
+            { stationId: '44009', name: 'DELAWARE BAY 26 NM Southeast of Cape May, NJ', latitude: 38.46, longitude: -74.692},
+            { stationId: '44013', name: 'BOSTON 16 NM East of Boston, MA', latitude: 42.346, longitude: -70.651},
+            { stationId: '44014', name: 'VIRGINIA BEACH 64 NM East of Virginia Beach, VA', latitude: 36.603, longitude: -74.837},
+            { stationId: '44018', name: 'CAPE COD - 9 NM North of Provincetown, MA', latitude: 42.203, longitude: -70.154},
+            { stationId: '44020', name: 'NANTUCKET SOUND', latitude: 41.497, longitude: -70.283},
+            { stationId: '44027', name: 'Jonesport, ME - 20 NM SE of Jonesport, ME', latitude: 44.283, longitude: -67.3},
+            { stationId: '44056', name: 'Duck FRF, NC', latitude: 36.2, longitude: -75.714},
+            { stationId: '44065', name: 'New York Harbor Entrance - 15 NM SE of Breezy Point , NY', latitude: 40.369, longitude: -73.703},
+            { stationId: '44078', name: 'OOI Irminger Sea Surface Mooring', latitude: 59.94, longitude: -39.52},
+            { stationId: '44084', name: 'Bethany Beach, DE (263)', latitude: 38.537, longitude: -75.044},
+            { stationId: '44085', name: 'Buzzards Bay, MA (260)', latitude: 41.387, longitude: -71.032},
+            { stationId: '44086', name: 'Nags Head, NC (243)', latitude: 36.001, longitude: -75.421},
+            { stationId: '44087', name: 'Thimble Shoal, VA (240)', latitude: 37.026, longitude: -76.149},
+            { stationId: '44088', name: 'Virginia Beach Offshore, VA (171)', latitude: 36.614, longitude: -74.841},
+            { stationId: '44089', name: 'Wallops Island, VA (224)', latitude: 37.754, longitude: -75.325},
+            { stationId: '44090', name: 'Cape Cod Bay, MA (221)', latitude: 41.84, longitude: -70.329},
+            { stationId: '44091', name: 'Barnegat, NJ (209)', latitude: 39.768, longitude: -73.77},
+            { stationId: '44095', name: 'Oregon Inlet, NC (192)', latitude: 35.75, longitude: -75.33},
+            { stationId: '44097', name: 'Block Island, RI  (154)', latitude: 40.967, longitude: -71.124},
+            { stationId: '44098', name: 'Jeffreys Ledge, NH (160)', latitude: 42.8, longitude: -70.171},
+            { stationId: '44099', name: 'Cape Henry, VA (147)', latitude: 36.915, longitude: -75.722},
+            { stationId: '44100', name: 'Duck FRF 26m, NC (430)', latitude: 36.258, longitude: -75.593},
+            { stationId: '45161', name: 'Muskegon Buoy, MI', latitude: 43.185, longitude: -86.352},
+            { stationId: '45212', name: 'North Huron Spotter', latitude: 45.351, longitude: -82.84},
+            { stationId: '45213', name: 'East Superior Spotter', latitude: 47.585, longitude: -86.585},
+            { stationId: '45214', name: 'South Michigan Spotter', latitude: 42.674, longitude: -87.026},
+            { stationId: '46001', name: 'WESTERN GULF OF ALASKA  - 175NM SE of Kodiak, AK', latitude: 56.3, longitude: -148.018},
+            { stationId: '46005', name: 'WEST WASHINGTON - 300NM West of Aberdeen, WA', latitude: 46.143, longitude: -131.09},
+            { stationId: '46006', name: 'SOUTHEAST PAPA - 600NM West of Eureka, CA', latitude: 40.764, longitude: -137.377},
+            { stationId: '46011', name: 'SANTA MARIA - 21NM NW of Point Arguello, CA', latitude: 34.936, longitude: -120.998},
+            { stationId: '46013', name: 'BODEGA BAY - 48NM NW of San Francisco, CA', latitude: 38.235, longitude: -123.317},
+            { stationId: '46014', name: 'PT ARENA - 19NM North of Point Arena, CA', latitude: 39.225, longitude: -123.98},
+            { stationId: '46022', name: 'EEL RIVER - 17NM WSW of Eureka, CA', latitude: 40.716, longitude: -124.54},
+            { stationId: '46025', name: 'Santa Monica Basin - 33NM WSW of Santa Monica, CA', latitude: 33.755, longitude: -119.045},
+            { stationId: '46026', name: 'SAN FRANCISCO - 18NM West of San Francisco, CA', latitude: 37.754, longitude: -122.839},
+            { stationId: '46027', name: 'ST GEORGES - 8 NM NW of Crescent City, CA', latitude: 41.84, longitude: -124.382},
+            { stationId: '46028', name: 'CAPE SAN MARTIN - 55NM West NW of Morro Bay, CA', latitude: 35.77, longitude: -121.903},
+            { stationId: '46041', name: 'CAPE ELIZABETH - 45NM NW of Aberdeen, WA', latitude: 47.352, longitude: -124.739},
+            { stationId: '46047', name: 'TANNER BANK - 121 NM West of San Diego, CA', latitude: 32.388, longitude: -119.525},
+            { stationId: '46050', name: 'STONEWALL BANK - 20NM West of Newport, OR', latitude: 44.669, longitude: -124.546},
+            { stationId: '46053', name: 'EAST SANTA BARBARA  - 12NM Southwest of Santa Barbara, CA', latitude: 34.241, longitude: -119.839},
+            { stationId: '46054', name: 'WEST SANTA BARBARA  38 NM West of Santa Barbara, CA', latitude: 34.274, longitude: -120.468},
+            { stationId: '46059', name: 'WEST CALIFORNIA - 357NM West of San Francisco, CA', latitude: 38.069, longitude: -129.976},
+            { stationId: '46060', name: 'WEST ORCA BAY - 8NM NW of Hinchinbrook Is., AK', latitude: 60.571, longitude: -146.795},
+            { stationId: '46066', name: 'SOUTH KODIAK - 310NM SSW of Kodiak, AK', latitude: 52.765, longitude: -155.009},
+            { stationId: '46069', name: 'SOUTH SANTA ROSA - 14 NM SW of Santa Rosa Island, CA', latitude: 33.677, longitude: -120.213},
+            { stationId: '46070', name: 'SOUTHWEST BERING SEA - 142NM NNE OF ATTU IS, AK', latitude: 55.065, longitude: 175.268},
+            { stationId: '46071', name: 'WESTERN ALEUTIANS - 14NM SOUTH OF AMCHITKA IS, AK ', latitude: 51.022, longitude: 179.784},
+            { stationId: '46072', name: 'CENTRAL ALEUTIANS 230 NM SW Dutch Harbor', latitude: 51.666, longitude: -172.114},
+            { stationId: '46075', name: 'SHUMAGIN ISLANDS - 85NM South of Sand Point, AK', latitude: 53.969, longitude: -160.794},
+            { stationId: '46076', name: 'CAPE CLEARE - 17 NM South of Montague Is,  AK', latitude: 59.471, longitude: -148.009},
+            { stationId: '46077', name: 'SHELIKOF STRAIT, AK', latitude: 57.869, longitude: -154.211},
+            { stationId: '46078', name: 'ALBATROSS BANK - 104NM South of Kodiak Is., AK', latitude: 55.561, longitude: -152.599},
+            { stationId: '46080', name: 'PORTLOCK BANK - 76 NM ENE of Kodiak, AK', latitude: 57.916, longitude: -150.133},
+            { stationId: '46081', name: 'Western Prince William Sound', latitude: 60.802, longitude: -148.283},
+            { stationId: '46082', name: 'Cape Suckling - 35 NM SE of Kayak Is, AK', latitude: 59.67, longitude: -143.353},
+            { stationId: '46083', name: 'FAIRWEATHER GROUND - 105 NM West  of Juneau, AK', latitude: 58.27, longitude: -138.019},
+            { stationId: '46084', name: 'CAPE EDGECUMBE - 25NM SSW of Cape Edgecumbe, AK', latitude: 56.614, longitude: -136.04},
+            { stationId: '46086', name: 'SAN CLEMENTE BASIN - 27NM SE Of San Clemente Is, CA', latitude: 32.499, longitude: -118.052},
+            { stationId: '46088', name: 'NEW DUNGENESS - 17 NM NE of Port Angeles, WA', latitude: 48.332, longitude: -123.179},
+            { stationId: '46097', name: 'OOI Newport Shelf', latitude: 44.639, longitude: -124.304},
+            { stationId: '46098', name: 'OOI Waldport Offshore', latitude: 44.378, longitude: -124.947},
+            { stationId: '46099', name: 'OOI Westport Shelf', latitude: 46.988, longitude: -124.567},
+            { stationId: '46100', name: 'OOI Westport Offshore', latitude: 46.851, longitude: -124.964},
+            { stationId: '46108', name: 'Lower Cook Inlet (204)', latitude: 59.598, longitude: -151.828},
+            { stationId: '46211', name: 'Grays Harbor, WA (036)', latitude: 46.857, longitude: -124.244},
+            { stationId: '46213', name: 'Cape Mendocino, CA (094)', latitude: 40.295, longitude: -124.732},
+            { stationId: '46214', name: 'Point Reyes, CA (029)', latitude: 37.937, longitude: -123.463},
+            { stationId: '46215', name: 'Diablo Canyon, CA (076)', latitude: 35.204, longitude: -120.859},
+            { stationId: '46218', name: 'Harvest, CA (071)', latitude: 34.452, longitude: -120.78},
+            { stationId: '46219', name: 'San Nicolas Island, CA (067)', latitude: 33.219, longitude: -119.872},
+            { stationId: '46221', name: 'Santa Monica Bay, CA (028)', latitude: 33.86, longitude: -118.641},
+            { stationId: '46222', name: 'San Pedro, CA (092)', latitude: 33.618, longitude: -118.317},
+            { stationId: '46224', name: 'Oceanside Offshore, CA (045)', latitude: 33.178, longitude: -117.472},
+            { stationId: '46225', name: 'Torrey Pines Outer, CA (100)', latitude: 32.933, longitude: -117.391},
+            { stationId: '46229', name: 'UMPQUA OFFSHORE, OR (139)', latitude: 43.772, longitude: -124.549},
+            { stationId: '46232', name: 'Point Loma South, CA  (191)', latitude: 32.517, longitude: -117.425},
+            { stationId: '46235', name: 'Imperial Beach Nearshore, CA (155)', latitude: 32.57, longitude: -117.169},
+            { stationId: '46237', name: 'San Francisco Bar, CA  (142)', latitude: 37.788, longitude: -122.634},
+            { stationId: '46239', name: 'Point Sur, CA (157)', latitude: 36.335, longitude: -122.104},
+            { stationId: '46240', name: 'Cabrillo Point, Monterey Bay, CA  (158)', latitude: 36.626, longitude: -121.907},
+            { stationId: '46243', name: 'Clatsop Spit, OR (162)', latitude: 46.216, longitude: -124.128},
+            { stationId: '46244', name: 'Humboldt Bay, North Spit, CA (168)', latitude: 40.896, longitude: -124.357},
+            { stationId: '46251', name: 'Santa Cruz Basin, CA (203)', latitude: 33.769, longitude: -119.565},
+            { stationId: '46253', name: 'San Pedro South, CA (213)', latitude: 33.576, longitude: -118.181},
+            { stationId: '46254', name: 'SCRIPPS Nearshore, CA (201)', latitude: 32.868, longitude: -117.267},
+            { stationId: '46256', name: 'Long Beach Channel, CA (215)', latitude: 33.7, longitude: -118.201},
+            { stationId: '46258', name: 'Mission Bay West, CA (220)', latitude: 32.749, longitude: -117.502},
+            { stationId: '46259', name: 'Santa Lucia Escarpment, CA (222)', latitude: 34.767, longitude: -121.498},
+            { stationId: '46266', name: 'Del Mar Nearshore, CA (153)', latitude: 32.957, longitude: -117.279},
+            { stationId: '46267', name: 'Angeles Point, WA (248)', latitude: 48.173, longitude: -123.607},
+            { stationId: '46268', name: 'Topanga Nearshore, CA (103)', latitude: 34.022, longitude: -118.578},
+            { stationId: '46274', name: 'Leucadia Nearshore, CA (262)', latitude: 33.062, longitude: -117.314},
+            { stationId: '46275', name: 'Red Beach Nearshore, CA (264)', latitude: 33.29, longitude: -117.5},
+            { stationId: '46276', name: 'Pajaro Beach, CA (266)', latitude: 36.845, longitude: -121.825},
+            { stationId: '46277', name: 'Green Beach Offshore, CA (271)', latitude: 33.336, longitude: -117.659},
+            { stationId: '46278', name: 'Tillamook Bay South Jetty, OR (270)', latitude: 45.561, longitude: -123.991},
+            { stationId: '46279', name: 'Pajaro Beach South, CA (267)', latitude: 36.838, longitude: -121.82},
+            { stationId: '51000', name: 'NORTHERN HAWAII ONE - 245NM NE of Honolulu HI', latitude: 23.528, longitude: -153.792},
+            { stationId: '51001', name: 'NORTHWESTERN HAWAII ONE - 188 NM NW of Kauai Island, HI', latitude: 24.451, longitude: -162.008},
+            { stationId: '51003', name: 'WESTERN  HAWAII - 205 NM SW of Honolulu, HI', latitude: 19.196, longitude: -160.639},
+            { stationId: '51004', name: 'SOUTHEAST HAWAII - 205 NM Southeast of Hilo, HI', latitude: 17.538, longitude: -152.23},
+            { stationId: '51101', name: 'NORTHWESTERN HAWAII TWO - 186 NM NW of Kauai Is., HI   ', latitude: 24.359, longitude: -162.081},
+            { stationId: '51201', name: 'Waimea Bay, HI (106)', latitude: 21.671, longitude: -158.118},
+            { stationId: '51202', name: 'Mokapu Point, HI (098)', latitude: 21.417, longitude: -157.68},
+            { stationId: '51205', name: 'Pauwela, Maui, HI (187)', latitude: 21.018, longitude: -156.425},
+            { stationId: '51207', name: 'Kaneohe Bay, HI (198)', latitude: 21.477, longitude: -157.752},
+            { stationId: '51210', name: 'Kaneohe Bay, WETS, HI (225)', latitude: 21.477, longitude: -157.757},
+            { stationId: '51211', name: 'Pearl Harbor Entrance, HI (233)', latitude: 21.297, longitude: -157.959},
+            { stationId: '51212', name: 'Barbers Point, Kalaeloa, HI (238)', latitude: 21.323, longitude: -158.149},
+            { stationId: '52200', name: 'Ipan, Guam (121)', latitude: 13.354, longitude: 144.788},
+            { stationId: '52201', name: 'Kalo, Majuro, Marshall Islands (163)', latitude: 7.079, longitude: 171.384},
+            { stationId: '52211', name: 'Tanapag, Saipan, NMI (197)', latitude: 15.268, longitude: 145.662},
+            { stationId: '52212', name: 'Ngaraard, Babeldaob, Palau (219)', latitude: 7.63, longitude: 134.671},
+            { stationId: '62107', name: 'Sevenstones Lightship', latitude: 50.102, longitude: -6.1},
+            { stationId: '62127', name: 'Cleeton AWS', latitude: 54.0, longitude: 0.7},
+            { stationId: '62130', name: 'Brae A', latitude: 58.7, longitude: 1.3},
+            { stationId: '62144', name: 'Clipper AWS', latitude: 53.4, longitude: 1.7},
+            { stationId: '62145', name: 'North Sea', latitude: 53.102, longitude: 2.8},
+            { stationId: '62146', name: 'Lomond AWS', latitude: 57.2, longitude: 2.1},
+            { stationId: '62149', name: 'West Sole "A" AWS', latitude: 53.7, longitude: 1.1},
+            { stationId: '62165', name: 'Ravenspurn North AWS', latitude: 54.0, longitude: 1.1},
+            { stationId: '62170', name: 'F3 Light Vessel', latitude: 51.24, longitude: 2.0},
+            { stationId: '62304', name: 'Sandettie Lightship', latitude: 51.102, longitude: 1.8},
+            { stationId: '62305', name: 'Greenwich Lightship', latitude: 50.4, longitude: 0.0},
+            { stationId: '63110', name: 'Beryl A AWS', latitude: 59.5, longitude: 1.5},
+            { stationId: '63112', name: 'Cormorant AWS', latitude: 61.1, longitude: 1.0},
+            { stationId: '63115', name: 'Magnus AWS', latitude: 61.6, longitude: 1.3},
         ];
+
 
         plotBuoys();
 
@@ -368,7 +495,6 @@
 
         document.getElementsByClassName("datetime")[0].innerHTML = new Date().toUTCString();    
 
-
     </script>
     
     <h3 class = "report-title">Choose buoy to begin</h3>
@@ -376,107 +502,44 @@
         <div class="card">
             <h2>Primary Swell</h2>
             <div class="content">
-                <div class="swellsymbol">&#8595;</div>
+                <div class="direction">
+                    <div class="swellsymbol">&#8595;</div>
+                    <p class="mwd">N/A</p>
+                </div>
                 <div class="details">
                     <p class= "swhswp" >N/A</p>
-                    <p class="mwdsteep">N/A</p>
+                    <p class="steep">N/A</p>
                 </div>
             </div>
         </div>
         <div class="card">
             <h2>Secondary Swell</h2>
             <div class="content">
-                <div class="windswellsymbol">&#8595;</div>
+                <div class="direction">
+                    <div class="windswellsymbol">&#8595;</div>
+                    <p class="wwd">W</p>
+                </div>
                 <div class="details">
                     <p class="wwhwwp">1ft 9s</p>
-                    <p class="wwd">W</p>
                 </div>
             </div>
         </div>
         <div class="card">
             <h2>Wind</h2>
             <div class="content">
-                <div class="windsymbol">&#8595;</div>
+                <div class="direction">
+                    <div class="windsymbol">&#8595;</div>
+                    <p class="wddir">E</p>
+                </div>
                 <div class="details">
-                    <p>5mph</p>
-                    <p>E</p>
+                    <p class="wdspd">5mph</p>
+                    <p class="gust">10mph</p>
+                    <p class="airtemp">70ºF</p>
+                    <p class="temp">70ºF</p>
                 </div>
             </div>
         </div>
     </div>
-
-
-    <!--
-        <h2>Current Report</h2>
-        <h3 class = "report-title">Null</h3>
-        <div class="report-container">
-        <div class="current-report">
-        <table class = "report-table">
-        <tr>
-        <th class = "report-table-item">Wave Height</th>
-        <th class = "report-table-item">Swell Height</th>
-        <th class = "report-table-item">Swell Period</th>
-        <th class = "report-table-item">Wind Wave Height</th>
-        <th class = "report-table-item">Wind Wave Period</th>
-
-        </tr>
-        <tr>
-
-        <td class = "wvht"></td>
-        <td class = "swh"></td>
-        <td class = "swp"></td>
-        <td class = "wwh"></td>
-        <td class = "wwp"></td>
-
-        </tr>
-        <tr>
-        <th class = "report-table-item">Swell Direction</th>
-        <th class = "report-table-item">Wind Wave Direction</th>
-        <th class = "report-table-item">Steepness</th>
-        <th class = "report-table-item">Average Period</th>
-        <th class = "report-table-item">Dominant Wave Direction</th>
-        </tr>
-        <tr>
-        <td class = "swd">{{.CurrentReport.SwD}}</td>
-        <td class = "wwd">{{.CurrentReport.WWD}}</td>
-        <td class = "steep">{{.CurrentReport.STEEPNESS}}</td>
-        <td class = "apd">{{printf "%.2f" .CurrentReport.APD}}s</td>
-        <td class = "mwd">{{printf "%.2f" .CurrentReport.MWD}}º</td>
-        </tr>
-        </table>
-        <a href = "https://www.ndbc.noaa.gov/faq/measdes.shtml" target = "_blank">data key</a>
-        </div>
-        </div>
-    -->
-
-<!-- 
-<h2>3 Day Forecast</h2>
-    <div class="predictions-container">
-        {{range .Predictions}}
-         <div class="prediction-item">
-            <h3>{{.Title}}</h3>
-            <p><b>{{printf "%.2fm" .WaveHeight}}</b> at <b>{{printf "%.2fsec" .Period}}</b></p>
-            <p>Direction: <b>{{printf "%.2fº" .DirectionDegrees}}  {{.DirectionLabel}}</b></p>
-        </div>
-        {{end}}
-    </div>
-    <div class = "description">
-        <p>
-        This forecast was found using a neural network trained on public buoy data since September 2023. 
-        Current prediction accuracy for north swells is poor due to lack of training on winter data... accuracy will improve as more data is collected.
-        Built with 
-        <a href = "https://pytorch.org/"> PyTorch </a>,  
-        <a href = "https://go.dev/"> golang </a>, 
-        <a href = "https://www.ndbc.noaa.gov/"> NOAA </a> data, 
-        <a href = "https://github.com/gin-gonic/gin"> gin </a>,
-        <a href = "https://turso.tech/"> Turso </a>,
-        <a href = "https://render.com/"> OnRender </a>,
-        and <a href = "https://www.sqlite.org/index.html"> sqlite3 </a>
-        </p>
-        <p> <a href = "https://github.com/evancoons22/nbdc-buoydata" target = "_blank" > Github </a> </p>
-    </div>
--->
-
 
 </body>
 </html>
