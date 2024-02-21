@@ -11,7 +11,6 @@ import (
     "fmt"
 	"log"
 	"net/http"
-    "bytes"
 	"github.com/gin-gonic/gin"
     _ "github.com/mattn/go-sqlite3"
     _ "github.com/libsql/libsql-client-go/libsql"
@@ -190,40 +189,27 @@ func queryLocalMapData() ([]MapData, error)  {
     return mapdata, nil
 }
 
+func getPredictions() ([]Prediction, error) {
+        // currently, we don't need the dbUrl, but we will need it later in main
+        // var dbUrl = "../nbdc-buoydata/db.db"
+        API_KEY := os.Getenv("API_KEY")
+        API_URL := os.Getenv("API_URL")
 
-func main() {
-	// Initialize the SQLite3 database connection
+        if API_KEY == "" {
+            fmt.Println("API_KEY environment variable not set.")
+            return nil, fmt.Errorf("API_KEY environment variable not set")
+        }
 
-    // var dbUrl = "../nbdc-buoydata/db.db"
-    API_KEY := os.Getenv("API_KEY")
-    API_URL := os.Getenv("API_URL")
+        // var dbUrl = "libsql://database-evancoons22.turso.io?authToken=${envVarValue}"
+        var dbUrl = fmt.Sprintf("%s?authToken=%s", API_URL, API_KEY) // linux
+        //var dbUrl = fmt.Sprintf(API_URL, API_KEY) // mac ... for some reason
 
-    if API_KEY == "" {
-        fmt.Println("API_KEY environment variable not set.")
-        return
-    }
+        db, err := sql.Open("libsql", dbUrl)
+        if err != nil {
+            log.Fatal(err)
+        }
+        defer db.Close()
 
-    // var dbUrl = "libsql://database-evancoons22.turso.io?authToken=${envVarValue}"
-    //var dbUrl = fmt.Sprintf("%s?authToken=%s", API_URL, API_KEY)
-    var dbUrl = fmt.Sprintf(API_URL, API_KEY)
-    println(dbUrl)
-
-	//db, err := sql.Open("sqlite3", dbUrl)
-	db, err := sql.Open("libsql", dbUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-    //gin.SetMode(gin.ReleaseMode)
-	// Initialize the Gin web framework
-	router := gin.Default()
-
-    router.ForwardedByClientIP = true
-    router.SetTrustedProxies([]string{"127.0.0.1","192.168.1.250", "192.168.1.1"})
-
-	// Define a route to handle requests
-	router.GET("/", func(c *gin.Context) {
 		// Query the database to get the latest prediction data
         var predictions []Prediction
         currentDate := time.Now()
@@ -242,8 +228,7 @@ func main() {
             err := db.QueryRow(query).Scan(&prediction.WaveHeight, &prediction.DirectionDegrees, &prediction.Period)
             if err != nil {
                 log.Println(err)
-                c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-                return
+                return nil, err
             }
             prediction.DirectionLabel = degreesToCompassLabel(prediction.DirectionDegrees)
             //fmt.Println(prediction, "\n")
@@ -251,64 +236,45 @@ func main() {
             //fmt.Println(prediction.Title)
             predictions = append(predictions, prediction)
         }
-
-        // get the current report
-        currentReport, err := getCurrentReport()
-        //fmt.Println(currentReport)
-        if err != nil {
-            log.Println(err)
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-            return
-        }
+        return predictions, nil
+    }
 
 
-        // get the database from a local databse stored in libsql/local.db
-        localMapData, err := queryLocalMapData()
-        if err != nil {
-            log.Println(err)
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-            return
-        }
 
-        //jsonData, err := json.Marshal(localMapData)
+
+func main() {
+    //gin.SetMode(gin.ReleaseMode)
+	router := gin.Default()
+
+    router.ForwardedByClientIP = true
+    //router.SetTrustedProxies([]string{"127.0.0.1","192.168.1.250", "192.168.1.1"})
+
+    // main route
+	router.GET("/", func(c *gin.Context) {
+        // predictions, err := getPredictions()
+        //currentReport, err := getCurrentReport() // we get the current report on the client side
+        //localMapData, err := queryLocalMapData()
 
 		// Parse the HTML template
 		// tmpl, err := template.ParseFiles("day.html")
-        tmpl, err := template.ParseFiles("day.html", "map.html")
-
-        //turn the localMapData into a string, then send it that way
-
-
-		if err != nil {
-			log.Println(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-			return
-		}
-
-        // data to send to template
-        data := map[string]interface{}{
-            "Predictions":  predictions,
-            "LocalMapData": localMapData,
-            "CurrentReport": currentReport,
-            // "LocalMapData": template.JS(jsonData),
-        }
-
+        tmpl, err := template.ParseFiles("day.html")
+        //send data to template with data := map[string]interface{}{... define map ..}
 		// Execute the template with the prediction data
-		htmlBuffer := new(bytes.Buffer)
-		err = tmpl.Execute(htmlBuffer, data)
+		//htmlBuffer := new(bytes.Buffer)
+		//err = tmpl.Execute(htmlBuffer, data)
+
+        err = tmpl.Execute(c.Writer, nil)
 		if err != nil {
 			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 			return
 		}
 
-		// Serve the HTML response
 		c.Header("Content-Type", "text/html; charset=utf-8")
-		c.String(http.StatusOK, htmlBuffer.String())
+		//c.String(http.StatusOK, htmlBuffer.String())
+        c.Status(http.StatusOK)
 	})
 
-    // Start the web server
-    // router.Run("127.0.0.1:8080")
     //router.Run(":8080")
     router.Run()
 }
