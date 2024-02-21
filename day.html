@@ -162,6 +162,23 @@
             display: flex;
             flex-direction: column;
         }
+        /* mobile */
+        @media (max-width: 768px) {
+            body {
+                padding-left: 0;
+                padding-right: 0;
+            }
+        }
+        @media (max-width: 768px) {
+            #map { 
+                /* height should be half of ui */
+                height: 300px;
+                width: 95%;
+                margin: 0 auto;
+                align-items: center;
+            }
+        }
+
 
 
     </style>
