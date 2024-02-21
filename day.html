@@ -2,17 +2,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>El Porto Buoy Forecast</title>
+    <title>CA Surf Report</title>
     <style>
-        /* Common styles for both desktop and mobile */
-        .description { 
-            text-align: center;
-            font-size: 1.1em;
-            padding: 10px;
-            padding-left: 10%;
-            padding-right: 10%;
-        }
-
         h1 , h3
         {
             text-align: center;
@@ -31,10 +22,7 @@
         body { 
             padding-left: 15%;
             padding-right: 15%;
-
         }
-            
-
         /* Mobile styles */
         .predictions-container {
             padding-left: 10%;
@@ -295,8 +283,8 @@
             const data = await response.text();
             const line = data.split('\n')[2].split(/\s+/);
 
-            document.getElementsByClassName("wdspd")[0].innerHTML = line[6] + 'mph';
-            document.getElementsByClassName("wddir")[0].innerHTML = line[5] + 'º';
+            document.getElementsByClassName("wdspd")[0].innerHTML = 'speed: ' + line[6] + 'mph';
+            document.getElementsByClassName("wddir")[0].innerHTML = 'gusts: ' + line[5] + 'º';
             document.getElementsByClassName("gust")[0].innerHTML = line[7] + 'mph';
             document.getElementsByClassName("temp")[0].innerHTML = "water temp: " + line[14] + 'ºC';
             document.getElementsByClassName("airtemp")[0].innerHTML = "air temp: " + line[15] + 'ºC';
