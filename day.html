@@ -261,12 +261,13 @@
             // format date as YYYYMMDD
             var date = new Date();
             var time = Math.floor(date.getHours() / 6) * 6;
+            var formattedTime = time.toString().padStart(2, '0');
             var formattedDate = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
 
 
             let attempts = 0; // Keep track of attempts to prevent infinite loops
             while (attempts < 3) { // Limit the number of attempts
-                const url = 'https://corsproxy.io/?' + 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.' + formattedDate + '/' + time + '/wave/station/bulls.t18z/gfswave.' + stationId + '.bull';
+                const url = 'https://corsproxy.io/?' + 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.' + formattedDate + '/' + formattedTime + '/wave/station/bulls.t'  + formattedTime + 'z/gfswave.' + stationId + '.bull';
 
                 try {
                     const response = await fetch(url, {
@@ -294,6 +295,7 @@
                     date.setHours(date.getHours() - 6);
 
                     time = Math.floor(date.getHours() / 6) * 6;
+                    formattedTime = time.toString().padStart(2, '0');
                     formattedDate = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
                 }
             }
