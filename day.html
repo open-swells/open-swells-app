@@ -4,7 +4,7 @@
 <head>
     <title>CA Surf Report</title>
     <style>
-        h1 , h3
+        h1
         {
             text-align: center;
         }
@@ -166,6 +166,32 @@
                 align-items: center;
             }
         }
+        .swell-cell {
+            text-align: center; /* Center the content in the swell cells */
+            font-size: 16px; /* Larger font size for swell info */
+            white-space: nowrap; /* Keep the arrow and text on the same line */
+        }
+        .swell-data { 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .swell-arrow {
+            display: inline-block;
+            transform-origin: 50% 50%;
+            font-size: 58px; /* Slightly larger font size for the arrow */
+        }
+        .hour-cell {
+            text-align: center; /* Center the content in the hour cells */
+            font-size: 16px; /* Larger font size for the hour */
+        }
+
+        .data-table {
+            /* I want the table to be narrower */
+            width: 80%;
+            border-collapse: collapse;
+            margin: 0 auto;
+        }
 
 
 
@@ -185,7 +211,7 @@
 
     <h1>Surffffff Forecast</h1>
     <!-- I want this to be todays date, not from template --> 
-    <h3 class="datetime"> default</h3>
+    <h3 class="datetime" style="text-align: center"> default</h3>
 
     <div id="map"></div>
 
@@ -230,6 +256,299 @@
             'NNW': 337.5
         };
 
+        async function getBuoyForecast(stationId) {
+            console.log('Fetching data for station ID:', stationId);
+            // format date as YYYYMMDD
+            // format time as HH // 6 * 3 hour intervals
+            // hour is always 00, 06, 12, 18
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const hour = date.getHours();
+            // const time = hour - (hour % 3);
+            const time = Math.floor(hour / 6) * 6;
+            const formattedDate = `${year}${month.toString().padStart(2, '0')}${day.toString().padStart(2, '0')}`;
+            console.log('Formatted date:', formattedDate);
+            console.log('Formatted time:', time);
+            const url =  'https://corsproxy.io/?' + 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.' + formattedDate + '/' + time + '/wave/station/bulls.t18z/gfswave.' + stationId + '.bull';
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const dataString = await response.text();
+            const parsedData = parseForecastData(dataString);
+            console.log(parsedData[0]);
+            // displayTable(parsedData);
+            displayGraphicalData(parsedData);
+        }
+
+
+        function groupDataByDay(data) {
+            const currentYear = new Date().getFullYear(); // Placeholder: Adjust based on current context
+            const currentMonth = new Date().getMonth() + 1; // Placeholder: Adjust as needed
+            // First, ensure all date strings are converted to Date objects
+            data.forEach(item => {
+                const [day, hour] = item.date.split(' ');
+                let month = currentMonth;
+                let year = currentYear;
+                // Adjust for month transition
+                if (parseInt(day, 10) < new Date().getDate()) {
+                    month++;
+                    if (month > 12) {
+                        month = 1;
+                        year++;
+                    }
+                }
+
+                item.dateObj = new Date(year, month - 1, parseInt(day, 10), parseInt(hour, 10));
+                // translate the time zone of this date
+            });
+
+            // Sort the data by dateObj
+            //data.sort((a, b) => a.dateObj - b.dateObj);
+
+            // Group data by day
+            const groupedData = {};
+            data.forEach(item => {
+                item.dateObj.setHours(item.dateObj.getHours() - 8); // subtract 8 hours to get to UTC
+                const dateKey = item.dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+                if (!groupedData[dateKey]) {
+                    groupedData[dateKey] = [];
+                }
+                groupedData[dateKey].push(item);
+            });
+            return groupedData;
+        }
+
+        function displayTable(data) {
+            // Clear the existing table content
+            document.getElementById('data-table').innerHTML = '';
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.setAttribute('border', '1');
+
+            // Function to create a header row for each day
+            const createDayHeader = (date) => {
+                const headerRow = document.createElement('tr');
+                const cell = document.createElement('th');
+                cell.textContent = `${date.toLocaleDateString()}`;
+                cell.colSpan = 7; // Span across all columns
+                headerRow.appendChild(cell);
+                return headerRow;
+            };
+
+            // Add table body
+            const body = table.createTBody();
+
+
+            groupedData = groupDataByDay(data);
+
+            // Iterate over each group and add rows
+            Object.entries(groupedData).forEach(([dateKey, items], index) => {
+                // Convert dateKey back to Date for header and formatting
+                const date = new Date(dateKey);
+                body.appendChild(createDayHeader(date));
+                // create a subheader that shows the names of the columns
+                const subheader = document.createElement('tr');
+                const subheaders = ['Date', 'Primary SWH', 'Primary SWP', 'Primary SWD', 'Secondary SWH', 'Secondary SWP', 'Secondary SWD'];
+                subheaders.forEach(text => {
+                    const cell = document.createElement('th');
+                    cell.textContent = text;
+                    subheader.appendChild(cell);
+                });
+
+                items.forEach(item => {
+                    const row = body.insertRow();
+                    Object.keys(item).forEach((key, cellIndex) => {
+                        if (key !== 'dateObj') { // Exclude the dateObj from being displayed
+                            const cell = row.insertCell();
+                            cell.textContent = item[key];
+                        }
+                    });
+                });
+            });
+
+            // Append the constructed table to the div
+            document.getElementById('data-table').appendChild(table);
+        }
+
+
+        function displayGraphicalData(data) {
+            const dataGroupedByDay = groupDataByDay(data);
+            // Clear any existing content
+            const dataTable = document.getElementById('data-table');
+            dataTable.innerHTML = '';
+
+            Object.entries(dataGroupedByDay).forEach(([date, dayData]) => {
+                const dateHeader = document.createElement('h3');
+                dateHeader.className = 'date-header';
+                dateHeader.textContent = new Date(date).toLocaleDateString(); // Convert date string to readable format
+                // convert date to have the day of the week
+                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
+                dataTable.appendChild(dateHeader);
+
+                // Create a table for each day
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                // table.setAttribute('border', '1');
+
+                // Create a header for the table
+                const header = table.createTHead();
+                const headerRow = header.insertRow();
+                const headers = ['Hour', 'Primary Swell', 'Secondary Swell'];
+                headers.forEach(headerText => {
+                    const headerCell = document.createElement('th');
+                    headerCell.textContent = headerText;
+                    headerRow.appendChild(headerCell);
+                });
+
+                // Create the body of the table
+                const tbody = document.createElement('tbody');
+                table.appendChild(tbody);
+
+                dayData.forEach(dataItem => {
+                    const row = tbody.insertRow();
+
+                    // Hour column
+                    const hourCell = row.insertCell();
+                    // split the date item and take the second part
+                    hourCell.textContent = dataItem.date.split(' ')[1];
+                    // hourCell.textContent = dataItem.date;
+                    hourCell.className = 'hour-cell';
+
+                    // Primary swell column
+                    const primaryCell = row.insertCell();
+                    primaryCell.innerHTML = createSwellHTML(dataItem.primary_swd, dataItem.primary_swh, dataItem.primary_swp);
+                    primaryCell.className = 'swell-cell';
+
+                    // Secondary swell column
+                    const secondaryCell = row.insertCell();
+                    secondaryCell.innerHTML = createSwellHTML(dataItem.secondary_swd, dataItem.secondary_swh, dataItem.secondary_swp);
+                    secondaryCell.className = 'swell-cell';
+                });
+
+                // Append the table to the container
+                dataTable.appendChild(table);
+            });}
+
+        function createSwellSVG(direction, height, period) {
+            // instead of this svg, use the default arrow &#8595
+            const svgNS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(svgNS, "svg");
+            svg.setAttribute('width', '100');
+            svg.setAttribute('height', '50');
+            svg.style.display = 'block';
+
+            // Create the arrow
+            const arrow = document.createElementNS(svgNS, "polygon");
+            const points = '50,10 55,20 45,20';
+            arrow.setAttribute('points', points);
+            arrow.setAttribute('fill', 'black');
+            // Rotate the arrow according to the swell direction
+            arrow.setAttribute('transform', `rotate(${direction} 50 15)`);
+
+            // Add the arrow to the SVG
+            svg.appendChild(arrow);
+
+            // Add text for height and period
+            const textHeight = document.createElementNS(svgNS, "text");
+            textHeight.setAttribute('x', '50');
+            textHeight.setAttribute('y', '35');
+            textHeight.setAttribute('class', 'swell-info');
+            textHeight.textContent = height;
+
+            const textPeriod = document.createElementNS(svgNS, "text");
+            textPeriod.setAttribute('x', '50');
+            textPeriod.setAttribute('y', '45');
+            textPeriod.setAttribute('class', 'swell-info');
+            textPeriod.textContent = period;
+
+            svg.appendChild(textHeight);
+            svg.appendChild(textPeriod);
+
+            return svg;
+        }
+
+        function createSwellHTML(direction, height, period) {
+            const arrowHTML = `<span class="swell-arrow" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
+
+            // Swell height and period information
+            const swellInfoHTML = `<span>${height} at ${period}</span>`;
+
+            // Combine the arrow with the swell info
+            return `<div class=swell-data>${arrowHTML} ${swellInfoHTML}</div>`;
+        }
+
+
+        function parseForecastData(dataString) {
+            // Split the data string into lines
+            // remove all | 
+                dataString = dataString.replace(/\|/g, '');
+            const lines = dataString.split('\n');
+
+            // Filter out headers and empty lines; start parsing from data rows
+            const dataRows = lines.slice(7); // Assuming first 7 lines are headers/metadata
+
+            // Initialize an array to hold the parsed data
+            let parsedData = [];
+
+            // Iterate over each data row
+            dataRows.some(row => {
+                // if the line starts with +, end the loop
+                // Split row by multiple spaces, considering data alignment
+                var parts = row.trim().split(/\s{1,}/); // Split by two or more spaces to account for data spacing
+
+                if(parts[0].startsWith('+')) {
+                    // I want the break the loop if this is true
+                    return true;
+                }
+                // remove all elements that are spaces
+                parts = parts.filter(part => part !== '');
+                parts = parts.filter(part => part !== '*');
+
+                if(parts.length >= 3) { // Ensure there's enough data for primary swell
+                    // Extract day, hour, and primary swell data
+                    const date = `${parts[0]} ${parts[1]}`;
+                    const primarySwell = {
+                        swh: parts[4],
+                        swp: parts[5],
+                        swd: parts[6]
+                    };
+
+                    // Initialize secondary swell data in case it's not available
+                    let secondarySwell = { swh: '-', swp: '-', swd: '-' };
+
+                    // Check if secondary swell data is available
+                    if (parts.length >= 8) {
+                        secondarySwell = {
+                            swh: parts[7],
+                            swp: parts[8],
+                            swd: parts[9]
+                        };
+                    }
+
+                    // Push the parsed data to the array
+                    parsedData.push({
+                        date,
+                        primary_swh: primarySwell.swh,
+                        primary_swp: primarySwell.swp,
+                        primary_swd: primarySwell.swd,
+                        secondary_swh: secondarySwell.swh,
+                        secondary_swp: secondarySwell.swp,
+                        secondary_swd: secondarySwell.swd
+                    });
+                }
+                return false;
+            });
+
+            return parsedData;
+        }
+
         async function getBuoyReport(stationId, name) {
             const url =  'https://corsproxy.io/?' + 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.spec';
             const response = await fetch(url, {
@@ -268,6 +587,7 @@
             document.getElementsByClassName("windswellsymbol")[0].style.transform = "rotate(" + directionmap[line[11]] + "deg)";
 
             getWindReport(stationId);
+            getBuoyForecast(stationId);
 
         }
 
@@ -284,8 +604,8 @@
             const line = data.split('\n')[2].split(/\s+/);
 
             document.getElementsByClassName("wdspd")[0].innerHTML = 'speed: ' + line[6] + 'mph';
-            document.getElementsByClassName("wddir")[0].innerHTML = 'gusts: ' + line[5] + 'º';
-            document.getElementsByClassName("gust")[0].innerHTML = line[7] + 'mph';
+            document.getElementsByClassName("wddir")[0].innerHTML = line[5] + 'º';
+            document.getElementsByClassName("gust")[0].innerHTML = 'gusts: ' + line[7] + 'mph';
             document.getElementsByClassName("temp")[0].innerHTML = "water temp: " + line[14] + 'ºC';
             document.getElementsByClassName("airtemp")[0].innerHTML = "air temp: " + line[15] + 'ºC';
             document.getElementsByClassName("windsymbol")[0].style.transform = "rotate(" + line[5] + "deg)";
@@ -544,7 +864,11 @@
                 </div>
             </div>
         </div>
+
+
     </div>
+    <h2>16 Day Forecast</h2>
+    <div id="data-table"> </div>
 
 </body>
 </html>
