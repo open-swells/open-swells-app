@@ -285,6 +285,7 @@
                     const parsedData = parseForecastData(dataString);
                     // displayTable(parsedData);
                     displayGraphicalData(parsedData);
+                    return;
 
                 } catch (error) {
                     console.error("Fetch attempt failed, error:", error);
