@@ -259,32 +259,47 @@
         async function getBuoyForecast(stationId) {
             console.log('Fetching data for station ID:', stationId);
             // format date as YYYYMMDD
-            // format time as HH // 6 * 3 hour intervals
-            // hour is always 00, 06, 12, 18
-            const date = new Date();
-            const year = date.getFullYear();
-            const month = date.getMonth() + 1;
-            const day = date.getDate();
-            const hour = date.getHours();
-            // const time = hour - (hour % 3);
-            const time = Math.floor(hour / 6) * 6;
-            const formattedDate = `${year}${month.toString().padStart(2, '0')}${day.toString().padStart(2, '0')}`;
-            console.log('Formatted date:', formattedDate);
-            console.log('Formatted time:', time);
-            const url =  'https://corsproxy.io/?' + 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.' + formattedDate + '/' + time + '/wave/station/bulls.t18z/gfswave.' + stationId + '.bull';
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
+            var date = new Date();
+            var time = Math.floor(date.getHours() / 6) * 6;
+            var formattedDate = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
 
-            const dataString = await response.text();
-            const parsedData = parseForecastData(dataString);
-            console.log(parsedData[0]);
-            // displayTable(parsedData);
-            displayGraphicalData(parsedData);
+
+            let attempts = 0; // Keep track of attempts to prevent infinite loops
+            while (attempts < 3) { // Limit the number of attempts
+                const url = 'https://corsproxy.io/?' + 'https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.' + formattedDate + '/' + time + '/wave/station/bulls.t18z/gfswave.' + stationId + '.bull';
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) { // Check if response status is not OK then throw error to catch block
+                        throw new Error('Request failed');
+                    }
+
+                    //return await response.json(); // Assuming the response needs to be parsed as JSON
+                    const dataString = await response.text();
+                    const parsedData = parseForecastData(dataString);
+                    // displayTable(parsedData);
+                    displayGraphicalData(parsedData);
+
+                } catch (error) {
+                    console.error("Fetch attempt failed, error:", error);
+                    attempts++;
+
+                    date.setHours(date.getHours() - 6);
+
+                    time = Math.floor(date.getHours() / 6) * 6;
+                    formattedDate = `${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}`;
+                }
+            }
+
+            throw new Error('All fetch attempts failed');
         }
+
 
 
         function groupDataByDay(data) {
@@ -307,9 +322,6 @@
                 item.dateObj = new Date(year, month - 1, parseInt(day, 10), parseInt(hour, 10));
                 // translate the time zone of this date
             });
-
-            // Sort the data by dateObj
-            //data.sort((a, b) => a.dateObj - b.dateObj);
 
             // Group data by day
             const groupedData = {};
@@ -436,49 +448,12 @@
                 dataTable.appendChild(table);
             });}
 
-        function createSwellSVG(direction, height, period) {
-            // instead of this svg, use the default arrow &#8595
-            const svgNS = "http://www.w3.org/2000/svg";
-            const svg = document.createElementNS(svgNS, "svg");
-            svg.setAttribute('width', '100');
-            svg.setAttribute('height', '50');
-            svg.style.display = 'block';
-
-            // Create the arrow
-            const arrow = document.createElementNS(svgNS, "polygon");
-            const points = '50,10 55,20 45,20';
-            arrow.setAttribute('points', points);
-            arrow.setAttribute('fill', 'black');
-            // Rotate the arrow according to the swell direction
-            arrow.setAttribute('transform', `rotate(${direction} 50 15)`);
-
-            // Add the arrow to the SVG
-            svg.appendChild(arrow);
-
-            // Add text for height and period
-            const textHeight = document.createElementNS(svgNS, "text");
-            textHeight.setAttribute('x', '50');
-            textHeight.setAttribute('y', '35');
-            textHeight.setAttribute('class', 'swell-info');
-            textHeight.textContent = height;
-
-            const textPeriod = document.createElementNS(svgNS, "text");
-            textPeriod.setAttribute('x', '50');
-            textPeriod.setAttribute('y', '45');
-            textPeriod.setAttribute('class', 'swell-info');
-            textPeriod.textContent = period;
-
-            svg.appendChild(textHeight);
-            svg.appendChild(textPeriod);
-
-            return svg;
-        }
 
         function createSwellHTML(direction, height, period) {
             const arrowHTML = `<span class="swell-arrow" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
 
             // Swell height and period information
-            const swellInfoHTML = `<span>${height}m at ${period}s</span>`;
+            const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
 
             // Combine the arrow with the swell info
             return `<div class=swell-data>${arrowHTML} ${swellInfoHTML}</div>`;
@@ -515,7 +490,7 @@
                     // Extract day, hour, and primary swell data
                     const date = `${parts[0]} ${parts[1]}`;
                     const primarySwell = {
-                        swh: parts[4],
+                        swh: Math.round(parts[4] * 3.28 * 100) / 100,
                         swp: parts[5],
                         swd: parts[6]
                     };
@@ -526,7 +501,7 @@
                     // Check if secondary swell data is available
                     if (parts.length >= 8) {
                         secondarySwell = {
-                            swh: parts[7],
+                            swh: Math.round(parts[7] * 3.28 * 100) / 100,
                             swp: parts[8],
                             swd: parts[9]
                         };
