@@ -1,19 +1,21 @@
 package main
 
 import (
-    "os"
-    "strconv"
+    //"os"
+    //"strconv"
     "strings"
-    "bufio"
+    //"bufio"
     "time"
-	"database/sql"
+    "bytes"
+	//"database/sql"
 	"html/template"
     "fmt"
 	"log"
 	"net/http"
 	"github.com/gin-gonic/gin"
-    _ "github.com/mattn/go-sqlite3"
-    _ "github.com/libsql/libsql-client-go/libsql"
+    "github.com/go-resty/resty/v2"
+    //_ "github.com/mattn/go-sqlite3"
+    //_ "github.com/libsql/libsql-client-go/libsql"
     "math"
 )
 
@@ -66,6 +68,16 @@ type CurrentWeather struct {
     TodaysLow string
 }
 
+type ForecastRow struct {
+    Date string
+    PrimaryWaveHeight string
+    PrimaryPeriod string
+    PrimaryDegrees string
+    SecondaryWaveHeight string
+    SecondaryPeriod string
+    SecondaryDegrees string
+}
+
 func degreesToCompassLabel(degrees float64) string {
     // Define the 16-wind compass directions
     compassLabels := []string{"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}
@@ -79,72 +91,127 @@ func degreesToCompassLabel(degrees float64) string {
     return compassLabels[index]
 }
 
+func parseBullFile(data string) ([]ForecastRow, error) {
+    // Parse the data from the bull file
+    // For simplicity, I'm just returning the raw data
+    forecast := []ForecastRow{}
+    lines := strings.Split(data, "\n")
+
+   // dateline := lines[3]
+   // parts := strings.Fields(dateline)
+   // currentdate:= parts[3]
+
+    lines = lines[6:]
+
+    for _, line := range lines {
+        // break if the line starts with "n :"
+        if strings.HasPrefix(line, "n :") {
+            break
+        }
+        // remove all "|" and replace with space
+        line = strings.ReplaceAll(line, "|", " ")
+        line = strings.ReplaceAll(line, "*", "")
+        // split by space
+        parts := strings.Fields(line)
+        if len(parts) < 10 {
+            continue
+        }
+
+        // Parse the data from the bull file
+        forecast = append(forecast, ForecastRow{
+            Date: parts[0] + " " + parts[1],
+            // strconv returns a float64 and an error, so we need to handle the error
+            PrimaryWaveHeight: parts[4],
+            PrimaryPeriod: parts[5],
+            PrimaryDegrees: parts[6],
+            SecondaryWaveHeight: parts[7],
+            SecondaryPeriod: parts[8],
+            SecondaryDegrees: parts[9],
+        })
+    }
+    return forecast, nil
+}
+
+func getPredictions(c *gin.Context) {
+    stationId := c.Param("stationId")
+    // You might want to add error handling here if stationId is mandatory
+
+    client := resty.New()
+    // Adjust the date and time formatting to match your requirements
+    now := time.Now().UTC()
+    // subtract a day
+    now = now.AddDate(0, 0, -1)
+    formattedDate := now.Format("20060102")
+    // formattedTime := now.Hour() / 6 * 6
+    formattedTime := 6
+    url := fmt.Sprintf("https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.%s/%02d/wave/station/bulls.t%02dz/gfswave.%s.bull", formattedDate, formattedTime, formattedTime, stationId)
+    fmt.Println(url)
+
+    resp, err := client.R().SetHeader("X-Requested-With", "XMLHttpRequest").Get(url)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+    }
+
+    data,err := resp.String(), nil
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    parsedData, err := parseBullFile(data)
+
+    tmpl, err := template.ParseFiles("templates/forecast.html")
+
+    returndata := map[string]interface{}{"forecast": parsedData}
+    // Execute the template with the prediction data
+    htmlBuffer := new(bytes.Buffer)
+    err = tmpl.Execute(htmlBuffer, returndata)
+    if err != nil {
+        log.Println(err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+    }
+
+    c.Header("Content-Type", "text/html; charset=utf-8")
+    c.String(http.StatusOK, htmlBuffer.String())
+    c.Status(http.StatusOK)
+}
+
 
 func main() {
     //gin.SetMode(gin.ReleaseMode)
-	router := gin.Default()
+    router := gin.Default()
 
     router.ForwardedByClientIP = true
     //router.SetTrustedProxies([]string{"127.0.0.1","192.168.1.250", "192.168.1.1"})
 
     // main route
-	router.GET("/", func(c *gin.Context) {
+    router.GET("/", func(c *gin.Context) {
         // predictions, err := getPredictions()
         //currentReport, err := getCurrentReport() // we get the current report on the client side
         //localMapData, err := queryLocalMapData()
 
-		// Parse the HTML template
-		// tmpl, err := template.ParseFiles("day.html")
+        // Parse the HTML template
+        // tmpl, err := template.ParseFiles("day.html")
         tmpl, err := template.ParseFiles("day.html")
         //send data to template with data := map[string]interface{}{... define map ..}
-		// Execute the template with the prediction data
-		//htmlBuffer := new(bytes.Buffer)
-		//err = tmpl.Execute(htmlBuffer, data)
+        // Execute the template with the prediction data
+        //htmlBuffer := new(bytes.Buffer)
+        //err = tmpl.Execute(htmlBuffer, data)
 
         // print
         err = tmpl.Execute(c.Writer, nil)
-		if err != nil {
-			log.Println(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-			return
-		}
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+            return
+        }
 
-		c.Header("Content-Type", "text/html; charset=utf-8")
-		//c.String(http.StatusOK, htmlBuffer.String())
+        c.Header("Content-Type", "text/html; charset=utf-8")
+        //c.String(http.StatusOK, htmlBuffer.String())
         c.Status(http.StatusOK)
-	})
-
-    router.GET("/forecast/:stationId", func(c *gin.Context) {
-        date := time.Now().Format("20060102")
-        fmt.Println("Date: %v", date)
-        // print a message
-        fmt.Println("Fetching forecast for stationId: ", c.Param("stationId"))
-        // get the hour of the day
-        // cast the hour to an int, divide by 6, then multiply by 6 to get the nearest 6 hour interval
-        hour, err := strconv.Atoi(time.Now().Format("15"))
-        if err != nil {
-            log.Println(err)
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-            return
-        }
-        hour = (hour / 6) * 6
-        // convert the hour back to a string
-
-        url := "https://corsproxy.io/?https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs." + date + "/" + strconv.Itoa(hour)  + "/wave/station/bulls.t18z/gfswave." + c.Param("stationId") + ".bull"
-
-        // get request
-        resp, err := http.Get(url)
-        if err != nil {
-            log.Println(err)
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-            return
-        }
-        defer resp.Body.Close()
-        fmt.Sprintf("Response: %v", resp)
-
-        // return this repsonse to the client
-
     })
 
-    router.Run()
+    router.GET("/forecast/:stationId", getPredictions) 
+
+    router.Run(":8080")
 }

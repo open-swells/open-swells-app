@@ -1,0 +1,101 @@
+<div id="forecast">
+    <script>
+        function displayGraphicalData(data) {
+            const dataGroupedByDay = groupDataByDay(data);
+            // Clear any existing content
+            const dataTable = document.getElementById('data-table');
+            dataTable.innerHTML = '';
+
+            Object.entries(dataGroupedByDay).forEach(([date, dayData]) => {
+                const dateHeader = document.createElement('h3');
+                dateHeader.className = 'date-header';
+                dateHeader.textContent = new Date(date).toLocaleDateString(); // Convert date string to readable format
+                // convert date to have the day of the week
+                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
+                dataTable.appendChild(dateHeader);
+
+                // Create a table for each day
+                const table = document.createElement('table');
+                table.style.width = '100%';
+                // table.setAttribute('border', '1');
+
+                // Create a header for the table
+                const header = table.createTHead();
+                const headerRow = header.insertRow();
+                const headers = ['Hour', 'Primary Swell', 'Secondary Swell'];
+                headers.forEach(headerText => {
+                    const headerCell = document.createElement('th');
+                    headerCell.textContent = headerText;
+                    headerRow.appendChild(headerCell);
+                });
+
+                // Create the body of the table
+                const tbody = document.createElement('tbody');
+                table.appendChild(tbody);
+
+                dayData.forEach(dataItem => {
+                    const row = tbody.insertRow();
+
+                    // Hour column
+                    const hourCell = row.insertCell();
+                    // split the date item and take the second part
+                    hourCell.textContent = dataItem.date.split(' ')[1];
+                    // hourCell.textContent = dataItem.date;
+                    hourCell.className = 'hour-cell';
+
+                    // Primary swell column
+                    const primaryCell = row.insertCell();
+                    primaryCell.innerHTML = createSwellHTML(dataItem.primary_swd, dataItem.primary_swh, dataItem.primary_swp);
+                    primaryCell.className = 'swell-cell';
+
+                    // Secondary swell column
+                    const secondaryCell = row.insertCell();
+                    secondaryCell.innerHTML = createSwellHTML(dataItem.secondary_swd, dataItem.secondary_swh, dataItem.secondary_swp);
+                    secondaryCell.className = 'swell-cell';
+                });
+
+                // Append the table to the container
+                dataTable.appendChild(table);
+            });}
+
+        function groupDataByDay(data) {
+            const currentYear = new Date().getFullYear(); // Placeholder: Adjust based on current context
+            const currentMonth = new Date().getMonth() + 1; // Placeholder: Adjust as needed
+            // First, ensure all date strings are converted to Date objects
+            data.forEach(item => {
+                const [day, hour] = item.Date.split(' ');
+                let month = currentMonth;
+                let year = currentYear;
+                // Adjust for month transition
+                if (parseInt(day, 10) < new Date().getDate()) {
+                    month++;
+                    if (month > 12) {
+                        month = 1;
+                        year++;
+                    }
+                }
+
+                item.dateObj = new Date(year, month - 1, parseInt(day, 10), parseInt(hour, 10));
+                // translate the time zone of this date
+            });
+
+            // Group data by day
+            const groupedData = {};
+            data.forEach(item => {
+                item.dateObj.setHours(item.dateObj.getHours() - 8); // subtract 8 hours to get to UTC
+                const dateKey = item.dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+                if (!groupedData[dateKey]) {
+                    groupedData[dateKey] = [];
+                }
+                groupedData[dateKey].push(item);
+            });
+            return groupedData;
+        }
+        console.log({{.forecast}});
+        displayGraphicalData({{.forecast}});
+
+    </script>
+    <div id="data-table"> </div>
+</div>
+
