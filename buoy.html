@@ -1,10 +1,182 @@
 <!DOCTYPE html>
 <html>
   <head>
+      <script src="https://cdn.tailwindcss.com"></script>
+      <style>
+        h1, h3
+        {
+            text-align: center;
+        }
+
+        p
+        { 
+            text-align: center;
+            font-size: 1.1em;
+        }
+
+        .datetime { 
+            font-size: 1.1em;
+        }
+
+        /* Mobile styles */
+        .predictions-container {
+            padding-left: 10%;
+            padding-right: 10%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 10px; /* Padding for mobile */
+        }
+
+        .prediction-item {
+            flex: 0 0 calc(100% - 20px);
+            margin: 11px;
+            padding-left: 10px;
+            padding-right: 10px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+            background-color: #f9f9f9;
+            background-color: #f0f0f0;
+        }
+
+        .report-container { 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 10px; /* Padding for mobile */
+        }
+
+        .current-report {
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border: 1px solid #ccc;
+            flex-wrap: wrap;
+        }
+
+        .report-table { 
+            border-collapse: collapse;
+            width: 100%;
+            text-align: center;
+            margin: 0 auto;
+            padding: 10px;
+            font-size: 1.1em;
+            
+
+        }
+
+        /* center the map*/
+        #map { 
+            height: 400px; width: 600px; 
+            margin: 0 auto;
+            padding: 10px;
+            align-items: center;
+            
+        }
+
+        #map { height: 400px; }
+
+        /* Desktop styles */
+        @media (min-width: 768px) {
+            .predictions-container {
+            }
+
+            .prediction-item {
+                flex: 0 0 calc(23.33% - 20px);
+            }
+        }
+
+
+        /*
+        .card {
+            padding: 10px;
+            width: 250px;
+            box-sizing: border-box;
+        }
+        */
+
+
+        .content {
+            display: flex;
+            align-items: center;
+            justify-content: space-evenly;
+        }
+
+        .swellsymbol {
+            font-size: 4em;
+        }
+        .windswellsymbol {
+            font-size: 4em;
+        }
+        .windsymbol {
+            font-size: 4em;
+        }
+
+        .details p {
+            margin: 5px 0;
+            font-size: 1.1em;
+        }
+
+        .headercontainer {
+            /* display horizontally */
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+        .direction {
+            display: flex;
+            flex-direction: column;
+        }
+        /* mobile */
+        @media (max-width: 768px) {
+            body {
+                padding-left: 0;
+                padding-right: 0;
+            }
+        }
+        @media (max-width: 768px) {
+            #map { 
+                /* height should be half of ui */
+                height: 300px;
+                width: 95%;
+                margin: 0 auto;
+                align-items: center;
+            }
+        }
+        .swell-cell {
+            text-align: center; /* Center the content in the swell cells */
+            font-size: 16px; /* Larger font size for swell info */
+            white-space: nowrap; /* Keep the arrow and text on the same line */
+        }
+        .swell-data { 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .swell-arrow {
+            display: inline-block;
+            transform-origin: 50% 50%;
+            font-size: 58px; /* Slightly larger font size for the arrow */
+        }
+        .hour-cell {
+            text-align: center; /* Center the content in the hour cells */
+            font-size: 16px; /* Larger font size for the hour */
+        }
+
+        .data-table {
+            /* I want the table to be narrower */
+            width: 80%;
+            border-collapse: collapse;
+            margin: 0 auto;
+        }
+          </style>
   </head>
-  <body>
+  <body class="px-40">
       <a href="/">Home</a>
-      <div> test </div>
       {{template "report" .}}
       {{template "forecast" .}}
   </body>

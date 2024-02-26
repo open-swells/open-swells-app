@@ -1,39 +1,10 @@
 {{ define "forecast" }}
 <div>
-    <style>
-        .swell-cell {
-            text-align: center; /* Center the content in the swell cells */
-            font-size: 16px; /* Larger font size for swell info */
-            white-space: nowrap; /* Keep the arrow and text on the same line */
-        }
-        .swell-data { 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .swell-arrow {
-            display: inline-block;
-            transform-origin: 50% 50%;
-            font-size: 58px; /* Slightly larger font size for the arrow */
-        }
-        .hour-cell {
-            text-align: center; /* Center the content in the hour cells */
-            font-size: 16px; /* Larger font size for the hour */
-        }
-
-        .data-table {
-            /* I want the table to be narrower */
-            width: 80%;
-            border-collapse: collapse;
-            margin: 0 auto;
-        }
-        </style>
-
     <script>
-        function displayGraphicalData(data) {
-            const dataGroupedByDay = groupDataByDay(data);
+        function displayGraphicalData(dataGroupedByDay) {
+            // data = groupDataByDay(data);
             // Clear any existing content
-            const dataTable = document.getElementById('data-table');
+            const dataTable = document.getElementById('forecast-table');
             dataTable.innerHTML = '';
 
 
@@ -94,25 +65,88 @@
                 dataTable.appendChild(table);
             });}
 
+        function summaryClicked(date) { 
+            // Get the date from the cardobject
+            const dayData = dataGroupedByDay[date];
+
+            const dataTable = document.getElementById('forecast-table');
+            dataTable.innerHTML = '';
+
+            const dateHeader = document.createElement('h3');
+            dateHeader.className = 'date-header';
+            dateHeader.textContent = date;
+
+            // convert date to have the day of the week
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
+            dataTable.appendChild(dateHeader);
+
+            // Create a table for each day
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            // table.setAttribute('border', '1');
+
+            // Create a header for the table
+            const header = table.createTHead();
+            const headerRow = header.insertRow();
+            const headers = ['Hour', 'Primary Swell', 'Secondary Swell'];
+            headers.forEach(headerText => {
+                const headerCell = document.createElement('th');
+                headerCell.textContent = headerText;
+                headerRow.appendChild(headerCell);
+            });
+
+            // Create the body of the table
+            const tbody = document.createElement('tbody');
+            table.appendChild(tbody);
+
+            dayData.forEach(dataItem => {
+                const row = tbody.insertRow();
+
+                // Hour column
+                const hourCell = row.insertCell();
+                // split the date item and take the second part
+                hourCell.textContent = dataItem.Date.split(' ')[1];
+                // hourCell.textContent = dataItem.date;
+                hourCell.className = 'hour-cell';
+
+                // Primary swell column
+                const primaryCell = row.insertCell();
+                primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
+                primaryCell.className = 'swell-cell';
+
+                // Secondary swell column
+                const secondaryCell = row.insertCell();
+                secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
+                secondaryCell.className = 'swell-cell';
+
+                // Append the table to the container
+                dataTable.appendChild(table);
+        }
+        )}
+
+        function createSwellHTML(direction, height, period) {
+            const arrowHTML = `<span class="swell-arrow" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
+
+            // Swell height and period information
+            const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
+
+            // Combine the arrow with the swell info
+            return `<div class=swell-data>${arrowHTML} ${swellInfoHTML}</div>`;
+        }
+
         function convertToDate(data, date) {
-            // date is in form YYYYMMDD
-            // we want to get the hour from the first element of data
-            // create a new object dateObj
-            // for every next element in data, we add an hour to the datetime
             hour = parseInt(data[0].Date.split(' ')[1]);
             firstdate = new Date(date.slice(0, 4), date.slice(4, 6), date.slice(6, 8), hour);
-            // console.log(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T${hour}:00:00Z`);
-            // firstdate = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T${hour}:00:00:00.000+00:00`);
             for (i = 0; i < data.length; i++) {
                 // this date needs to be in UTC!!
-                data[i].dateObj = new Date(firstdate);
+                    data[i].dateObj = new Date(firstdate);
                 data[i].dateObj.setHours(data[i].dateObj.getHours() + i);
             }
             return data;
         }
 
         function groupDataByDay(data) {
-            // Group data by day
             const groupedData = {};
             data.forEach(item => {
                 item.dateObj.setHours(item.dateObj.getHours() - 7); // subtract 8 hours to get to UTC
@@ -125,25 +159,107 @@
             return groupedData;
         }
 
-        function createSwellHTML(direction, height, period) {
-            const arrowHTML = `<span class="swell-arrow" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
+        function buildSummary(data) { 
+            const summary = [];
 
-            // Swell height and period information
-            const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
+            Object.entries(data).forEach(([date, item]) => {
+                // get the day of the week
+                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                const dayOfWeek = days[new Date(date).getDay()];
 
-            // Combine the arrow with the swell info
-            return `<div class=swell-data>${arrowHTML} ${swellInfoHTML}</div>`;
-        }
-        
+                // get the abbreviated date
+                const datefull = new Date(date).toLocaleDateString().split(' ')[0];
+                const abbreviatedDate = datefull.slice(0, datefull.length - 5);
+
+                // keep track of total primary swell
+                let totalPrimarySwell = 0;
+                item.forEach((item) => {
+                    totalPrimarySwell += parseFloat(item.PrimaryWaveHeight);
+                });
+                const primarySwellAverage = totalPrimarySwell / item.length;
+
+                // get the condition
+                let condition = 'good';
+                if (primarySwellAverage < 0.5) {
+                    condition = 'poor';
+                } else if (primarySwellAverage < 1.5) {
+                    condition = 'fair';
+                }
+
+                summary.push({
+                    date: date,
+                    dateabv: `${dayOfWeek} ${abbreviatedDate}`,
+                    condition: condition
+                });
+            });
+
+            return summary;
+        } 
+
+
+        let dataGroupedByDay = {};
+        let forecastsummary = [];
+
         document.addEventListener('DOMContentLoaded', () => {
             const data = convertToDate({{.forecast}}, {{.date}});
-            displayGraphicalData(data);
+            dataGroupedByDay = groupDataByDay(data);
+            forecastsummary = buildSummary(dataGroupedByDay);
+            displayGraphicalData(dataGroupedByDay);
+
+            // for forecastsummar, append a list of objects for each item in dataGroupedByDay. Each will have a date and a condition
+            // condition can always be good for now
+
+            const forecastContainer = document.getElementById('forecastContainer');
+
+            forecastsummary.forEach(forecast => {
+                const card = document.createElement('div');
+                card.className = 'forecastcard border-1 bg-white rounded shadow p-4 flex flex-col items-center cursor-pointer hover:bg-gray-100'; // TailwindCSS classes for styling
+
+                card.setAttribute('data-date', forecast.date); // Store the date in a data attribute
+
+                // Assuming forecast.date is a string in the format "Day MM/DD", e.g., "Sun 3/22"
+                const dayOfWeek = document.createElement('div');
+                dayOfWeek.className = 'font-medium';
+                dayOfWeek.textContent = forecast.dateabv.split(' ')[0]; // Get the day abbreviation
+
+                const dateEl = document.createElement('div');
+                dateEl.className = 'text-sm';
+                dateEl.textContent = forecast.dateabv.split(' ')[1]; // Get the date abbreviation
+
+                const conditionEl = document.createElement('div');
+                conditionEl.textContent = forecast.condition;
+                conditionEl.className = `font-bold ${forecast.condition.toLowerCase() === 'good' ? 'text-green-500' : forecast.condition.toLowerCase() === 'fair' ? 'text-orange-500' : 'text-red-500'}`;
+
+                card.appendChild(dayOfWeek);
+                card.appendChild(dateEl);
+                card.appendChild(conditionEl);
+
+                forecastContainer.appendChild(card);
+            });
+            
         });
 
-        </script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const data = convertToDate({{.forecast}}, {{.date}});
+            const dataGroupedByDay = groupDataByDay(data);
+            const cards = document.querySelectorAll('.forecastcard');
+            cards.forEach(card => {
+                card.addEventListener('click', function() {
+                    this.classList.toggle('font-bold', 'bg-gray-100'); // This toggles the bold class on click
+                    summaryClicked(this.getAttribute('data-date')); // Call the summaryClicked function
+                });
+            });
+        });
 
-    <h2 >Forecast</h2>
-    <div id="data-table" class="data-table"></div>
 
-<div>
+    </script>
+
+    <div class = "container mx-auto p-4">
+    <h2 class="text-5x1 font-bold mb-4">Forecast</h2>
+    <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer"> </div>
+
+    </div>
+    <div id="forecast-table" class="mt-8"></div>
+
+</div>
 {{end}}

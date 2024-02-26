@@ -248,8 +248,8 @@ func getForecast(c *gin.Context, cache *Cache) {
 
 
 func main() {
-    gin.SetMode(gin.ReleaseMode)
-    // router := gin.Default()
+    // gin.SetMode(gin.ReleaseMode)
+    router := gin.Default()
     cache := NewCache()
 
     cache.ClearEvery(6 * time.Hour)
