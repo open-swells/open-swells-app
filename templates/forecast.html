@@ -88,9 +88,11 @@
         }
 
         function groupDataByDay(data) {
+            // order by date first
+            data.sort((a, b) => a.dateObj - b.dateObj);
             const groupedData = {};
             data.forEach(item => {
-                item.dateObj.setHours(item.dateObj.getHours() - 7); // subtract 8 hours to get to UTC
+                item.dateObj.setHours(item.dateObj.getHours() - 8); // subtract 8 hours to get to UTC
                 const dateKey = item.dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
                 if (!groupedData[dateKey]) {
                     groupedData[dateKey] = [];
@@ -143,8 +145,9 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             const data = convertToDate({{.forecast}}, {{.date}});
-            console.log({{.date}});
+            console.log(data);
             dataGroupedByDay = groupDataByDay(data);
+            console.log(dataGroupedByDay);
             forecastsummary = buildSummary(dataGroupedByDay);
             displayClicked(Object.keys(dataGroupedByDay)[0]);
 
@@ -199,7 +202,7 @@
 
     </script>
 
-    <h2 class="text-2x1 text-lg font-bold mt-8">Forecast</h2>
+    <h2 class="text-2x1 text-lg font-bold mt-8">16 Day Forecast</h2>
     <div class = "container mx-auto ">
         <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer"> </div>
     </div>
