@@ -1,72 +1,7 @@
 {{ define "forecast" }}
 <div>
     <script>
-        function displayGraphicalData(dataGroupedByDay) {
-            // data = groupDataByDay(data);
-            // Clear any existing content
-            const dataTable = document.getElementById('forecast-table');
-            dataTable.innerHTML = '';
-
-
-            Object.entries(dataGroupedByDay).forEach(([date, dayData]) => {
-                const dateHeader = document.createElement('h3');
-                dateHeader.className = 'date-header';
-                // dateHeader.textContent = new Date(date).toLocaleDateString(); // Convert date string to readable format
-                // date is in format YYYY-MM-DD
-                // convert this to a header that is readable
-                dateHeader.textContent = date;
-
-                // convert date to have the day of the week
-                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
-                dataTable.appendChild(dateHeader);
-
-                // Create a table for each day
-                const table = document.createElement('table');
-                table.style.width = '100%';
-                // table.setAttribute('border', '1');
-
-                // Create a header for the table
-                const header = table.createTHead();
-                const headerRow = header.insertRow();
-                const headers = ['Hour', 'Primary Swell', 'Secondary Swell'];
-                headers.forEach(headerText => {
-                    const headerCell = document.createElement('th');
-                    headerCell.textContent = headerText;
-                    headerRow.appendChild(headerCell);
-                });
-
-                // Create the body of the table
-                const tbody = document.createElement('tbody');
-                table.appendChild(tbody);
-
-                dayData.forEach(dataItem => {
-                    const row = tbody.insertRow();
-
-                    // Hour column
-                    const hourCell = row.insertCell();
-                    // split the date item and take the second part
-                    hourCell.textContent = dataItem.Date.split(' ')[1];
-                    // hourCell.textContent = dataItem.date;
-                    hourCell.className = 'hour-cell';
-
-                    // Primary swell column
-                    const primaryCell = row.insertCell();
-                    primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
-                    primaryCell.className = 'swell-cell';
-
-                    // Secondary swell column
-                    const secondaryCell = row.insertCell();
-                    secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
-                    secondaryCell.className = 'swell-cell';
-                });
-
-                // Append the table to the container
-                dataTable.appendChild(table);
-            });}
-
-        function summaryClicked(date) { 
-            // Get the date from the cardobject
+        function displayClicked(date) { 
             const dayData = dataGroupedByDay[date];
 
             const dataTable = document.getElementById('forecast-table');
@@ -75,8 +10,8 @@
             const dateHeader = document.createElement('h3');
             dateHeader.className = 'date-header';
             dateHeader.textContent = date;
+            dateHeader.className = 'text-2x1 text-lg font-bold mb-4';
 
-            // convert date to have the day of the week
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
             dataTable.appendChild(dateHeader);
@@ -84,15 +19,19 @@
             // Create a table for each day
             const table = document.createElement('table');
             table.style.width = '100%';
+            table.className = 'w-full text-sm text-left';
+
             // table.setAttribute('border', '1');
 
             // Create a header for the table
             const header = table.createTHead();
             const headerRow = header.insertRow();
+            headerRow.className = 'text-xs uppercase';
             const headers = ['Hour', 'Primary Swell', 'Secondary Swell'];
             headers.forEach(headerText => {
                 const headerCell = document.createElement('th');
                 headerCell.textContent = headerText;
+                headerCell.className = 'py-3 px-6';
                 headerRow.appendChild(headerCell);
             });
 
@@ -102,23 +41,25 @@
 
             dayData.forEach(dataItem => {
                 const row = tbody.insertRow();
+                row.className = 'border-b';
+
 
                 // Hour column
                 const hourCell = row.insertCell();
                 // split the date item and take the second part
                 hourCell.textContent = dataItem.Date.split(' ')[1];
                 // hourCell.textContent = dataItem.date;
-                hourCell.className = 'hour-cell';
+                hourCell.className = 'py-3 px-6';
 
                 // Primary swell column
                 const primaryCell = row.insertCell();
                 primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
-                primaryCell.className = 'swell-cell';
+                primaryCell.className = 'py-3 px-6';
 
                 // Secondary swell column
                 const secondaryCell = row.insertCell();
                 secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
-                secondaryCell.className = 'swell-cell';
+                secondaryCell.className = 'py-3 px-6';
 
                 // Append the table to the container
                 dataTable.appendChild(table);
@@ -126,18 +67,18 @@
         )}
 
         function createSwellHTML(direction, height, period) {
-            const arrowHTML = `<span class="swell-arrow" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
+            const arrowHTML = `<span class="swell-arrow text-xl" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
 
             // Swell height and period information
             const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
 
             // Combine the arrow with the swell info
-            return `<div class=swell-data>${arrowHTML} ${swellInfoHTML}</div>`;
+            return `<div class="flex flex-center items-center">${arrowHTML} ${swellInfoHTML}</div>`;
         }
 
         function convertToDate(data, date) {
             hour = parseInt(data[0].Date.split(' ')[1]);
-            firstdate = new Date(date.slice(0, 4), date.slice(4, 6), date.slice(6, 8), hour);
+            firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour);
             for (i = 0; i < data.length; i++) {
                 // this date needs to be in UTC!!
                     data[i].dateObj = new Date(firstdate);
@@ -202,22 +143,20 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             const data = convertToDate({{.forecast}}, {{.date}});
+            console.log({{.date}});
             dataGroupedByDay = groupDataByDay(data);
             forecastsummary = buildSummary(dataGroupedByDay);
-            displayGraphicalData(dataGroupedByDay);
+            displayClicked(Object.keys(dataGroupedByDay)[0]);
 
-            // for forecastsummar, append a list of objects for each item in dataGroupedByDay. Each will have a date and a condition
-            // condition can always be good for now
 
             const forecastContainer = document.getElementById('forecastContainer');
 
             forecastsummary.forEach(forecast => {
                 const card = document.createElement('div');
-                card.className = 'forecastcard border-1 bg-white rounded shadow p-4 flex flex-col items-center cursor-pointer hover:bg-gray-100'; // TailwindCSS classes for styling
+                card.className = 'forecastcard  bg-white rounded-lg shadow border border-1 p-4 flex flex-col items-center cursor-pointer hover:bg-gray-100'; // TailwindCSS classes for styling
 
                 card.setAttribute('data-date', forecast.date); // Store the date in a data attribute
 
-                // Assuming forecast.date is a string in the format "Day MM/DD", e.g., "Sun 3/22"
                 const dayOfWeek = document.createElement('div');
                 dayOfWeek.className = 'font-medium';
                 dayOfWeek.textContent = forecast.dateabv.split(' ')[0]; // Get the day abbreviation
@@ -245,8 +184,14 @@
             const cards = document.querySelectorAll('.forecastcard');
             cards.forEach(card => {
                 card.addEventListener('click', function() {
-                    this.classList.toggle('font-bold', 'bg-gray-100'); // This toggles the bold class on click
-                    summaryClicked(this.getAttribute('data-date')); // Call the summaryClicked function
+                    this.classList.toggle('font-bold'); // This toggles the bold class on click
+                    this.classList.toggle('bg-gray-100'); // This toggles the border-3 class on click
+                    cards.forEach(otherCard => {
+                        if (otherCard !== this) {
+                            otherCard.classList.remove('font-bold', 'bg-gray-100');
+                        }
+                    });
+                    displayClicked(this.getAttribute('data-date')); // Call the displayClicked function
                 });
             });
         });
@@ -254,10 +199,9 @@
 
     </script>
 
-    <div class = "container mx-auto p-4">
-    <h2 class="text-5x1 font-bold mb-4">Forecast</h2>
-    <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer"> </div>
-
+    <h2 class="text-2x1 text-lg font-bold mt-8">Forecast</h2>
+    <div class = "container mx-auto ">
+        <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer"> </div>
     </div>
     <div id="forecast-table" class="mt-8"></div>
 

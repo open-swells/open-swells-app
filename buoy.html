@@ -1,90 +1,15 @@
 <!DOCTYPE html>
 <html>
-  <head>
-      <script src="https://cdn.tailwindcss.com"></script>
-      <style>
-        h1, h3
-        {
-            text-align: center;
-        }
-
-        p
-        { 
-            text-align: center;
-            font-size: 1.1em;
-        }
-
-        .datetime { 
-            font-size: 1.1em;
-        }
-
-        /* Mobile styles */
-        .predictions-container {
-            padding-left: 10%;
-            padding-right: 10%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-            padding: 10px; /* Padding for mobile */
-        }
-
-        .prediction-item {
-            flex: 0 0 calc(100% - 20px);
-            margin: 11px;
-            padding-left: 10px;
-            padding-right: 10px;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-            background-color: #f9f9f9;
-            background-color: #f0f0f0;
-        }
-
-        .report-container { 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-            padding: 10px; /* Padding for mobile */
-        }
-
-        .current-report {
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            background-color: #f0f0f0;
-            border: 1px solid #ccc;
-            flex-wrap: wrap;
-        }
-
-
-
-
-        .swell-data { 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .swell-arrow {
-            display: inline-block;
-            transform-origin: 50% 50%;
-            font-size: 58px; /* Slightly larger font size for the arrow */
-        }
-        .hour-cell {
-            text-align: center; /* Center the content in the hour cells */
-            font-size: 16px; /* Larger font size for the hour */
-        }
-
-        .data-table {
-            /* I want the table to be narrower */
-            width: 80%;
-            border-collapse: collapse;
-            margin: 0 auto;
-        }
-          </style>
-  </head>
-  <body class="px-40">
-      <a href="/">Home</a>
-      {{template "report" .}}
-      {{template "forecast" .}}
-  </body>
+    <head>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="px-40">
+        <div class="mt-10 mb-5 flex items-center justify-between">
+            <a href="/" class="text-xl font-bold underline">&#8592 Return To Map</a>
+            <h1 class="text-xl text-center font-bold flex-1">Buoy {{.swellreport.StationId}} Report</h1>
+            <div class="w-[11rem]"><!-- Spacer to center the title --></div>
+        </div>
+        {{template "report" .}}
+        {{template "forecast" .}}
+    </body>
 </html>

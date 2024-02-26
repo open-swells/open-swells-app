@@ -2,76 +2,8 @@
 <html>
 <head>
     <title>CA Surf Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        h1, h3
-        {
-            text-align: center;
-        }
-
-        p
-        { 
-            text-align: center;
-            font-size: 1.1em;
-        }
-
-        .datetime { 
-            font-size: 1.1em;
-        }
-
-        body { 
-            padding-left: 15%;
-            padding-right: 15%;
-        }
-        /* Mobile styles */
-        .predictions-container {
-            padding-left: 10%;
-            padding-right: 10%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-            padding: 10px; /* Padding for mobile */
-        }
-
-        .prediction-item {
-            flex: 0 0 calc(100% - 20px);
-            margin: 11px;
-            padding-left: 10px;
-            padding-right: 10px;
-            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-            background-color: #f9f9f9;
-            background-color: #f0f0f0;
-        }
-
-        .report-container { 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-            padding: 10px; /* Padding for mobile */
-        }
-
-        .current-report {
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-            background-color: #f0f0f0;
-            border: 1px solid #ccc;
-            flex-wrap: wrap;
-        }
-
-        .report-table { 
-            border-collapse: collapse;
-            width: 100%;
-            text-align: center;
-            margin: 0 auto;
-            padding: 10px;
-            font-size: 1.1em;
-            
-
-        }
-
-        /* center the map*/
         #map { 
             height: 400px; width: 600px; 
             margin: 0 auto;
@@ -80,123 +12,11 @@
             
         }
 
-        .report-table-item { 
-            border: 1px solid #000;
-            padding: 8px;
-        }
-
         #map { height: 400px; }
-
-        /* Desktop styles */
-        @media (min-width: 768px) {
-            .predictions-container {
-            }
-
-            .prediction-item {
-                flex: 0 0 calc(23.33% - 20px);
-            }
-        }
-
-
-        .container {
-            display: flex;
-            justify-content: space-evenly;
-            padding: 20px;
-        }
-
-        .card {
-            border: 1px solid #000;
-            padding: 20px;
-            width: 250px;
-            box-sizing: border-box;
-        }
-
-        .card h2 {
-            font-size: 1.2em;
-            margin: 0 0 10px;
-        }
-
-        .content {
-            display: flex;
-            align-items: center;
-            justify-content: space-evenly;
-        }
-
-        .swellsymbol {
-            font-size: 4em;
-        }
-        .windswellsymbol {
-            font-size: 4em;
-        }
-        .windsymbol {
-            font-size: 4em;
-        }
-
-        .details p {
-            margin: 5px 0;
-            font-size: 1.1em;
-        }
-
-        .headercontainer {
-            /* display horizontally */
-            display: flex;
-            flex-direction: row;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-        }
-        .direction {
-            display: flex;
-            flex-direction: column;
-        }
-        /* mobile */
-        @media (max-width: 768px) {
-            body {
-                padding-left: 0;
-                padding-right: 0;
-            }
-        }
-        @media (max-width: 768px) {
-            #map { 
-                /* height should be half of ui */
-                height: 300px;
-                width: 95%;
-                margin: 0 auto;
-                align-items: center;
-            }
-        }
-        .swell-cell {
-            text-align: center; /* Center the content in the swell cells */
-            font-size: 16px; /* Larger font size for swell info */
-            white-space: nowrap; /* Keep the arrow and text on the same line */
-        }
-        .swell-data { 
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .swell-arrow {
-            display: inline-block;
-            transform-origin: 50% 50%;
-            font-size: 58px; /* Slightly larger font size for the arrow */
-        }
-        .hour-cell {
-            text-align: center; /* Center the content in the hour cells */
-            font-size: 16px; /* Larger font size for the hour */
-        }
-
-        .data-table {
-            /* I want the table to be narrower */
-            width: 80%;
-            border-collapse: collapse;
-            margin: 0 auto;
-        }
-
-
 
     </style>
 </head>
-<body>
+<body class="px-40 mb-10" >
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
                            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -208,9 +28,9 @@
             crossorigin=""></script>
 
 
-    <h1>Surffffff Forecast</h1>
+    <h1 class = "text-xl text-center font-bold flex-1 mt-8 mb-5" >Surffffff Forecast</h1>
     <!-- I want this to be todays date, not from template --> 
-    <h3 class="datetime" style="text-align: center"> default</h3>
+    <h3 class="datetime mb-5 font-bold" style="text-align: center"> default</h3>
 
     <div id="map"></div>
 
@@ -597,7 +417,7 @@
 
         async function plotBuoys() {
             buoyData.forEach(buoy => {
-                const popupContent = `<div>${buoy.name}<br><button onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')">Show Report</button><br><a href="/forecast/${buoy.stationId}">16 Day Forecast</a></div>`;
+                const popupContent = `<div>${buoy.name}<br><button onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')">Show Report</button><a className="button" href="/forecast/${buoy.stationId}">16 Day Forecast</a></div>`;
                 // const popupContent = `<div>${buoy.name}<br><a href="/forecast/${buoy.stationId}">Show Report</a></div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
                     .bindPopup(popupContent, {minWidth: 200})
@@ -800,7 +620,8 @@
 
     </script>
     
-    <h3 class = "report-title">Choose buoy to begin</h3>
+    <h3 class = "report-title text-center my-5 text-lg font-bold">Choose buoy to begin</h3>
+    <!--
     <div class="container">
         <div class="card">
             <h2>Primary Swell</h2>
@@ -843,12 +664,50 @@
             </div>
         </div>
 
-
     </div>
-    <!-- 
-        <h2>16 Day Forecast</h2>
-        <div id="data-table"> </div> 
     -->
+
+    <div class="container flex flex-row px-15 justify-evenly">
+        <div class="card bg-white shadow-lg rounded-lg overflow-hidden border border-2 w-60">
+            <h2 class="text-lg font-semibold text-gray-800 p-4">Primary Swell</h2>
+            <div class="content">
+                <div class="direction flex flex-col items-center space-x-2">
+                    <div class="swellsymbol text-6xl" style="transform: rotate({{.swellreport.PrimaryDegrees}}deg);">&#8595;</div>
+                    <p class="mwd text-center">{{.swellreport.PrimaryDegrees}}º</p>
+                </div>
+                <div class="details text-base">
+                    <p class= "swhswp text-center" >NA</p>
+                    <p class="steep text-center"></p>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-white shadow-lg rounded-lg overflow-hidden border border-2 w-60">
+            <h2 class="text-lg font-semibold text-gray-800 p-4">Secondary Swell</h2>
+            <div class="content">
+                <div class="direction flex flex-col items-center space-x-2">
+                    <div class="windswellsymbol text-6xl">&#8595;</div>
+                    <p class="wwd text-center"></p>
+                </div>
+                <div class="details space text-base">
+                    <p class="wwhwwp text-center">NA</p>
+                </div>
+            </div>
+        </div>
+        <div class="card bg-white shadow-lg rounded-lg overflow-hidden border border-2 w-60">
+            <h2 class="text-lg font-semibold text-gray-800 p-4">Wind</h2>
+            <div class="content">
+                <div class="direction flex flex-col items-center space-x-2">
+                    <div class="windsymbol text-6xl" style="transform: rotate({{.windreport.WindDir}}deg);">&#8595;</div>
+                    <p class="wddir text-center">NA</p>
+                </div>
+                <div class="details space text-base">
+                    <p class="wdspd text-center">NA</p>
+                    <p class="gust text-center">NA</p>
+                    <p class="airtemp text-center">NA</p>
+                    <p class="temp text-center">NA</p>
+                </div>
+            </div>
+        </div>
 
 </body>
 </html>
