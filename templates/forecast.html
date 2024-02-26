@@ -1,4 +1,34 @@
-<div id="forecast">
+{{ define "forecast" }}
+<div>
+    <style>
+        .swell-cell {
+            text-align: center; /* Center the content in the swell cells */
+            font-size: 16px; /* Larger font size for swell info */
+            white-space: nowrap; /* Keep the arrow and text on the same line */
+        }
+        .swell-data { 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .swell-arrow {
+            display: inline-block;
+            transform-origin: 50% 50%;
+            font-size: 58px; /* Slightly larger font size for the arrow */
+        }
+        .hour-cell {
+            text-align: center; /* Center the content in the hour cells */
+            font-size: 16px; /* Larger font size for the hour */
+        }
+
+        .data-table {
+            /* I want the table to be narrower */
+            width: 80%;
+            border-collapse: collapse;
+            margin: 0 auto;
+        }
+        </style>
+
     <script>
         function displayGraphicalData(data) {
             const dataGroupedByDay = groupDataByDay(data);
@@ -6,10 +36,15 @@
             const dataTable = document.getElementById('data-table');
             dataTable.innerHTML = '';
 
+
             Object.entries(dataGroupedByDay).forEach(([date, dayData]) => {
                 const dateHeader = document.createElement('h3');
                 dateHeader.className = 'date-header';
-                dateHeader.textContent = new Date(date).toLocaleDateString(); // Convert date string to readable format
+                // dateHeader.textContent = new Date(date).toLocaleDateString(); // Convert date string to readable format
+                // date is in format YYYY-MM-DD
+                // convert this to a header that is readable
+                dateHeader.textContent = date;
+
                 // convert date to have the day of the week
                 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
@@ -40,18 +75,18 @@
                     // Hour column
                     const hourCell = row.insertCell();
                     // split the date item and take the second part
-                    hourCell.textContent = dataItem.date.split(' ')[1];
+                    hourCell.textContent = dataItem.Date.split(' ')[1];
                     // hourCell.textContent = dataItem.date;
                     hourCell.className = 'hour-cell';
 
                     // Primary swell column
                     const primaryCell = row.insertCell();
-                    primaryCell.innerHTML = createSwellHTML(dataItem.primary_swd, dataItem.primary_swh, dataItem.primary_swp);
+                    primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
                     primaryCell.className = 'swell-cell';
 
                     // Secondary swell column
                     const secondaryCell = row.insertCell();
-                    secondaryCell.innerHTML = createSwellHTML(dataItem.secondary_swd, dataItem.secondary_swh, dataItem.secondary_swp);
+                    secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
                     secondaryCell.className = 'swell-cell';
                 });
 
@@ -59,31 +94,28 @@
                 dataTable.appendChild(table);
             });}
 
+        function convertToDate(data, date) {
+            // date is in form YYYYMMDD
+            // we want to get the hour from the first element of data
+            // create a new object dateObj
+            // for every next element in data, we add an hour to the datetime
+            hour = parseInt(data[0].Date.split(' ')[1]);
+            firstdate = new Date(date.slice(0, 4), date.slice(4, 6), date.slice(6, 8), hour);
+            // console.log(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T${hour}:00:00Z`);
+            // firstdate = new Date(`${date.slice(0,4)}-${date.slice(4,6)}-${date.slice(6,8)}T${hour}:00:00:00.000+00:00`);
+            for (i = 0; i < data.length; i++) {
+                // this date needs to be in UTC!!
+                data[i].dateObj = new Date(firstdate);
+                data[i].dateObj.setHours(data[i].dateObj.getHours() + i);
+            }
+            return data;
+        }
+
         function groupDataByDay(data) {
-            const currentYear = new Date().getFullYear(); // Placeholder: Adjust based on current context
-            const currentMonth = new Date().getMonth() + 1; // Placeholder: Adjust as needed
-            // First, ensure all date strings are converted to Date objects
-            data.forEach(item => {
-                const [day, hour] = item.Date.split(' ');
-                let month = currentMonth;
-                let year = currentYear;
-                // Adjust for month transition
-                if (parseInt(day, 10) < new Date().getDate()) {
-                    month++;
-                    if (month > 12) {
-                        month = 1;
-                        year++;
-                    }
-                }
-
-                item.dateObj = new Date(year, month - 1, parseInt(day, 10), parseInt(hour, 10));
-                // translate the time zone of this date
-            });
-
             // Group data by day
             const groupedData = {};
             data.forEach(item => {
-                item.dateObj.setHours(item.dateObj.getHours() - 8); // subtract 8 hours to get to UTC
+                item.dateObj.setHours(item.dateObj.getHours() - 7); // subtract 8 hours to get to UTC
                 const dateKey = item.dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
                 if (!groupedData[dateKey]) {
                     groupedData[dateKey] = [];
@@ -92,10 +124,26 @@
             });
             return groupedData;
         }
-        console.log({{.forecast}});
-        displayGraphicalData({{.forecast}});
 
-    </script>
-    <div id="data-table"> </div>
-</div>
+        function createSwellHTML(direction, height, period) {
+            const arrowHTML = `<span class="swell-arrow" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
 
+            // Swell height and period information
+            const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
+
+            // Combine the arrow with the swell info
+            return `<div class=swell-data>${arrowHTML} ${swellInfoHTML}</div>`;
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const data = convertToDate({{.forecast}}, {{.date}});
+            displayGraphicalData(data);
+        });
+
+        </script>
+
+    <h2 >Forecast</h2>
+    <div id="data-table" class="data-table"></div>
+
+<div>
+{{end}}

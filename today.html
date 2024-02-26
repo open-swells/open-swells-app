@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <title>CA Surf Report</title>
     <style>
-        h1
+        h1, h3
         {
             text-align: center;
         }
@@ -565,7 +564,7 @@
             document.getElementsByClassName("windswellsymbol")[0].style.transform = "rotate(" + directionmap[line[11]] + "deg)";
 
             getWindReport(stationId);
-            getBuoyForecast(stationId);
+            //getBuoyForecast(stationId);
 
         }
 
@@ -598,7 +597,8 @@
 
         async function plotBuoys() {
             buoyData.forEach(buoy => {
-                const popupContent = `<div>${buoy.name}<br><button onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')">Show Report</button></div>`;
+                const popupContent = `<div>${buoy.name}<br><button onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')">Show Report</button><br><a href="/forecast/${buoy.stationId}">16 Day Forecast</a></div>`;
+                // const popupContent = `<div>${buoy.name}<br><a href="/forecast/${buoy.stationId}">Show Report</a></div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
                     .bindPopup(popupContent, {minWidth: 200})
             });
@@ -845,8 +845,10 @@
 
 
     </div>
-    <h2>16 Day Forecast</h2>
-    <div id="data-table"> </div>
+    <!-- 
+        <h2>16 Day Forecast</h2>
+        <div id="data-table"> </div> 
+    -->
 
 </body>
 </html>
