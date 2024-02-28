@@ -33,7 +33,7 @@
     </style>
 </head>
 
-<body class="mb-10 bg-white text-black dark:bg-black dark:text-white" >
+<body class="mb-10 font-mono" >
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
                            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -47,7 +47,7 @@
 
     <div class="header flex flex-row justify-around items-center p-4">
         <div class="title width:20%">
-            <h1 class="text-xl font-bold">Surffffff Forecast</h1>
+            <h1 class="text-xl font-bold">Surffffff;/</h1>
         </div>
         <div class="search w-1/2">
             <input type="text" id="search" class="w-full border-2 border-gray-300 p-2 rounded-md" placeholder="Search for a buoy">
@@ -245,13 +245,13 @@
                     <br>
                     <button
                         onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')"
-                        class="bg-gray-200 hover:bg-blue-700  font-bold py-2 px-4 rounded"
+                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3 rounded-md"
                     >
                     Show Report
                     </button>
                     <a
                         href="/forecast/${buoy.stationId}"
-                        class="bg-gray-200 hover:bg-blue-700  font-bold py-2 px-4 rounded"
+                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3 rounded-md"
                     >
                     16 Day Forecast
                     </a>

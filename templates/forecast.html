@@ -49,17 +49,17 @@
                 // split the date item and take the second part
                 hourCell.textContent = dataItem.Date.split(' ')[1];
                 // hourCell.textContent = dataItem.date;
-                hourCell.className = 'py-3 px-6';
+                hourCell.className = 'py-2 px-6';
 
                 // Primary swell column
                 const primaryCell = row.insertCell();
                 primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
-                primaryCell.className = 'py-3 px-6';
+                primaryCell.className = 'py-2 px-6';
 
                 // Secondary swell column
                 const secondaryCell = row.insertCell();
                 secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
-                secondaryCell.className = 'py-3 px-6';
+                secondaryCell.className = 'py-2 px-6';
 
                 // Append the table to the container
                 dataTable.appendChild(table);
@@ -67,7 +67,7 @@
         )}
 
         function createSwellHTML(direction, height, period) {
-            const arrowHTML = `<span class="swell-arrow text-xl" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
+            const arrowHTML = `<span class="swell-arrow text-3xl" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
 
             // Swell height and period information
             const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;

@@ -65,11 +65,11 @@
             <div class="content flex flex-row justify-evenly mb-4">
                 <div class="direction flex flex-col items-center space-x-2">
                     <div class="windsymbol text-6xl" style="transform: rotate({{.windreport.WindDir}}deg);">&#8595;</div>
-                    <p class="wddir text-center">{{.windreport.WindDir}}</p>
+                    <p class="wddir text-center">{{.windreport.WindDir}}º</p>
                 </div>
                 <div class="details space text-base grid content-center">
-                    <p class="wdspd text-center">wind speed: {{.windreport.WindSpeed}}mph</p>
-                    <p class="gust text-center">wind gust: {{.windreport.WindGust}}mph</p>
+                    <p class="wdspd text-center">speed: {{.windreport.WindSpeed}}mph</p>
+                    <p class="gust text-center">gusts: {{.windreport.WindGust}}mph</p>
                 </div>
             </div>
         </div>
