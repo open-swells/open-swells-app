@@ -11,7 +11,6 @@
             align-items: center;
             
         }
-        #map { height: 400px; }
         #searchResults {
             position: absolute;
             z-index: 1000;
@@ -34,7 +33,7 @@
     </style>
 </head>
 
-<body class="mb-10" >
+<body class="mb-10 bg-white text-black dark:bg-black dark:text-white" >
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
                            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -56,7 +55,7 @@
         </div>
         <div class="width:20%">
             <a href> about</a>
-            <button id="dark-mode-toggle" class="ml-4">Dark Mode</button>
+            <button id="darkModeToggle" class="ml-4">Dark Mode</button>
         </div>
     </div>
 
@@ -238,7 +237,25 @@
 
         async function plotBuoys() {
             buoyData.forEach(buoy => {
-                const popupContent = `<div>${buoy.name}<br><button onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')">Show Report</button><a className="button" href="/forecast/${buoy.stationId}">16 Day Forecast</a></div>`;
+                const popupContent = `
+                    <div>
+                        <div class="text-md">
+                        ${buoy.name}
+                        </div>
+                    <br>
+                    <button
+                        onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')"
+                        class="bg-gray-200 hover:bg-blue-700  font-bold py-2 px-4 rounded"
+                    >
+                    Show Report
+                    </button>
+                    <a
+                        href="/forecast/${buoy.stationId}"
+                        class="bg-gray-200 hover:bg-blue-700  font-bold py-2 px-4 rounded"
+                    >
+                    16 Day Forecast
+                    </a>
+                    </div>`;
                 // const popupContent = `<div>${buoy.name}<br><a href="/forecast/${buoy.stationId}">Show Report</a></div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
                     .bindPopup(popupContent, {minWidth: 200})
@@ -455,7 +472,7 @@
                             }
                         }
                     });
-                    map.setView([match.latitude, match.longitude], 6);
+                    map.setView([match.latitude + 0.5, match.longitude], 6);
                 };
                 searchResults.appendChild(div);
             });
@@ -476,6 +493,29 @@
             }
             window.location.href = `/forecast/${currentBuoy.stationId}`;
         });
+
+        function toggleDarkMode() {
+            // Check if the dark class exists on the body
+            if (document.body.classList.contains('dark')) {
+                // If dark mode is enabled, turn it off
+                document.body.classList.remove('dark');
+                // Save the preference in localStorage
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                // If dark mode is not enabled, turn it on
+                document.body.classList.add('dark');
+                // Save the preference in localStorage
+                localStorage.setItem('darkMode', 'true');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.body.classList.add('dark');
+            }
+        });
+
+        document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
 
         plotBuoys();
 
