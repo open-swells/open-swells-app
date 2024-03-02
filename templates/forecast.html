@@ -147,6 +147,7 @@
         let currentDay = []; 
         let swellChart = null;
 
+
         document.addEventListener('DOMContentLoaded', () => {
             const data = convertToDate({{.forecast}}, {{.date}});
             dataGroupedByDay = groupDataByDay(data);
@@ -228,9 +229,11 @@
                 const image = new Image();
                 image.src = canvas.toDataURL();
                 return image;
-            }
+            };
+            
             // Dimensions and margins of the graph
             const margin = {top: 20, right: 30, bottom: 30, left: 50},
+                // width should be max width
                 width = 860 - margin.left - margin.right,
                 height = 400 - margin.top - margin.bottom;
 
@@ -252,13 +255,15 @@
                 .call(d3.axisBottom(x));
 
 
+
             // y should not start at 0, but  just below the minimum swell height
             const y = d3.scaleLinear()
                 .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])
                 .range([ height, 0 ]);
-            svg.append("g")
-                .call(d3.axisLeft(y));
 
+            svg.append("g")
+                .call(d3.axisLeft(y))
+                .attr("class", "y-axis");
 
             // Initial chart draw
             updateChart(currentDay, svg, x, y);
@@ -330,11 +335,23 @@
             swellChart.update();
         }
 
+
         // Function to draw and update the line chart
         function updateChart(data, svg, x, y) { 
             // change x and y according to the new data
-            // x.domain(d3.extent(data, d => d.hour));
+           // y = d3.scaleLinear()
+           //     .domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])
+           //     .range([ height, 0 ]);
+
+            // remove y axis
+            svg.selectAll("g.y-axis").remove();
+
             y.domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))]);
+            //svg.append("g").attr("class", "y axis").call(d3.axisLeft(y)).transition().duration(1000).call(d3.axisLeft(y));
+
+
+            svg.append("g")
+                .call(d3.axisLeft(y));
                 
             // Line generator for primary swell height
             const linePrimary = d3.line()
@@ -377,6 +394,26 @@
                 .attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight)}) rotate(45)`)
                 .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
                 .attr("fill", "orange");
+
+            const tooltip = d3.select("#tooltip");
+
+            // Mouse move handler to update tooltip content and position
+            svg.on("mousemove", (event) => {
+                const mousePos = d3.pointer(event);
+                const mouseX = mousePos[0];
+                const hoverDate = x.invert(mouseX);
+                const closestData = data.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
+
+                tooltip.style("visibility", "visible")
+                    .style("top", (event.pageY + 15) + "px")
+                    .style("left", (event.pageX + 15) + "px")
+                    .html(`Hour: ${closestData.hour}<br>Primary Swell Height: ${closestData.primarySwellHeight}<br>Secondary Swell Height: ${closestData.secondarySwellHeight}`);
+            });
+
+            // Mouse leave handler to hide tooltip
+            svg.on("mouseleave", () => {
+                tooltip.style("visibility", "hidden");
+            });
         }
 
 
@@ -394,6 +431,7 @@
     <div id="canvasContainer">
         <canvas id="swellChart"></canvas>
     </div>
+    <div id="tooltip" style="position: absolute; visibility: hidden; padding: 10px; background: white; border: 1px solid #000; border-radius: 5px; pointer-events: none;"></div>
     <div id="forecast-table" class="mt-8"></div>
 
 
