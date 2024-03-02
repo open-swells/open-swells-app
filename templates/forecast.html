@@ -8,14 +8,18 @@
             const dataTable = document.getElementById('forecast-table');
             dataTable.innerHTML = '';
 
-            const dateHeader = document.createElement('h3');
-            dateHeader.className = 'date-header';
+           // const dateHeader = document.createElement('h3');
+           // dateHeader.className = 'date-header';
+           // dateHeader.className = 'text-2x1 text-lg font-bold mb-4';
+
+            // change date by getting the div instead
+            const dateHeader = document.getElementById('date-header');
             dateHeader.textContent = date;
-            dateHeader.className = 'text-2x1 text-lg font-bold mb-4';
+
 
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
-            dataTable.appendChild(dateHeader);
+            //dataTable.appendChild(dateHeader);
 
             // Create a table for each day
             const table = document.createElement('table');
@@ -148,14 +152,13 @@
         let swellChart = null;
 
 
+        // this dom listener adds the forecast cards
         document.addEventListener('DOMContentLoaded', () => {
             const data = convertToDate({{.forecast}}, {{.date}});
             dataGroupedByDay = groupDataByDay(data);
             forecastsummary = buildSummary(dataGroupedByDay);
             displayClicked(Object.keys(dataGroupedByDay)[0]);
             currentDay = dataGroupedByDay[Object.keys(dataGroupedByDay)[0]];
-            swellChart = initializeChart();
-            console.log(swellChart);
 
 
             const forecastContainer = document.getElementById('forecastContainer');
@@ -187,6 +190,30 @@
             
         });
 
+        function createRotatedSymbol(symbol, rotationDegrees) {
+            const canvas = document.createElement('canvas');
+            const size = 20; // Size of the square canvas and thus the symbol
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            // Move the origin to the center of the canvas
+            ctx.translate(size / 2, size / 2);
+            // Rotate the canvas
+            ctx.rotate(rotationDegrees * Math.PI / 180);
+            // Draw the symbol, adjusting to center the text after rotation
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(symbol, 0, 0);
+
+            // Convert canvas to an image
+            const image = new Image();
+            image.src = canvas.toDataURL();
+            return image;
+        };
+
+        // this dom listener adds the visualization and forecast chart
         document.addEventListener('DOMContentLoaded', () => {
             const data = convertToDate({{.forecast}}, {{.date}});
             const dataGroupedByDay = groupDataByDay(data);
@@ -201,40 +228,17 @@
                         }
                     });
                     displayClicked(this.getAttribute('data-date')); // Call the displayClicked function
-                    updateChartData();
-                    updateChart(currentDay, svg, x, y);
+                    updateChart(currentDay, svg);
                 });
             });
 
-            console.log("logging this: ", currentDay);
-
-            function createRotatedSymbol(symbol, rotationDegrees) {
-                const canvas = document.createElement('canvas');
-                const size = 20; // Size of the square canvas and thus the symbol
-                canvas.width = size;
-                canvas.height = size;
-                const ctx = canvas.getContext('2d');
-
-                // Move the origin to the center of the canvas
-                ctx.translate(size / 2, size / 2);
-                // Rotate the canvas
-                ctx.rotate(rotationDegrees * Math.PI / 180);
-                // Draw the symbol, adjusting to center the text after rotation
-                ctx.font = '16px Arial';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(symbol, 0, 0);
-
-                // Convert canvas to an image
-                const image = new Image();
-                image.src = canvas.toDataURL();
-                return image;
-            };
             
             // Dimensions and margins of the graph
             const margin = {top: 20, right: 30, bottom: 30, left: 50},
                 // width should be max width
-                width = 860 - margin.left - margin.right,
+                //width = 860 - margin.left - margin.right,
+                // set the width to 100% of the parent container
+                width = document.getElementById('chart-container').offsetWidth - margin.left - margin.right,
                 height = 400 - margin.top - margin.bottom;
 
             // Append the svg object to the body of the page
@@ -254,169 +258,110 @@
                 .attr("transform", `translate(0,${height})`)
                 .call(d3.axisBottom(x));
 
-
-
             // y should not start at 0, but  just below the minimum swell height
-            const y = d3.scaleLinear()
+            var y = d3.scaleLinear()
                 .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])
                 .range([ height, 0 ]);
 
-            svg.append("g")
-                .call(d3.axisLeft(y))
-                .attr("class", "y-axis");
+            var yScale = d3.scaleLinear()
+                .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])
+                .range([ height, 0 ]);
 
-            // Initial chart draw
-            updateChart(currentDay, svg, x, y);
+            var yAxis = d3.axisLeft(yScale);
+
+            svg.append("g")
+                .attr("class", "yaxis")
+                .call(yAxis);
+
+            function updateChart(data, svg) { 
+                // remove y axis
+
+                // clear y domain and update
+                rescale();
+                y.domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))]);
+
+                // Line generator for primary swell height
+                const linePrimary = d3.line()
+                    .x(d => x(d.hour))
+                    .y(d => y(d.PrimaryWaveHeight));
+
+                // Line generator for secondary swell height
+                const lineSecondary = d3.line()
+                    .x(d => x(d.hour))
+                    .y(d => y(d.SecondaryWaveHeight));
+
+                // Draw or update primary swell line
+                svg.selectAll(".linePrimary").data([data], d => d.hour)
+                    .join("path")
+                    .attr("class", "linePrimary")
+                    .attr("d", linePrimary)
+                    .attr("fill", "none")
+                    .attr("stroke", "steelblue");
+
+                // Draw or update secondary swell line
+                svg.selectAll(".lineSecondary").data([data], d => d.hour)
+                    .join("path")
+                    .attr("class", "lineSecondary")
+                    .attr("d", lineSecondary)
+                    .attr("fill", "none")
+                    .attr("stroke", "orange");
+
+
+                // Add arrows for primary swell points
+                svg.selectAll(".primaryPoint").data(data)
+                    .join("path")
+                    .attr("class", "primaryPoint")
+                    .attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight)}) rotate(${d.PrimaryDegrees - 135}) skewY(25)`)
+                    .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
+                    .attr("fill", "steelblue");
+
+                // Add arrows for secondary swell points, with different rotation
+                svg.selectAll(".secondaryPoint").data(data)
+                    .join("path")
+                    .attr("class", "secondaryPoint")
+                    .attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight)}) rotate(${d.SecondaryDegrees - 135}) skewY(25)`)
+                    .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
+                    .attr("stroke", "orange")
+                    .attr("fill", "orange");
+
+                const tooltip = d3.select("#tooltip");
+
+                // Mouse move handler to update tooltip content and position
+                svg.on("mousemove", (event) => {
+                    // show a popup anywhere on hover, not just over the line
+
+                    const mousePos = d3.pointer(event);
+                    const mouseX = mousePos[0];
+                    const hoverDate = x.invert(mouseX);
+                    const closestData = data.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
+
+
+
+                    tooltip.style("visibility", "visible")
+                        .style("top", (event.pageY + 15) + "px")
+                        .style("left", (event.pageX + 15) + "px")
+                        .html(`Hour: ${closestData.hour}<br>Primary Swell Height: ${closestData.PrimaryWaveHeight}<br>Secondary Swell Height: ${closestData.SecondaryWaveHeight}`);
+                });
+
+                // Mouse leave handler to hide tooltip
+                svg.on("mouseleave", () => {
+                    tooltip.style("visibility", "hidden");
+                });
+            }
+
+            function rescale() {
+                yScale.domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])  // change scale to 0, to between 10 and 100
+                svg.select(".yaxis")
+                        .transition().duration(200)  // https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
+                        .call(yAxis);  
+
+                svg.select(".yaxis_label")
+                    .text("Rescaled Axis");
+            }
+
+            updateChart(currentDay, svg);
 
         });
-
-        function initializeChart() { 
-
-            console.log(currentDay);
-            const labels = currentDay.map(data => data.hour);
-            const primarySwellHeights = currentDay.map(data => data.PrimaryWaveHeight);
-            const secondarySwellHeights = currentDay.map(data => data.SecondaryWaveHeight);
-
-
-            const ctx = document.getElementById('swellChart').getContext('2d');
-            swellChart = new Chart(ctx, {
-                type: 'line', // Define the chart type
-                data: {
-                    labels: labels, // X-axis labels
-                    datasets: [{
-                        label: 'Primary Swell Height (m)',
-                        data: primarySwellHeights,
-                        borderColor: 'rgba(255, 99, 132, 1)', // Example color
-                        borderWidth: 2,
-                        fill: false
-                    }, {
-                        label: 'Secondary Swell Height (m)',
-                        data: secondarySwellHeights,
-                        borderColor: 'rgba(54, 162, 235, 1)', // Example color
-                        borderWidth: 2,
-                        fill: false
-                    }]
-                },
-                options: {
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Hour'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Swell Height (m)'
-                            },
-                            beginAtZero: true
-                        }
-                    },
-                    responsive: true, // Ensure the chart is responsive
-                    plugins: {
-                        legend: {
-                            position: 'top', // Position the legend at the top
-                        },
-                        title: {
-                            display: true,
-                            text: 'Swell Height'
-                        }
-                    }
-                }
-            });
-            return swellChart;
-        };
-
-        function updateChartData() { 
-            swellChart.data.labels = currentDay.map(data => data.hour);
-            swellChart.data.datasets[0].data = currentDay.map(data => data.PrimaryWaveHeight);
-            swellChart.data.datasets[1].data = currentDay.map(data => data.SecondaryWaveHeight);
-            swellChart.update();
-        }
-
-
-        // Function to draw and update the line chart
-        function updateChart(data, svg, x, y) { 
-            // change x and y according to the new data
-           // y = d3.scaleLinear()
-           //     .domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])
-           //     .range([ height, 0 ]);
-
-            // remove y axis
-            svg.selectAll("g.y-axis").remove();
-
-            y.domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))]);
-            //svg.append("g").attr("class", "y axis").call(d3.axisLeft(y)).transition().duration(1000).call(d3.axisLeft(y));
-
-
-            svg.append("g")
-                .call(d3.axisLeft(y));
-                
-            // Line generator for primary swell height
-            const linePrimary = d3.line()
-                .x(d => x(d.hour))
-                .y(d => y(d.PrimaryWaveHeight));
-
-            // Line generator for secondary swell height
-            const lineSecondary = d3.line()
-                .x(d => x(d.hour))
-                .y(d => y(d.SecondaryWaveHeight));
-
-            // Draw or update primary swell line
-            svg.selectAll(".linePrimary").data([data], d => d.hour)
-                .join("path")
-                .attr("class", "linePrimary")
-                .attr("d", linePrimary)
-                .attr("fill", "none")
-                .attr("stroke", "steelblue");
-
-            // Draw or update secondary swell line
-            svg.selectAll(".lineSecondary").data([data], d => d.hour)
-                .join("path")
-                .attr("class", "lineSecondary")
-                .attr("d", lineSecondary)
-                .attr("fill", "none")
-                .attr("stroke", "orange");
-
-            // Add arrows for primary swell points
-            svg.selectAll(".primaryPoint").data(data)
-                .join("path")
-                .attr("class", "primaryPoint")
-                .attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight)}) rotate(-45)`)
-                .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
-                .attr("fill", "steelblue");
-
-            // Add arrows for secondary swell points, with different rotation
-            svg.selectAll(".secondaryPoint").data(data)
-                .join("path")
-                .attr("class", "secondaryPoint")
-                .attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight)}) rotate(45)`)
-                .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
-                .attr("fill", "orange");
-
-            const tooltip = d3.select("#tooltip");
-
-            // Mouse move handler to update tooltip content and position
-            svg.on("mousemove", (event) => {
-                const mousePos = d3.pointer(event);
-                const mouseX = mousePos[0];
-                const hoverDate = x.invert(mouseX);
-                const closestData = data.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
-
-                tooltip.style("visibility", "visible")
-                    .style("top", (event.pageY + 15) + "px")
-                    .style("left", (event.pageX + 15) + "px")
-                    .html(`Hour: ${closestData.hour}<br>Primary Swell Height: ${closestData.primarySwellHeight}<br>Secondary Swell Height: ${closestData.secondarySwellHeight}`);
-            });
-
-            // Mouse leave handler to hide tooltip
-            svg.on("mouseleave", () => {
-                tooltip.style("visibility", "hidden");
-            });
-        }
-
-
 
 
     </script>
@@ -426,10 +371,12 @@
     <div class = "container mx-auto ">
         <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer"> </div>
     </div>
-    <div id="chart">
+    <div id="date-header" class= 'text-2x1 text-lg font-bold my-4'> </div>
+
+    <div id="chart-container" class="flex justify-center">
+        <div id="chart">
     </div>
-    <div id="canvasContainer">
-        <canvas id="swellChart"></canvas>
+
     </div>
     <div id="tooltip" style="position: absolute; visibility: hidden; padding: 10px; background: white; border: 1px solid #000; border-radius: 5px; pointer-events: none;"></div>
     <div id="forecast-table" class="mt-8"></div>
