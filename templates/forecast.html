@@ -4,6 +4,7 @@
         function displayClicked(date) { 
             const dayData = dataGroupedByDay[date];
             currentDay = dayData;
+            console.log(currentDay);
 
             const dataTable = document.getElementById('forecast-table');
             dataTable.innerHTML = '';
@@ -159,6 +160,7 @@
             forecastsummary = buildSummary(dataGroupedByDay);
             displayClicked(Object.keys(dataGroupedByDay)[0]);
             currentDay = dataGroupedByDay[Object.keys(dataGroupedByDay)[0]];
+            console.log(currentDay);
 
 
             const forecastContainer = document.getElementById('forecastContainer');
@@ -274,9 +276,6 @@
                 .call(yAxis);
 
             function updateChart(data, svg) { 
-                // remove y axis
-
-                // clear y domain and update
                 rescale();
                 y.domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))]);
 
@@ -289,6 +288,15 @@
                 const lineSecondary = d3.line()
                     .x(d => x(d.hour))
                     .y(d => y(d.SecondaryWaveHeight));
+
+                //Draw tertiary swell line
+                const lineTertiary = d3.line()
+                    .x(d => x(d.hour))
+                    .y(d => y(d.TertiaryWaveHeight));
+
+                const lineQuaternary = d3.line()
+                    .x(d => x(d.hour))
+                    .y(d => y(d.QuaternaryWaveHeight));
 
                 // Draw or update primary swell line
                 svg.selectAll(".linePrimary").data([data], d => d.hour)
@@ -306,6 +314,19 @@
                     .attr("fill", "none")
                     .attr("stroke", "orange");
 
+                svg.selectAll(".lineTertiary").data([data], d => d.hour)
+                    .join("path")
+                    .attr("class", "lineTertiary")
+                    .attr("d", lineTertiary)
+                    .attr("fill", "none")
+                    .attr("stroke", "green");
+
+                svg.selectAll(".lineQuaternary").data([data], d => d.hour)
+                    .join("path")
+                    .attr("class", "lineQuaternary")
+                    .attr("d", lineQuaternary)
+                    .attr("fill", "none")
+                    .attr("stroke", "purple");
 
                 // Add arrows for primary swell points
                 svg.selectAll(".primaryPoint").data(data)
@@ -323,6 +344,29 @@
                     .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
                     .attr("stroke", "orange")
                     .attr("fill", "orange");
+
+                // if all the tertiary data is 0, don't draw the line
+                svg.selectAll(".tertiaryPoint").data(data)
+                    .join("path")
+                    .attr("class", "tertiaryPoint")
+                    .attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight)}) rotate(${d.TertiaryDegrees - 135}) skewY(25)`)
+                    .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
+                    .attr("stroke", "green")
+                    .attr("fill", "green");
+
+                // if every tertiary point is empty, don't draw the line
+                if (data.every(d => d.TertiaryWaveHeight === 0)) {
+                    svg.selectAll(".lineTertiary").remove();
+                }
+
+                // add arrows for quaternary swell points, with different rotation
+                svg.selectAll(".quaternaryPoint").data(data)
+                    .join("path")
+                    .attr("class", "quaternaryPoint")
+                    .attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight)}) rotate(${d.QuaternaryDegrees - 135}) skewY(25)`)
+                    .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
+                    .attr("stroke", "purple")
+                    .attr("fill", "purple");
 
                 const tooltip = d3.select("#tooltip");
 

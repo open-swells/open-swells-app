@@ -22,6 +22,12 @@ type ForecastRow struct {
     SecondaryWaveHeight string
     SecondaryPeriod string
     SecondaryDegrees string
+    TertiaryWaveHeight string
+    TertiaryPeriod string
+    TertiaryDegrees string
+    QuaternaryWaveHeight string
+    QuaternaryPeriod string
+    QuaternaryDegrees string
 }
 
 type SwellReport struct {
@@ -119,21 +125,58 @@ func parseBullFile(data string) ([]ForecastRow, error) {
         line = strings.ReplaceAll(line, "*", "")
         // split by space
         parts := strings.Fields(line)
-        if len(parts) < 10 {
+        if len(parts) < 7 {
             continue
         }
+        if len(parts) < 8 {
+            forecast = append(forecast, ForecastRow{
+                Date: parts[0] + " " + parts[1],
+                PrimaryWaveHeight: parts[4],
+                PrimaryPeriod: parts[5],
+                PrimaryDegrees: parts[6],
+            })
+        } else if len(parts) < 11 {
+            forecast = append(forecast, ForecastRow{
+                Date: parts[0] + " " + parts[1],
+                // strconv returns a float64 and an error, so we need to handle the error
+                PrimaryWaveHeight: parts[4],
+                PrimaryPeriod: parts[5],
+                PrimaryDegrees: parts[6],
+                SecondaryWaveHeight: parts[7],
+                SecondaryPeriod: parts[8],
+                SecondaryDegrees: parts[9],
+            })
+        } else if len(parts) < 14 {
+            forecast = append(forecast, ForecastRow{
+                Date: parts[0] + " " + parts[1],
+                PrimaryWaveHeight: parts[4],
+                PrimaryPeriod: parts[5],
+                PrimaryDegrees: parts[6],
+                SecondaryWaveHeight: parts[7],
+                SecondaryPeriod: parts[8],
+                SecondaryDegrees: parts[9],
+                TertiaryWaveHeight: parts[10],
+                TertiaryPeriod: parts[11],
+                TertiaryDegrees: parts[12],
+            })
+        } else {
+            forecast = append(forecast, ForecastRow{
+                Date: parts[0] + " " + parts[1],
+                PrimaryWaveHeight: parts[4],
+                PrimaryPeriod: parts[5],
+                PrimaryDegrees: parts[6],
+                SecondaryWaveHeight: parts[7],
+                SecondaryPeriod: parts[8],
+                SecondaryDegrees: parts[9],
+                TertiaryWaveHeight: parts[10],
+                TertiaryPeriod: parts[11],
+                TertiaryDegrees: parts[12],
+                QuaternaryWaveHeight: parts[13],
+                QuaternaryPeriod: parts[14],
+                QuaternaryDegrees: parts[15],
+            })
 
-        // Parse the data from the bull file
-        forecast = append(forecast, ForecastRow{
-            Date: parts[0] + " " + parts[1],
-            // strconv returns a float64 and an error, so we need to handle the error
-            PrimaryWaveHeight: parts[4],
-            PrimaryPeriod: parts[5],
-            PrimaryDegrees: parts[6],
-            SecondaryWaveHeight: parts[7],
-            SecondaryPeriod: parts[8],
-            SecondaryDegrees: parts[9],
-        })
+        }
     }
     return forecast, nil
 }
