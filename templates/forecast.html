@@ -67,6 +67,24 @@
                 secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
                 secondaryCell.className = 'py-2 px-6';
 
+                // Tertiary swell column
+                const tertiaryCell = row.insertCell();
+                if (dataItem.TertiaryWaveHeight === '') {
+                    tertiaryCell.innerHTML = '';
+                } else {
+                    tertiaryCell.innerHTML = createSwellHTML(dataItem.TertiaryDegrees, dataItem.TertiaryWaveHeight, dataItem.TertiaryPeriod);
+                    tertiaryCell.className = 'py-2 px-6';
+                }
+
+                // Quaternary swell column
+                const quaternaryCell = row.insertCell();
+                if (dataItem.QuaternaryWaveHeight === '') {
+                    quaternaryCell.innerHTML = '';
+                } else {
+                    quaternaryCell.innerHTML = createSwellHTML(dataItem.QuaternaryDegrees, dataItem.QuaternaryWaveHeight, dataItem.QuaternaryPeriod);
+                    quaternaryCell.className = 'py-2 px-6';
+                }
+
                 // Append the table to the container
                 dataTable.appendChild(table);
         }
@@ -99,8 +117,12 @@
             data.sort((a, b) => a.dateObj - b.dateObj);
             const groupedData = {};
             data.forEach(item => {
-                item.dateObj.setHours(item.dateObj.getHours() - 8); // subtract 8 hours to get to UTC
+                // item.dateObj.setHours(item.dateObj.getHours() - 8); // subtract 8 hours to get to UTC
+                // set time zone as UTC
+                item.dateObj.setHours(item.dateObj.getHours() - item.dateObj.getTimezoneOffset() / 60);
                 const dateKey = item.dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+                // make dateKey based on UTC time zone
+
                 if (!groupedData[dateKey]) {
                     groupedData[dateKey] = [];
                 }
@@ -384,7 +406,7 @@
                     tooltip.style("visibility", "visible")
                         .style("top", (event.pageY + 15) + "px")
                         .style("left", (event.pageX + 15) + "px")
-                        .html(`Hour: ${closestData.hour}<br>Primary Swell Height: ${closestData.PrimaryWaveHeight}<br>Secondary Swell Height: ${closestData.SecondaryWaveHeight}`);
+                        .html(`Hour: ${closestData.hour}<br>${closestData.PrimaryWaveHeight}m at ${closestData.PrimaryPeriod}s`);
                 });
 
                 // Mouse leave handler to hide tooltip
