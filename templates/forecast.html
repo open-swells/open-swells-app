@@ -15,12 +15,16 @@
 
             // change date by getting the div instead
             const dateHeader = document.getElementById('date-header');
-            dateHeader.textContent = date;
-
 
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
+            // dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
             //dataTable.appendChild(dateHeader);
+
+            // from summary
+            const datefull = new Date(date).toLocaleDateString().split(' ')[0];
+            dateHeader.textContent = days[new Date(date).getDay()] + ' ' + datefull
+            // const abbreviatedDate = datefull.slice(0, datefull.length - 5);
+            //
 
             // Create a table for each day
             const table = document.createElement('table');
