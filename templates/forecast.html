@@ -4,7 +4,6 @@
         function displayClicked(date) { 
             const dayData = dataGroupedByDay[date];
             currentDay = dayData;
-            console.log(currentDay);
 
             const dataTable = document.getElementById('forecast-table');
             dataTable.innerHTML = '';
@@ -21,10 +20,19 @@
             //dataTable.appendChild(dateHeader);
 
             // from summary
-            const datefull = new Date(date).toLocaleDateString().split(' ')[0];
-            dateHeader.textContent = days[new Date(date).getDay()] + ' ' + datefull
+            // const datefull = new Date(date).toLocaleDateString().split(' ')[0];
+
+            let tempdate = new Date(date);
+            tempdate.setHours(tempdate.getHours() - tempdate.getTimezoneOffset() / 60);
+            console.log("here: ", tempdate);
+            const datefull = date.split('T')[0];
+
+            dateHeader.textContent = days[tempdate.getDay()] + ' ' + datefull
             // const abbreviatedDate = datefull.slice(0, datefull.length - 5);
             //
+
+            let abbreviatedDate = datefull.slice(5, 10);
+            abbreviatedDate = abbreviatedDate.replace(/^0+/, '').replace('-', '/');
 
             // Create a table for each day
             const table = document.createElement('table');
@@ -106,10 +114,14 @@
 
         function convertToDate(data, date) {
             hour = parseInt(data[0].Date.split(' ')[1]);
-            firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour);
+            console.log(date);
+            firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour); // this sets the time as UTC time, but listed as local time
+            // console.log(firstdate);
+            firstdate.setHours(firstdate.getHours() - firstdate.getTimezoneOffset() / 60); // this converts the time VALUE to match the time zone
+            console.log(firstdate);
             for (i = 0; i < data.length; i++) {
                 // this date needs to be in UTC!!
-                    data[i].dateObj = new Date(firstdate);
+                data[i].dateObj = new Date(firstdate);
                 data[i].dateObj.setHours(data[i].dateObj.getHours() + i);
                 data[i].hour = data[i].dateObj.getHours();
             }
@@ -118,12 +130,14 @@
 
         function groupDataByDay(data) {
             // order by date first
+            // log first date
+            console.log("first date: ", data[0].dateObj);
             data.sort((a, b) => a.dateObj - b.dateObj);
             const groupedData = {};
             data.forEach(item => {
                 // item.dateObj.setHours(item.dateObj.getHours() - 8); // subtract 8 hours to get to UTC
                 // set time zone as UTC
-                item.dateObj.setHours(item.dateObj.getHours() - item.dateObj.getTimezoneOffset() / 60);
+                item.dateObj.setHours(item.dateObj.getHours() - item.dateObj.getTimezoneOffset() / 60); // offset again so that the ISO makes sense
                 const dateKey = item.dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
                 // make dateKey based on UTC time zone
 
@@ -140,12 +154,15 @@
 
             Object.entries(data).forEach(([date, item]) => {
                 // get the day of the week
+                let tempdate = new Date(date);
+                tempdate.setHours(tempdate.getHours() - tempdate.getTimezoneOffset() / 60);
                 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                const dayOfWeek = days[new Date(date).getDay()];
+                const dayOfWeek = days[tempdate.getDay()];
 
-                // get the abbreviated date
-                const datefull = new Date(date).toLocaleDateString().split(' ')[0];
-                const abbreviatedDate = datefull.slice(0, datefull.length - 5);
+                const datefull = date.split('T')[0];
+                let abbreviatedDate = datefull.slice(5, 10);
+                abbreviatedDate = abbreviatedDate.replace(/^0+/, '').replace('-', '/');
+
 
                 // keep track of total primary swell
                 let totalPrimarySwell = 0;
@@ -173,20 +190,17 @@
         } 
 
 
-        let dataGroupedByDay = {};
-        let forecastsummary = [];
         let currentDay = []; 
         let swellChart = null;
+        let data = convertToDate({{.forecast}}, {{.date}});
+        let dataGroupedByDay = groupDataByDay(data);
+        let forecastsummary = buildSummary(dataGroupedByDay);
 
 
         // this dom listener adds the forecast cards
         document.addEventListener('DOMContentLoaded', () => {
-            const data = convertToDate({{.forecast}}, {{.date}});
-            dataGroupedByDay = groupDataByDay(data);
-            forecastsummary = buildSummary(dataGroupedByDay);
             displayClicked(Object.keys(dataGroupedByDay)[0]);
             currentDay = dataGroupedByDay[Object.keys(dataGroupedByDay)[0]];
-            console.log(currentDay);
 
 
             const forecastContainer = document.getElementById('forecastContainer');
@@ -243,8 +257,8 @@
 
         // this dom listener adds the visualization and forecast chart
         document.addEventListener('DOMContentLoaded', () => {
-            const data = convertToDate({{.forecast}}, {{.date}});
-            const dataGroupedByDay = groupDataByDay(data);
+            // const data = convertToDate({{.forecast}}, {{.date}});
+            // const dataGroupedByDay = groupDataByDay(data);
             const cards = document.querySelectorAll('.forecastcard');
             cards.forEach(card => {
                 card.addEventListener('click', function() {

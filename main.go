@@ -247,6 +247,7 @@ func getForecast(c *gin.Context, cache *Cache) {
             formattedDate := now.Format("20060102")
             formattedTime := now.Hour() / 6 * 6
             url := fmt.Sprintf("https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.%s/%02d/wave/station/bulls.t%02dz/gfswave.%s.bull", formattedDate, formattedTime, formattedTime, stationId)
+            fmt.Println(url)
 
             resp, err := client.R().SetHeader("X-Requested-With", "XMLHttpRequest").Get(url)
             if err == nil && resp.StatusCode() == http.StatusOK {
