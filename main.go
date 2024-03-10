@@ -108,70 +108,6 @@ func getDate(data string) string {
     return parts[2]
 }
 
-func parseBullFileTest(data string) ([]ForecastRow, error) {
-    forecast := []ForecastRow{}
-    lines := strings.Split(data, "\n")
-    lines = lines[6:391]
-    for _, line := range lines {
-        if strings.HasPrefix(line, "n :") {
-            break
-        }
-        // split line by | 
-        lineForecast := ForecastRow{}
-        sections := strings.Split(line, "|")
-        for i, section := range sections {
-            if i == 2 {
-                // go to next iteration in loop
-                continue
-            }
-            if i == 1 && len(section) > 1 {
-                // split by space, add to forecast
-                parts := strings.Fields(section)
-                lineForecast.Date = parts[0] + " " + parts[1]
-            } else if i == 3 && len(section) > 2 { 
-                parts := strings.Fields(section)
-                if len(parts) < 3 {
-                    continue
-                }
-                lineForecast.PrimaryWaveHeight = parts[0]
-                lineForecast.PrimaryPeriod = parts[1]
-                lineForecast.PrimaryDegrees = parts[2]
-            } else if i == 4 && len(section) > 2 {
-                parts := strings.Fields(section)
-                if len(parts) < 3 {
-                    continue
-                }
-                lineForecast.SecondaryWaveHeight = parts[0]
-                lineForecast.SecondaryPeriod = parts[1]
-                lineForecast.SecondaryDegrees = parts[2]
-            } else if i == 5 && len(section) > 2 {
-                parts := strings.Fields(section)
-                if len(parts) < 3 {
-                    continue
-                }
-                lineForecast.TertiaryWaveHeight = parts[0]
-                lineForecast.TertiaryPeriod = parts[1]
-                lineForecast.TertiaryDegrees = parts[2]
-            } else if i == 6 && len(section) > 2 {
-                parts := strings.Fields(section)
-                if len(parts) < 3 {
-                    continue
-                }
-                lineForecast.QuaternaryWaveHeight = parts[0]
-                lineForecast.QuaternaryPeriod = parts[1]
-                lineForecast.QuaternaryDegrees = parts[2]
-            } else {
-                continue
-            }
-                
-        }
-        if len(lineForecast.Date) > 0 {
-            forecast = append(forecast, lineForecast)
-        }
-    }
-    return forecast, nil
-}
-
 func parseBullFile(data string) ([]ForecastRow, error) {
     // Parse the data from the bull file
     forecast := []ForecastRow{}
@@ -300,6 +236,21 @@ func getWindReport(stationId string) (WindReport, error) {
 
 }
 
+func getTides(c *gin.Context) {
+    tmpl, err := template.ParseFiles("tides.html", "templates/tides.html")
+    // Execute the template with the prediction data
+    htmlBuffer := new(bytes.Buffer)
+    err = tmpl.ExecuteTemplate(htmlBuffer, "tides.html", nil)
+    if err != nil {
+        log.Println(err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+        return
+    }
+
+    c.Header("Content-Type", "text/html; charset=utf-8")
+    c.String(http.StatusOK, htmlBuffer.String())
+}
+
 func getForecast(c *gin.Context, cache *Cache) {
     stationId := c.Param("stationId")
 
@@ -372,17 +323,6 @@ func main() {
 
     router.ForwardedByClientIP = true
     //router.SetTrustedProxies([]string{"127.0.0.1","192.168.1.250", "192.168.1.1"})
-
-    // create a string of test data
-
-   // testdata := `|  9 19 | 0.75  6   |   0.47  8.6  99 |   0.36 11.9 112 |   0.24 14.6  13 |   0.24 14.3 111 |   0.23 12.5  16 |   0.18 17.2  10 |
-   //  |  9 20 | 0.76  6   |   0.50  8.6 100 |   0.31 11.6 111 |   0.30 13.8 114 |   0.23 14.6  13 |   0.22 12.5  16 |   0.20 16.9  11 |
-   //  |  9 21 | 0.82  7 1 |   0.56  6.7 102 |   0.31 13.5 113 |   0.28 11.3 112 |   0.23 14.5  14 |  |   |`
-   // result, err := parseBullFileTest(testdata)
-   // fmt.Println(result)
-   // if err != nil {
-   //     fmt.Println(err)
-   // }
 
     // main route
     router.GET("/", func(c *gin.Context) {

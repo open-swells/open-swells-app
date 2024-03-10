@@ -16,20 +16,11 @@
             const dateHeader = document.getElementById('date-header');
 
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            // dateHeader.textContent = days[new Date(date).getDay()] + ' ' + dateHeader.textContent;
-            //dataTable.appendChild(dateHeader);
-
-            // from summary
-            // const datefull = new Date(date).toLocaleDateString().split(' ')[0];
 
             let tempdate = new Date(date);
-            tempdate.setHours(tempdate.getHours() - tempdate.getTimezoneOffset() / 60);
-            console.log("here: ", tempdate);
             const datefull = date.split('T')[0];
 
             dateHeader.textContent = days[tempdate.getDay()] + ' ' + datefull
-            // const abbreviatedDate = datefull.slice(0, datefull.length - 5);
-            //
 
             let abbreviatedDate = datefull.slice(5, 10);
             abbreviatedDate = abbreviatedDate.replace(/^0+/, '').replace('-', '/');
@@ -114,11 +105,8 @@
 
         function convertToDate(data, date) {
             hour = parseInt(data[0].Date.split(' ')[1]);
-            console.log(date);
             firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour); // this sets the time as UTC time, but listed as local time
-            // console.log(firstdate);
             firstdate.setHours(firstdate.getHours() - firstdate.getTimezoneOffset() / 60); // this converts the time VALUE to match the time zone
-            console.log(firstdate);
             for (i = 0; i < data.length; i++) {
                 // this date needs to be in UTC!!
                 data[i].dateObj = new Date(firstdate);
@@ -131,16 +119,10 @@
         function groupDataByDay(data) {
             // order by date first
             // log first date
-            console.log("first date: ", data[0].dateObj);
             data.sort((a, b) => a.dateObj - b.dateObj);
             const groupedData = {};
             data.forEach(item => {
-                // item.dateObj.setHours(item.dateObj.getHours() - 8); // subtract 8 hours to get to UTC
-                // set time zone as UTC
-                item.dateObj.setHours(item.dateObj.getHours() - item.dateObj.getTimezoneOffset() / 60); // offset again so that the ISO makes sense
-                const dateKey = item.dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
-                // make dateKey based on UTC time zone
-
+                const dateKey = item.dateObj.toLocaleDateString();
                 if (!groupedData[dateKey]) {
                     groupedData[dateKey] = [];
                 }
@@ -155,12 +137,13 @@
             Object.entries(data).forEach(([date, item]) => {
                 // get the day of the week
                 let tempdate = new Date(date);
-                tempdate.setHours(tempdate.getHours() - tempdate.getTimezoneOffset() / 60);
+                // tempdate.setHours(tempdate.getHours() - tempdate.getTimezoneOffset() / 60);
                 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
                 const dayOfWeek = days[tempdate.getDay()];
 
+
                 const datefull = date.split('T')[0];
-                let abbreviatedDate = datefull.slice(5, 10);
+                let abbreviatedDate = datefull.slice(0, 4);
                 abbreviatedDate = abbreviatedDate.replace(/^0+/, '').replace('-', '/');
 
 
@@ -199,7 +182,6 @@
 
         // this dom listener adds the forecast cards
         document.addEventListener('DOMContentLoaded', () => {
-            displayClicked(Object.keys(dataGroupedByDay)[0]);
             currentDay = dataGroupedByDay[Object.keys(dataGroupedByDay)[0]];
 
 
@@ -229,31 +211,10 @@
 
                 forecastContainer.appendChild(card);
             });
+            displayClicked(Object.keys(dataGroupedByDay)[0]);
             
         });
 
-        function createRotatedSymbol(symbol, rotationDegrees) {
-            const canvas = document.createElement('canvas');
-            const size = 20; // Size of the square canvas and thus the symbol
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-
-            // Move the origin to the center of the canvas
-            ctx.translate(size / 2, size / 2);
-            // Rotate the canvas
-            ctx.rotate(rotationDegrees * Math.PI / 180);
-            // Draw the symbol, adjusting to center the text after rotation
-            ctx.font = '16px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(symbol, 0, 0);
-
-            // Convert canvas to an image
-            const image = new Image();
-            image.src = canvas.toDataURL();
-            return image;
-        };
 
         // this dom listener adds the visualization and forecast chart
         document.addEventListener('DOMContentLoaded', () => {
@@ -273,6 +234,10 @@
                     updateChart(currentDay, svg);
                 });
             });
+
+            firstcard = cards[0];
+            firstcard.classList.toggle('font-bold');
+            firstcard.classList.toggle('bg-gray-100');
 
             
             // Dimensions and margins of the graph
@@ -424,7 +389,10 @@
                     tooltip.style("visibility", "visible")
                         .style("top", (event.pageY + 15) + "px")
                         .style("left", (event.pageX + 15) + "px")
-                        .html(`Hour: ${closestData.hour}<br>${closestData.PrimaryWaveHeight}m at ${closestData.PrimaryPeriod}s`);
+                        .html(`Hour: ${closestData.hour}<br>${closestData.PrimaryWaveHeight}m at ${closestData.PrimaryPeriod}s
+                            <br>${closestData.SecondaryWaveHeight}m at ${closestData.SecondaryPeriod}s
+                            <br>${closestData.TertiaryWaveHeight}m at ${closestData.TertiaryPeriod}s
+                            <br>${closestData.QuaternaryWaveHeight}m at ${closestData.QuaternaryPeriod}s`);
                 });
 
                 // Mouse leave handler to hide tooltip
