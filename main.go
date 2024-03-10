@@ -108,6 +108,70 @@ func getDate(data string) string {
     return parts[2]
 }
 
+func parseBullFileTest(data string) ([]ForecastRow, error) {
+    forecast := []ForecastRow{}
+    lines := strings.Split(data, "\n")
+    lines = lines[6:391]
+    for _, line := range lines {
+        if strings.HasPrefix(line, "n :") {
+            break
+        }
+        // split line by | 
+        lineForecast := ForecastRow{}
+        sections := strings.Split(line, "|")
+        for i, section := range sections {
+            if i == 2 {
+                // go to next iteration in loop
+                continue
+            }
+            if i == 1 && len(section) > 1 {
+                // split by space, add to forecast
+                parts := strings.Fields(section)
+                lineForecast.Date = parts[0] + " " + parts[1]
+            } else if i == 3 && len(section) > 2 { 
+                parts := strings.Fields(section)
+                if len(parts) < 3 {
+                    continue
+                }
+                lineForecast.PrimaryWaveHeight = parts[0]
+                lineForecast.PrimaryPeriod = parts[1]
+                lineForecast.PrimaryDegrees = parts[2]
+            } else if i == 4 && len(section) > 2 {
+                parts := strings.Fields(section)
+                if len(parts) < 3 {
+                    continue
+                }
+                lineForecast.SecondaryWaveHeight = parts[0]
+                lineForecast.SecondaryPeriod = parts[1]
+                lineForecast.SecondaryDegrees = parts[2]
+            } else if i == 5 && len(section) > 2 {
+                parts := strings.Fields(section)
+                if len(parts) < 3 {
+                    continue
+                }
+                lineForecast.TertiaryWaveHeight = parts[0]
+                lineForecast.TertiaryPeriod = parts[1]
+                lineForecast.TertiaryDegrees = parts[2]
+            } else if i == 6 && len(section) > 2 {
+                parts := strings.Fields(section)
+                if len(parts) < 3 {
+                    continue
+                }
+                lineForecast.QuaternaryWaveHeight = parts[0]
+                lineForecast.QuaternaryPeriod = parts[1]
+                lineForecast.QuaternaryDegrees = parts[2]
+            } else {
+                continue
+            }
+                
+        }
+        if len(lineForecast.Date) > 0 {
+            forecast = append(forecast, lineForecast)
+        }
+    }
+    return forecast, nil
+}
+
 func parseBullFile(data string) ([]ForecastRow, error) {
     // Parse the data from the bull file
     forecast := []ForecastRow{}
@@ -120,11 +184,19 @@ func parseBullFile(data string) ([]ForecastRow, error) {
         if strings.HasPrefix(line, "n :") {
             break
         }
+        // use regex to get the first 3 elements in between each set of | 
         // remove all "|" and replace with space
         line = strings.ReplaceAll(line, "|", " ")
         line = strings.ReplaceAll(line, "*", "")
         // split by space
         parts := strings.Fields(line)
+        // if the the fifth value is equal to 1, remove it
+        // check of parts[4] is a whole integer
+
+        if len(parts) > 4 && (parts[4] == "1" || parts[4] == "2" || parts[4] == "3" || parts[4] == "4" || parts[4] == "5") {
+            parts = append(parts[:4], parts[5:]...)
+        }
+
         if len(parts) < 7 {
             continue
         }
@@ -138,7 +210,6 @@ func parseBullFile(data string) ([]ForecastRow, error) {
         } else if len(parts) < 11 {
             forecast = append(forecast, ForecastRow{
                 Date: parts[0] + " " + parts[1],
-                // strconv returns a float64 and an error, so we need to handle the error
                 PrimaryWaveHeight: parts[4],
                 PrimaryPeriod: parts[5],
                 PrimaryDegrees: parts[6],
@@ -264,6 +335,7 @@ func getForecast(c *gin.Context, cache *Cache) {
         }
 
         parsedData, err := parseBullFile(data)
+
         date := getDate(data)
         windreport, err := getWindReport(stationId)
         swellreport, err := getSwellReport(stationId)
@@ -300,6 +372,17 @@ func main() {
 
     router.ForwardedByClientIP = true
     //router.SetTrustedProxies([]string{"127.0.0.1","192.168.1.250", "192.168.1.1"})
+
+    // create a string of test data
+
+   // testdata := `|  9 19 | 0.75  6   |   0.47  8.6  99 |   0.36 11.9 112 |   0.24 14.6  13 |   0.24 14.3 111 |   0.23 12.5  16 |   0.18 17.2  10 |
+   //  |  9 20 | 0.76  6   |   0.50  8.6 100 |   0.31 11.6 111 |   0.30 13.8 114 |   0.23 14.6  13 |   0.22 12.5  16 |   0.20 16.9  11 |
+   //  |  9 21 | 0.82  7 1 |   0.56  6.7 102 |   0.31 13.5 113 |   0.28 11.3 112 |   0.23 14.5  14 |  |   |`
+   // result, err := parseBullFileTest(testdata)
+   // fmt.Println(result)
+   // if err != nil {
+   //     fmt.Println(err)
+   // }
 
     // main route
     router.GET("/", func(c *gin.Context) {
