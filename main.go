@@ -315,7 +315,8 @@ func getForecast(c *gin.Context, cache *Cache) {
 
 
 func main() {
-    gin.SetMode(gin.ReleaseMode)
+    //gin.SetMode(gin.ReleaseMode)
+    gin.SetMode(gin.DebugMode)
     router := gin.Default()
     cache := NewCache()
 
