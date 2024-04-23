@@ -1,6 +1,30 @@
-# go-mb-surf
-This is a project that uses public buoy data to predict the surf report in Los Angeles. I use an LSTM network to forecast wave height, period, and direction. 
+<p align="center">
+  <img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" width="300"/>
+</p>
 
-The model that was used to make these predictions can be found in **evancoons22/nbdc-buoy-data**. 
+### [GoSurf;](https://go-surf-app-438594f906bc.herokuapp.com/)
+### Overview
 
-Check out the predictions [here](https://go-ml-surf-forecast.onrender.com/). 
+**[GoSurf](https://go-surf-app-438594f906bc.herokuapp.com/)** is a free, open-source **surf report** and **16 day swell forecast from 170+ locations**. Reports and forecasts are from the [The Environmental Modeling Center Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php).
+New forecasts are received every 6 hours. 
+
+### Previously
+
+This project was previously a 3 forecast for my local break using an LSTM network ([site](https://go-ml-surf-forecast.onrender.com/), [github](https://github.com/evancoons22/nbdc-buoy-data)). I have since expanded it to include a 16 days forecast for 170+ locations thanks to Environmental Modeling Center and NOAA.
+
+### Running the App
+
+You can run this app locally.
+
+1. clone repo
+2. `$ go run main.go`
+3. go to localhost:8080
+
+### Resources and Tools
+- [htmx](https://htmx.org/)
+- [tailwindcss](https://tailwindcss.com/)
+- [golang](https://golang.org/)
+- [gin-gonic](https://github.com/gin-gonic/gin)
+- [leafletjs](https://leafletjs.com/) (maps)
+- [d3js](https://d3js.org/) (charts)
+- [EMC Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php)

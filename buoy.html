@@ -9,7 +9,9 @@
         <div class="mt-10 mb-5 flex items-center justify-between">
             <a href="/" class="text-xl font-bold underline">&#8592 Return To Map</a>
             <h1 class="text-xl text-center font-bold flex-1">Buoy {{.swellreport.StationId}} Report</h1>
-            <div class="w-[11rem]"><!-- Spacer to center the title --></div>
+            <div class="w-[11rem]">
+                <img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" alt="buoy" width="160">
+            </div>
         </div>
         {{template "report" .}}
         {{template "forecast" .}}
