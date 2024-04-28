@@ -1,0 +1,7 @@
+1. go build -o main (build the binary)
+2. nohup ./myapp > nohup.out 2>&1 &
+3. sudo ufw allow (port num)
+
+kill app
+1. ps -ef | grep myapp
+
