@@ -1,6 +1,8 @@
-<p align="center">
+<!-- <p align="center">
   <img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" width="300"/>
 </p>
+-->
+## GoSurf
 
 ### [GoSurf;](https://go-surf-app-438594f906bc.herokuapp.com/)
 ### Overview
@@ -10,15 +12,15 @@ New forecasts are received every 6 hours.
 
 ### Previously
 
-This project was previously a 3 forecast for my local break using an LSTM network ([site](https://go-ml-surf-forecast.onrender.com/), [github](https://github.com/evancoons22/nbdc-buoy-data)). I have since expanded it to include a 16 days forecast for 170+ locations thanks to Environmental Modeling Center and NOAA.
+This project was previously a 3 day forecast for my local beach using an LSTM network, and later graph neural networks ([site](https://go-ml-surf-forecast.onrender.com/), [github](https://github.com/evancoons22/nbdc-buoy-data)). I have since expanded it to include a 16 days forecast for 170+ locations thanks to Environmental Modeling Center and NOAA.
 
 ### Running the App
 
 You can run this app locally.
 
 1. clone repo
-2. `$ go run main.go`
-3. go to localhost:8080
+2. `$ go run .`
+3. go to localhost:8081
 
 ### Resources and Tools
 - [htmx](https://htmx.org/)

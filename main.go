@@ -269,7 +269,7 @@ func getForecast(c *gin.Context, cache *Cache) {
             formattedDate := now.Format("20060102")
             formattedTime := now.Hour() / 6 * 6
             url := fmt.Sprintf("https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.%s/%02d/wave/station/bulls.t%02dz/gfswave.%s.bull", formattedDate, formattedTime, formattedTime, stationId)
-            fmt.Println(url)
+            //fmt.Println(url)
 
             resp, err := client.R().SetHeader("X-Requested-With", "XMLHttpRequest").Get(url)
             if err == nil && resp.StatusCode() == http.StatusOK {
@@ -297,7 +297,7 @@ func getForecast(c *gin.Context, cache *Cache) {
         cache.Set(stationId, returndata)
     }
 
-    tmpl, err := template.ParseFiles("buoy.html", "templates/forecast.html", "templates/report.html")
+    tmpl, err := template.ParseFiles("pages/buoy.html", "templates/forecast.html", "templates/report.html")
     // Execute the template with the prediction data
     htmlBuffer := new(bytes.Buffer)
     // err = tmpl.Execute(htmlBuffer, returndata)
@@ -326,7 +326,7 @@ func main() {
 
     // main route
     router.GET("/", func(c *gin.Context) {
-        tmpl, err := template.ParseFiles("today.html")
+        tmpl, err := template.ParseFiles("pages/today.html")
 
         err = tmpl.Execute(c.Writer, nil)
         if err != nil {
@@ -341,6 +341,20 @@ func main() {
 
     router.GET("/forecast/:stationId", func(c *gin.Context) {
         getForecast(c, cache)
+    })
+
+    router.GET("/about", func(c *gin.Context) {
+        tmpl, err := template.ParseFiles("pages/about.html")
+
+        err = tmpl.Execute(c.Writer, nil)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+            return
+        }
+
+        c.Header("Content-Type", "text/html; charset=utf-8")
+        c.Status(http.StatusOK)
     })
 
     router.Run(":8081")
