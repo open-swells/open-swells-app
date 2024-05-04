@@ -2,12 +2,12 @@
   <img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" width="300"/>
 </p>
 -->
-## GoSurf
+## OpenSwells;
 
-### [GoSurf;](https://go-surf-app-438594f906bc.herokuapp.com/)
+### [openswells.com](https://openswells.com)
 ### Overview
 
-**[GoSurf](https://go-surf-app-438594f906bc.herokuapp.com/)** is a free, open-source **surf report** and **16 day swell forecast from 170+ locations**. Reports and forecasts are from the [The Environmental Modeling Center Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php).
+**[OpenSwells](https://go-surf-app-438594f906bc.herokuapp.com/)** is a free, open-source **surf report** and **16 day swell forecast from 170+ locations**. Reports and forecasts are from the [The Environmental Modeling Center Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php).
 New forecasts are received every 6 hours. 
 
 ### Previously
