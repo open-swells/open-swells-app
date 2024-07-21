@@ -29,6 +29,9 @@
         .search-result:last-child {
             border-bottom: none;
         }
+        .leaflet-popup-content-wrapper { 
+            border-radius: 0px !important;
+        } 
 
     </style>
 </head>
@@ -51,7 +54,7 @@
             <!--<img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" alt="surfing" width="160"> -->
         </div>
         <div class="search w-1/2">
-            <input type="text" id="search" class="w-full border-2 border-gray-300 p-2 rounded-md" placeholder="Search for a buoy">
+            <input type="text" id="search" class="w-full border-2 border-gray-300 p-2" placeholder="Search for a buoy">
             <div id="searchResults" class="mt-2"></div>
         </div>
         <div class="width:20%">
@@ -67,7 +70,7 @@
     <div class="report flex justify-center">
     <div class="container flex flex-row  justify-evenly">
 
-        <div class="card bg-white shadow-lg rounded-md overflow-hidden border border-2 w-60">
+        <div class="card bg-white overflow-hidden border-2 w-60">
             <h2 class="text-lg font-semibold text-gray-800 p-2">Primary Swell</h2>
             <div class="content flex flex-row justify-evenly">
                 <div class="direction flex flex-col items-center space-x-2">
@@ -81,7 +84,7 @@
             </div>
         </div>
 
-        <div class="card bg-white shadow-lg rounded-md overflow-hidden border border-2 w-60">
+        <div class="card bg-white overflow-hidden border-2 w-60">
             <h2 class="text-lg font-semibold text-gray-800 p-2">Secondary Swell</h2>
             <div class="content flex flex-row justify-evenly">
                 <div class="direction flex flex-col items-center space-x-2">
@@ -94,7 +97,7 @@
             </div>
         </div>
 
-        <div class="card bg-white shadow-lg rounded-md overflow-hidden border border-2 w-60">
+        <div class="card bg-white overflow-hidden  border-2 w-60">
             <h2 class="text-lg font-semibold text-gray-800 p-2">Wind</h2>
             <div class="content flex flex-row justify-evenly mb-4">
                 <div class="direction flex flex-col items-center space-x-2">
@@ -108,7 +111,7 @@
             </div>
         </div>
 
-        <div class="card bg-white shadow-lg rounded-md overflow-hidden border border-2 w-60">
+        <div class="card bg-white overflow-hidden  border-2 w-60">
             <h2 class="text-lg font-semibold text-gray-800 p-2">Weather</h2>
             <div class="content">
                     <p class="airtemp text-center">NA</p>
@@ -120,7 +123,7 @@
 
     <!-- div to get the forecast -->
     <div class="forecast flex justify-center">
-        <button id="forecastBtn" class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 my-5 px-4 rounded-md">Show 16 Day Forecast</button>
+        <button id="forecastBtn" class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 my-5 px-4">Show 16 Day Forecast</button>
     </div>
 
 
@@ -239,27 +242,27 @@
         async function plotBuoys() {
             buoyData.forEach(buoy => {
                 const popupContent = `
-                    <div>
+                    <div div="">
                         <div class="text-md">
                         ${buoy.name}
                         </div>
                     <br>
                     <button
                         onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')"
-                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3 rounded-md"
+                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3"
                     >
                     Show Report
                     </button>
                     <a
                         href="/forecast/${buoy.stationId}"
-                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3 rounded-md"
+                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3"
                     >
                     16 Day Forecast
                     </a>
                     </div>`;
                 // const popupContent = `<div>${buoy.name}<br><a href="/forecast/${buoy.stationId}">Show Report</a></div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
-                    .bindPopup(popupContent, {minWidth: 200})
+                    .bindPopup(popupContent, {minWidth: 250})
             });
         }
 
