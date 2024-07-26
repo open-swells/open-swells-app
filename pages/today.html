@@ -171,7 +171,8 @@
 
         async function getBuoyReport(stationId, name) {
             // const url =  'https://corsproxy.io/?' + 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.spec';
-            const url = 'http://localhost:8081/realtime/' + stationId;
+            const base_url = window.location.origin;
+            const url = base_url + '/realtime/' + stationId;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
@@ -215,7 +216,8 @@
 
         async function getWindReport(stationId) {
             // const url = 'https://corsproxy.io/?' + 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.txt';
-            const url = 'http://localhost:8081/realtime/wind/' + stationId;
+            const base_url = window.location.origin;
+            const url = base_url + '/realtime/wind/' + stationId;
             const response = await fetch(url, {
                 method: 'GET',
                 headers: {
