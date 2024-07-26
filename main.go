@@ -1,6 +1,7 @@
 package main
 
 import (
+    "io"
     "strings"
     "sync"
     "time"
@@ -315,7 +316,7 @@ func getForecast(c *gin.Context, cache *Cache) {
 
 
 func main() {
-    gin.SetMode(gin.ReleaseMode)
+    // gin.SetMode(gin.ReleaseMode)
     router := gin.Default()
     cache := NewCache()
 
@@ -323,6 +324,15 @@ func main() {
 
     router.ForwardedByClientIP = true
     //router.SetTrustedProxies([]string{"127.0.0.1","192.168.1.250", "192.168.1.1"})
+    trustedProxies := []string {
+        "2a01:7e03::f03c:94ff:fee7:167d", 
+        "127.0.0.1",                     
+        "::1",
+    }
+    err := router.SetTrustedProxies(trustedProxies)
+    if err != nil {
+        log.Fatalf("failed to set proxies: %v",  err) 
+    }
 
     // main route
     router.GET("/", func(c *gin.Context) {
@@ -341,6 +351,40 @@ func main() {
 
     router.GET("/forecast/:stationId", func(c *gin.Context) {
         getForecast(c, cache)
+    })
+
+    router.GET("realtime/:stationId", func(c *gin.Context) {
+        stationId := c.Param("stationId")
+        url := "https://www.ndbc.noaa.gov/data/realtime2/" + stationId + ".spec"
+
+        resp, err := http.Get(url)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch data"})
+            return
+        }
+        defer resp.Body.Close()
+
+        c.Header("Content-Type", resp.Header.Get("Content-Type"))
+        c.Status(resp.StatusCode)
+        io.Copy(c.Writer, resp.Body)
+
+    })
+
+    router.GET("realtime/wind/:stationId", func(c *gin.Context) {
+        stationId := c.Param("stationId")
+        url := "https://www.ndbc.noaa.gov/data/realtime2/" + stationId + ".txt"
+
+        resp, err := http.Get(url)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch data"})
+            return
+        }
+        defer resp.Body.Close()
+
+        c.Header("Content-Type", resp.Header.Get("Content-Type"))
+        c.Status(resp.StatusCode)
+        io.Copy(c.Writer, resp.Body)
+
     })
 
     router.GET("/about", func(c *gin.Context) {
