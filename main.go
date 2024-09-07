@@ -190,6 +190,9 @@ func parseBullFile(data string) ([]ForecastRow, error) {
 }
 
 func getSwellReport(stationId string) (SwellReport, error) {
+    if stationId == "" {
+        return SwellReport{}, nil
+    }
     client := resty.New()
     resp, err := client.R().SetHeader("X-Requested-With", "XMLHttpRequest").Get("https://www.ndbc.noaa.gov/data/realtime2/" + stationId + ".spec")
     if err != nil {
@@ -215,15 +218,25 @@ func getSwellReport(stationId string) (SwellReport, error) {
 }
 
 func getWindReport(stationId string) (WindReport, error) {
+    if stationId == "" {
+        return WindReport{}, nil
+    }
+
     client := resty.New()
     resp, err := client.R().SetHeader("X-Requested-With", "XMLHttpRequest").Get("https://www.ndbc.noaa.gov/data/realtime2/" + stationId + ".txt")
     if err != nil {
         return WindReport{}, err
     }
     lines := strings.Split(resp.String(), "\n")
+    if len(lines) < 3 {
+        return WindReport{}, fmt.Errorf("insufficient data in response")
+    }
     line := lines[2]
     // split by space
     parts := strings.Fields(line)
+    if len(parts) < 15 {
+        return WindReport{}, fmt.Errorf("insufficient data in response line")
+    }
     report := WindReport{
         StationId: stationId,
         Date: parts[0] + " " + parts[1] + " " + parts[2] + " " + parts[3],
@@ -234,9 +247,9 @@ func getWindReport(stationId string) (WindReport, error) {
         WaterTemp: parts[14],
     }
     return report, nil
-
 }
 
+// doing nothing rn
 func getTides(c *gin.Context) {
     tmpl, err := template.ParseFiles("tides.html", "templates/tides.html")
     // Execute the template with the prediction data
@@ -336,17 +349,68 @@ func main() {
 
     // main route
     router.GET("/", func(c *gin.Context) {
-        tmpl, err := template.ParseFiles("pages/today.html")
 
-        err = tmpl.Execute(c.Writer, nil)
+        //------------------- Use an Empty report for the opening page ----------------
+        windreport, err := getWindReport("")
+        swellreport, err := getSwellReport("")
+
+
+        var returndata map[string]interface{}
+        returndata = map[string]interface{}{"forecast": "", "date": "", "windreport": windreport, "swellreport": swellreport}
+
+
+        tmpl, err := template.ParseFiles("pages/today.html", "templates/forecast.html", "templates/report.html")
+        htmlBuffer := new(bytes.Buffer)
+        err = tmpl.ExecuteTemplate(htmlBuffer, "today.html", returndata)
+
         if err != nil {
             log.Println(err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
             return
+        } 
+
+        c.Header("Content-Type", "text/html; charset=utf-8")
+        c.String(http.StatusOK, htmlBuffer.String())
+
+    })
+
+    router.GET("/report/:stationId", func(c *gin.Context) {
+        stationId := c.Param("stationId")
+        windreport, err := getWindReport(stationId)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wind report"})
+            return
+        }
+        swellreport, err := getSwellReport(stationId)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get swell report"})
+            return
+        }
+
+        returndata := map[string]interface{}{
+            "windreport":  windreport,
+            "swellreport": swellreport,
+        }
+
+        tmpl, err := template.ParseFiles("templates/report.html")
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse template"})
+            return
+        }
+
+        htmlBuffer := new(bytes.Buffer)
+        err = tmpl.ExecuteTemplate(htmlBuffer, "report", returndata)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute template"})
+            return
         }
 
         c.Header("Content-Type", "text/html; charset=utf-8")
-        c.Status(http.StatusOK)
+        c.String(http.StatusOK, htmlBuffer.String())
     })
 
     router.GET("/forecast/:stationId", func(c *gin.Context) {

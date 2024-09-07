@@ -9,12 +9,11 @@
             margin: 0 auto;
             padding: 10px;
             align-items: center;
-            
         }
         #searchResults {
             position: absolute;
             z-index: 1000;
-            width: calc(50% - 1rem); /* Adjust based on your input width and padding */
+            width: calc(50% - 1rem);
             background: white;
             border: 1px solid #ddd;
             border-top: none;
@@ -32,7 +31,24 @@
         .leaflet-popup-content-wrapper { 
             border-radius: 0px !important;
         } 
-
+        
+        /* Dark mode styles */
+        body.dark {
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+        body.dark #searchResults {
+            background: #333;
+            border-color: #555;
+        }
+        body.dark .search-result {
+            border-bottom-color: #555;
+        }
+        body.dark input {
+            background-color: #333;
+            color: #ffffff;
+            border-color: #555;
+        }
     </style>
 </head>
 
@@ -67,57 +83,9 @@
 
     <h3 class = "report-title text-center my-5 text-lg font-bold">Choose buoy to begin</h3>
 
-    <div class="report flex justify-center">
-    <div class="container flex flex-row  justify-evenly">
-
-        <div class="card bg-white overflow-hidden border-2 w-60">
-            <h2 class="text-lg font-semibold text-gray-800 p-2">Primary Swell</h2>
-            <div class="content flex flex-row justify-evenly">
-                <div class="direction flex flex-col items-center space-x-2">
-                    <div class="swellsymbol text-6xl" style="transform: rotate({{.swellreport.PrimaryDegrees}}deg);">&#8595;</div>
-                    <p class="mwd text-center">{{.swellreport.PrimaryDegrees}}º</p>
-                </div>
-                <div class="details text-base grid content-center">
-                    <p class= "swhswp text-center" >NA</p>
-                    <p class="steep text-center"></p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card bg-white overflow-hidden border-2 w-60">
-            <h2 class="text-lg font-semibold text-gray-800 p-2">Secondary Swell</h2>
-            <div class="content flex flex-row justify-evenly">
-                <div class="direction flex flex-col items-center space-x-2">
-                    <div class="windswellsymbol text-6xl">&#8595;</div>
-                    <p class="wwd text-center"></p>
-                </div>
-                <div class="details space text-base grid content-center">
-                    <p class="wwhwwp text-center">NA</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card bg-white overflow-hidden  border-2 w-60">
-            <h2 class="text-lg font-semibold text-gray-800 p-2">Wind</h2>
-            <div class="content flex flex-row justify-evenly mb-4">
-                <div class="direction flex flex-col items-center space-x-2">
-                    <div class="windsymbol text-6xl" style="transform: rotate({{.windreport.WindDir}}deg);">&#8595;</div>
-                    <p class="wddir text-center">NA</p>
-                </div>
-                <div class="details space text-base grid content-center">
-                    <p class="wdspd text-center">NA</p>
-                    <p class="gust text-center">NA</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card bg-white overflow-hidden  border-2 w-60">
-            <h2 class="text-lg font-semibold text-gray-800 p-2">Weather</h2>
-            <div class="content">
-                    <p class="airtemp text-center">NA</p>
-                    <p class="temp text-center">NA</p>
-            </div>
-        </div>
+    <div id="report-container"class="report flex justify-center">
+    <div class="container flex flex-row justify-evenly">
+        {{template "report" .}}
     </div>
     </div>
 
@@ -127,6 +95,7 @@
     </div>
 
 
+    <script src="https://unpkg.com/htmx.org@2.0.2"></script>
     <script> 
 
         var map = L.map('map').setView([33.800832, -121.157227], 5);
@@ -148,25 +117,6 @@
         }
 
         map.on('click', onMapClick);
-
-        let directionmap = {
-            'N': 0,
-            'NNE': 22.5,
-            'NE': 45,
-            'ENE': 67.5,
-            'E': 90,
-            'ESE': 112.5,
-            'SE': 135,
-            'SSE': 157.5,   
-            'S': 180,
-            'SSW': 202.5,
-            'SW': 225,
-            'WSW': 247.5,
-            'W': 270,
-            'WNW': 292.5,
-            'NW': 315,
-            'NNW': 337.5
-        };
 
 
         async function getBuoyReport(stationId, name) {
@@ -242,6 +192,18 @@
             }
         }
 
+        document.addEventListener('htmx:afterRequest', (event) => {
+            const button = event.target.closest('button');
+            if (button) {
+                button.disabled = false;  // Re-enable the button
+            }
+        });
+
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+            if (event.detail.target.id === "report-container") {
+                console.log('Report content swapped');
+            }
+        });
 
         async function plotBuoys() {
             buoyData.forEach(buoy => {
@@ -257,6 +219,20 @@
                     >
                     Show Report
                     </button>
+
+                    <!--
+                    <button
+                        hx-get="/report/${buoy.stationId}/?t=${new Date().getTime()}"
+                        hx-target="#report-container"
+                        hx-swap="innerHTML"
+                        hx-on="click"
+                        hx-boost="true"
+                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3"
+                    >
+                    Show Faster Report
+                    </button>
+                    -->
+
                     <a
                         href="/forecast/${buoy.stationId}"
                         class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3"
@@ -264,9 +240,11 @@
                     16 Day Forecast
                     </a>
                     </div>`;
-                // const popupContent = `<div>${buoy.name}<br><a href="/forecast/${buoy.stationId}">Show Report</a></div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
                     .bindPopup(popupContent, {minWidth: 250})
+                    .on('popupopen', () => {
+                        htmx.process(document.querySelector('.leaflet-popup-content'));
+                    });
             });
         }
 
@@ -518,9 +496,9 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('darkMode') === 'true') {
-                document.body.classList.add('dark');
-            }
+            // Default to dark mode
+            document.body.classList.add('dark');
+            localStorage.setItem('darkMode', 'true');
         });
 
         document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
