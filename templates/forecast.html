@@ -223,8 +223,12 @@
             const cards = document.querySelectorAll('.forecastcard');
             cards.forEach(card => {
                 card.addEventListener('click', function() {
-                    this.classList.toggle('font-bold'); // This toggles the bold class on click
-                    this.classList.toggle('bg-gray-100'); // This toggles the border-3 class on click
+                    this.classList.toggle('selectedforecast'); // This toggles the selectedforecast class on click
+                    cards.forEach(otherCard => {
+                        if (otherCard !== this) {
+                            otherCard.classList.remove('selectedforecast');
+                        }
+                    });
                     cards.forEach(otherCard => {
                         if (otherCard !== this) {
                             otherCard.classList.remove('font-bold', 'bg-gray-100');
@@ -417,6 +421,55 @@
 
 
     </script>
+
+    <style> 
+        body.dark .container {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border-color: #555;
+        }
+
+        body.dark h2 {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border-color: #555;
+        }
+        body.dark .forecastcard { 
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border-color: #555;
+        } 
+
+        .forecastcard.selectedforecast {
+            font-weight: bold;
+            background-color: #e5e7eb;
+        }
+
+        body.dark .forecastcard.selectedforecast {
+            font-weight: bold;
+            background-color: #2c2c2c;
+        }
+
+        #forecast-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+
+        #forecast-table td {
+            border-bottom: 1px solid #e5e7eb;
+            padding: 8px;
+        }
+
+        body.dark #forecast-table td {
+            border-bottom: 1px solid #4a5568;
+        }
+
+        body.dark #forecast-table {
+            color: #ffffff;
+        }
+
+    </style>
 
 
     <h2 class="text-2x1 text-lg font-bold mt-8">16 Day Forecast</h2>

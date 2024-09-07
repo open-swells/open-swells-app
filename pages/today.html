@@ -5,7 +5,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         #map { 
-            height: 400px; width: 100%; 
+            height: 700px; width: 100%; 
             margin: 0 auto;
             padding: 10px;
             align-items: center;
@@ -15,7 +15,6 @@
             z-index: 1000;
             width: calc(50% - 1rem);
             background: white;
-            border: 1px solid #ddd;
             border-top: none;
             max-height: 200px;
             overflow-y: auto;
@@ -25,14 +24,23 @@
             border-bottom: 1px solid #eee;
             cursor: pointer;
         }
+        .search-result:hover { 
+            background-color: #f0f0f0;
+        } 
         .search-result:last-child {
             border-bottom: none;
         }
         .leaflet-popup-content-wrapper { 
             border-radius: 0px !important;
         } 
+
         
         /* Dark mode styles */
+        body.dark .leaflet-popup-content-wrapper { 
+            background-color: #333;
+            color: #ffffff;
+            border-radius: 0px !important;
+        } 
         body.dark {
             background-color: #1a1a1a;
             color: #ffffff;
@@ -49,10 +57,29 @@
             color: #ffffff;
             border-color: #555;
         }
-    </style>
+        body.dark .simple-button {
+            border-color: #fff;
+        }
+        body.dark button { 
+            background-color: #333;
+            color: #ffffff;
+            border-color: #555;
+            border-width: 1px;
+            border-style: solid;
+        } 
+   </style>
 </head>
 
 <body class="mb-10 font-mono" >
+
+    <script>
+        // applying in body
+        (function() {
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.body.classList.add('dark'); // Apply dark mode before body renders
+            }
+        })();
+    </script>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
                            integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
@@ -64,34 +91,51 @@
             crossorigin=""></script>
 
 
-    <div class="header flex flex-row justify-around items-center p-4">
+    <div class="header flex flex-row justify-evenly items-center p-4">
         <div class="title width:20%">
             <h1 class="text-xl font-bold">OpenSwells;</h1> 
             <!--<img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" alt="surfing" width="160"> -->
         </div>
         <div class="search w-1/2">
-            <input type="text" id="search" class="w-full border-2 border-gray-300 p-2" placeholder="Search for a buoy">
+            <input type="text" id="search" class="w-full border border-gray-300 p-2" placeholder="Search for a buoy">
             <div id="searchResults" class="mt-2"></div>
         </div>
-        <div class="width:20%">
-            <a href="/about"> about </a>
-            <button id="darkModeToggle" class="ml-4">Dark Mode</button>
+        <div class="width:20% flex items-center">
+            <a href="/about" class="w-10 h-10 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </a>
+            <a href="https://github.com/yourusername/yourrepository" class="w-10 h-10 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                </svg>
+            </a>
+            <a id="darkModeToggle" class="w-10 h-10 flex items-center justify-center cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+            </a>
         </div>
     </div>
 
-    <div id="map"></div>
-
-    <h3 class = "report-title text-center my-5 text-lg font-bold">Choose buoy to begin</h3>
-
-    <div id="report-container"class="report flex justify-center">
-    <div class="container flex flex-row justify-evenly">
-        {{template "report" .}}
-    </div>
-    </div>
-
-    <!-- div to get the forecast -->
-    <div class="forecast flex justify-center">
-        <button id="forecastBtn" class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 my-5 px-4">Show 16 Day Forecast</button>
+    <div class="content max-w-[95%] min-w-[320px] mx-auto">
+        <div class="flex flex-wrap">
+            <div class="w-full lg:w-1/2 pr-0 lg:pr-4">
+                <div id="map" class=""></div>
+                <h3 class="report-title text-center my-5 text-lg font-bold">Choose buoy to begin</h3>
+            </div>
+            <div class="w-full lg:w-1/2 mt-4 lg:mt-0">
+                <div id="report-container" class="report">
+                    <div>
+                        {{template "report" .}}
+                    </div>
+                    <div class="forecast flex justify-center">
+                        <button id="forecastBtn" class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 my-5 px-4">Show 16 Day Forecast</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
 
@@ -215,7 +259,7 @@
                     <br>
                     <button
                         onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')"
-                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3"
+                        class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2  px-4"
                     >
                     Show Report
                     </button>
@@ -233,12 +277,12 @@
                     </button>
                     -->
 
-                    <a
-                        href="/forecast/${buoy.stationId}"
-                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3"
+                    <button
+                        onclick="window.location.href='/forecast/${buoy.stationId}'"
+                        class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
                     >
                     16 Day Forecast
-                    </a>
+                    </button>
                     </div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
                     .bindPopup(popupContent, {minWidth: 250})
@@ -495,13 +539,9 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            // Default to dark mode
-            document.body.classList.add('dark');
-            localStorage.setItem('darkMode', 'true');
-        });
 
         document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+
 
         plotBuoys();
 

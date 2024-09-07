@@ -28,27 +28,41 @@
         });
 
     </script> 
+    <style> 
+        body.dark .card {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border-color: #555;
+        }
+
+        body.dark h2 {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border-color: #555;
+        }
+
+
+    </style>
     <h2 class="text-5x1 text-lg font-bold mb-4">Report</h2>
 
-    <div class="report flex justify-center">
-    <div class="container flex flex-row  justify-evenly">
-
-        <div class="card bg-white shadow-sm overflow-hidden border border-2 w-60">
-            <h2 class="text-lg font-semibold text-gray-800 p-2">Primary Swell</h2>
+    <!-- <div class="report flex justify-center"> -->
+    <div class="container grid grid-cols-2 gap-4 mx-auto max-w-4xl">
+        <div class="card bg-white shadow-sm overflow-hidden border border-gray-300 p-4">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">Primary Swell</h2>
             <div class="content flex flex-row justify-evenly">
                 <div class="direction flex flex-col items-center space-x-2">
                     <div class="swellsymbol text-6xl" style="transform: rotate({{.swellreport.PrimaryDegrees}}deg);">&#8595;</div>
                     <p class="mwd text-center">{{.swellreport.PrimaryDegrees}}º</p>
                 </div>
                 <div class="details text-base grid content-center">
-                    <p class= "swhswp text-center" >{{.swellreport.PrimaryWaveHeight}}ft at {{.swellreport.PrimaryPeriod}}s</p>
+                    <p class="swhswp text-center">{{.swellreport.PrimaryWaveHeight}}ft at {{.swellreport.PrimaryPeriod}}s</p>
                     <p class="steep text-center">{{.swellreport.Steepness}}</p>
                 </div>
             </div>
         </div>
 
-        <div class="card bg-white shadow-sm overflow-hidden border border-2 w-60">
-            <h2 class="text-lg font-semibold text-gray-800 p-2">Secondary Swell</h2>
+        <div class="card bg-white shadow-sm overflow-hidden border border-gray-300 p-4">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">Secondary Swell</h2>
             <div class="content flex flex-row justify-evenly">
                 <div class="direction flex flex-col items-center space-x-2">
                     <div class="windswellsymbol text-6xl">&#8595;</div>
@@ -60,9 +74,9 @@
             </div>
         </div>
 
-        <div class="card bg-white shadow-sm overflow-hidden border border-2 w-60">
-            <h2 class="text-lg font-semibold text-gray-800 p-2">Wind</h2>
-            <div class="content flex flex-row justify-evenly mb-4">
+        <div class="card bg-white shadow-sm overflow-hidden border border-gray-300 p-4">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">Wind</h2>
+            <div class="content flex flex-row justify-evenly">
                 <div class="direction flex flex-col items-center space-x-2">
                     <div class="windsymbol text-6xl" style="transform: rotate({{.windreport.WindDir}}deg);">&#8595;</div>
                     <p class="wddir text-center">{{.windreport.WindDir}}º</p>
@@ -74,15 +88,15 @@
             </div>
         </div>
 
-        <div class="card bg-white shadow-sm overflow-hidden border border-2 w-60">
-            <h2 class="text-lg font-semibold text-gray-800 p-2">Weather</h2>
+        <div class="card bg-white shadow-sm overflow-hidden border border-gray-300 p-4">
+            <h2 class="text-lg font-semibold text-gray-800 mb-2">Weather</h2>
             <div class="content">
-                    <p class="airtemp text-center">air temp: {{.windreport.AirTemp}}ºF</p>
-                    <p class="temp text-center">water temp: {{.windreport.WaterTemp}}ºF</p>
+                <p class="airtemp text-center">air temp: {{.windreport.AirTemp}}ºF</p>
+                <p class="temp text-center">water temp: {{.windreport.WaterTemp}}ºF</p>
             </div>
         </div>
     </div>
-    </div>
+    <!-- </div> -->
 
 
 </div>

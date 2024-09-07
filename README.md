@@ -30,3 +30,12 @@ You can run this app locally.
 - [leafletjs](https://leafletjs.com/) (maps)
 - [d3js](https://d3js.org/) (charts)
 - [EMC Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php)
+
+### to do
+- [] fix dark mode
+- [X] button redesign top right
+- [] new flex layout map and report. 
+    - [] Map should become a template and returned from go
+- [] map in forecast and 
+- [X] remove auto dark mode
+- [] eventually, use htmx to replace the report on request (see "show fast report" commented out in button)
