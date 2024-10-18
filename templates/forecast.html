@@ -162,10 +162,14 @@
                     condition = 'fair';
                 }
 
+                // get the height of the wave in feet
+                const waveHeightFeet = (primarySwellAverage * 3.28084).toFixed(1); // Convert meters to feet and round to 1 decimal place
+
                 summary.push({
                     date: date,
                     dateabv: `${dayOfWeek} ${abbreviatedDate}`,
-                    condition: condition
+                    condition: condition,
+                    waveHeight: `${waveHeightFeet}ft`
                 });
             });
 
@@ -189,9 +193,12 @@
 
             forecastsummary.forEach(forecast => {
                 const card = document.createElement('div');
-                card.className = 'forecastcard  bg-white border border-1 p-4 flex flex-col items-center cursor-pointer hover:bg-gray-100'; // TailwindCSS classes for styling
+                card.className = 'forecastcard bg-white border border-1 py-4 px-2 flex flex-col items-center cursor-pointer hover:bg-gray-100'; // TailwindCSS classes for styling
 
                 card.setAttribute('data-date', forecast.date); // Store the date in a data attribute
+
+                const dayDateContainer = document.createElement('div');
+                dayDateContainer.className = 'flex items-center space-x-1 mb-1';
 
                 const dayOfWeek = document.createElement('div');
                 dayOfWeek.className = 'font-medium';
@@ -201,12 +208,19 @@
                 dateEl.className = 'text-sm';
                 dateEl.textContent = forecast.dateabv.split(' ')[1]; // Get the date abbreviation
 
+                dayDateContainer.appendChild(dayOfWeek);
+                dayDateContainer.appendChild(dateEl);
+
+                const waveHeightEl = document.createElement('div');
+                waveHeightEl.className = 'text-sm font-semibold';
+                waveHeightEl.textContent = forecast.waveHeight;
+
                 const conditionEl = document.createElement('div');
                 conditionEl.textContent = forecast.condition;
                 conditionEl.className = `font-bold ${forecast.condition.toLowerCase() === 'good' ? 'text-green-500' : forecast.condition.toLowerCase() === 'fair' ? 'text-orange-500' : 'text-red-500'}`;
 
-                card.appendChild(dayOfWeek);
-                card.appendChild(dateEl);
+                card.appendChild(dayDateContainer);
+                card.appendChild(waveHeightEl);
                 card.appendChild(conditionEl);
 
                 forecastContainer.appendChild(card);
