@@ -53,6 +53,13 @@ type WindReport struct {
     WaterTemp string
 }
 
+type ForecastData struct {
+    Forecast    []ForecastRow
+    Date        string
+    //WindReport  WindReport
+    //SwellReport SwellReport
+}
+
 
 type CacheItem struct {
     Data      interface{}
@@ -265,65 +272,51 @@ func getTides(c *gin.Context) {
     c.String(http.StatusOK, htmlBuffer.String())
 }
 
-func getForecast(c *gin.Context, cache *Cache) {
-    stationId := c.Param("stationId")
+func getForecast(c *gin.Context, cache *Cache, stationId string) (map[string]interface{}, error) {
+    // stationId := c.Param("stationId")
 
     client := resty.New()
     now := time.Now().UTC()
 
-
     var returndata map[string]interface{}
     if cachedData, found := cache.Get(stationId); found {
         returndata, _ = cachedData.(map[string]interface{})
-    } else {
-        var data string;
-        var err error;
-        for i:= 0; i < 3; i++ {
-
-            formattedDate := now.Format("20060102")
-            formattedTime := now.Hour() / 6 * 6
-            url := fmt.Sprintf("https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.%s/%02d/wave/station/bulls.t%02dz/gfswave.%s.bull", formattedDate, formattedTime, formattedTime, stationId)
-            //fmt.Println(url)
-
-            resp, err := client.R().SetHeader("X-Requested-With", "XMLHttpRequest").Get(url)
-            if err == nil && resp.StatusCode() == http.StatusOK {
-                data,err = resp.String(), nil
-                break
-            } else { 
-                now = now.Add(-6 * time.Hour)
-            }
-        }
-
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
-
-        parsedData, err := parseBullFile(data)
-
-        date := getDate(data)
-        windreport, err := getWindReport(stationId)
-        swellreport, err := getSwellReport(stationId)
-
-
-        returndata = map[string]interface{}{"forecast": parsedData, "date": date, "windreport": windreport, "swellreport": swellreport}
-
-        cache.Set(stationId, returndata)
+        return returndata, nil
     }
 
-    tmpl, err := template.ParseFiles("pages/buoy.html", "templates/forecast.html", "templates/report.html")
-    // Execute the template with the prediction data
-    htmlBuffer := new(bytes.Buffer)
-    // err = tmpl.Execute(htmlBuffer, returndata)
-    err = tmpl.ExecuteTemplate(htmlBuffer, "buoy.html", returndata)
+    var data string
+    var err error
+    for i := 0; i < 3; i++ {
+        formattedDate := now.Format("20060102")
+        formattedTime := now.Hour() / 6 * 6
+        url := fmt.Sprintf("https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.%s/%02d/wave/station/bulls.t%02dz/gfswave.%s.bull", formattedDate, formattedTime, formattedTime, stationId)
+
+        resp, err := client.R().SetHeader("X-Requested-With", "XMLHttpRequest").Get(url)
+        if err == nil && resp.StatusCode() == http.StatusOK {
+            data = resp.String()
+            break
+        }
+        now = now.Add(-6 * time.Hour)
+    }
+
     if err != nil {
-        log.Println(err)
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-        return
+        return nil, fmt.Errorf("failed to fetch forecast data: %w", err)
     }
 
-    c.Header("Content-Type", "text/html; charset=utf-8")
-    c.String(http.StatusOK, htmlBuffer.String())
+    parsedData, err := parseBullFile(data)
+    if err != nil {
+        return nil, fmt.Errorf("failed to parse bull file: %w", err)
+    }
+
+    date := getDate(data)
+
+    returndata = map[string]interface{}{
+        "forecast":    parsedData,
+        "date":        date,
+    }
+
+    cache.Set(stationId, returndata)
+    return returndata, nil
 }
 
 
@@ -354,12 +347,15 @@ func main() {
         windreport, err := getWindReport("")
         swellreport, err := getSwellReport("")
 
+        forecastdata, err := getForecast(c, cache, "46221")
+        // print foreacsta dat
+        // fmt.Println(forecastdata)
 
         var returndata map[string]interface{}
-        returndata = map[string]interface{}{"forecast": "", "date": "", "windreport": windreport, "swellreport": swellreport}
+        returndata = map[string]interface{}{"forecastdata": forecastdata, "windreport": windreport, "swellreport": swellreport}
 
 
-        tmpl, err := template.ParseFiles("pages/today.html", "templates/forecast.html", "templates/report.html")
+        tmpl, err := template.ParseFiles("pages/today.html", "templates/report.html", "templates/forecastsummary.html")
         htmlBuffer := new(bytes.Buffer)
         err = tmpl.ExecuteTemplate(htmlBuffer, "today.html", returndata)
 
@@ -414,9 +410,45 @@ func main() {
     })
 
     router.GET("/forecast/:stationId", func(c *gin.Context) {
-        getForecast(c, cache)
+        stationId := c.Param("stationId")
+        forecastdata, err := getForecast(c, cache, stationId)
+        swellreport, err := getSwellReport(stationId)
+        windreport, err := getWindReport(stationId)
+
+
+        returndata := map[string]interface{}{
+            "forecastdata":    forecastdata,
+            "swellreport": swellreport,
+            "windreport":  windreport,
+        }
+
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get forecast data"})
+            return
+        }
+
+        tmpl, err := template.ParseFiles("pages/buoy.html", "templates/forecast.html", "templates/report.html")
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse template"})
+            return
+        }
+
+        // Execute the template with the prediction data
+        htmlBuffer := new(bytes.Buffer)
+        err = tmpl.ExecuteTemplate(htmlBuffer, "buoy.html", returndata)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute template"})
+            return
+        }
+
+        c.Header("Content-Type", "text/html; charset=utf-8")
+        c.String(http.StatusOK, htmlBuffer.String())
     })
 
+    // this just sends the data
     router.GET("realtime/:stationId", func(c *gin.Context) {
         stationId := c.Param("stationId")
         url := "https://www.ndbc.noaa.gov/data/realtime2/" + stationId + ".spec"
@@ -434,6 +466,7 @@ func main() {
 
     })
 
+    // this also sends data, no template
     router.GET("realtime/wind/:stationId", func(c *gin.Context) {
         stationId := c.Param("stationId")
         url := "https://www.ndbc.noaa.gov/data/realtime2/" + stationId + ".txt"

@@ -6,7 +6,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         #map { 
-            height: 700px; width: 100%; 
+            height: 500px; width: 100%; 
             margin: 0 auto;
             padding: 10px;
             align-items: center;
@@ -71,7 +71,7 @@
    </style>
 </head>
 
-<body class="mb-10 font-mono" >
+<body class="mb-10 mx-20 font-mono" >
 
     <script>
         // applying in body
@@ -92,6 +92,7 @@
             crossorigin=""></script>
 
 
+    <!-- This is all the header --> 
     <div class="header flex flex-row justify-evenly items-center p-4">
         <div class="title width:20%">
             <h1 class="text-xl font-bold">OpenSwells;</h1> 
@@ -120,14 +121,13 @@
         </div>
     </div>
 
+    <!-- report content --> 
     <div class="content max-w-[95%] min-w-[320px] mx-auto">
         <div class="flex flex-wrap">
-            <div class="w-full lg:w-1/2 pr-0 lg:pr-4">
-                <div id="map" class=""></div>
+            <div class="w-full lg:w-2/3 pr-0 lg:pr-4">
+                <div id="map" class="h-[300px]"></div>
                 <h3 class="report-title text-center my-5 text-lg font-bold">Choose buoy to begin</h3>
-            </div>
-            <div class="w-full lg:w-1/2 mt-4 lg:mt-0">
-                <div id="report-container" class="report">
+                <div id="report-container" class="report mt-4">
                     <div>
                         {{template "report" .}}
                     </div>
@@ -136,21 +136,26 @@
                     </div>
                 </div>
             </div>
+            <div class="w-full lg:w-1/3 mt-4 lg:mt-0">
+                <div id="favorites-container" class="favorites">
+                    <h2 class="text-xl font-bold mb-4">Saved</h2>
+                    <div id="favorites-list">
+                        <!-- Forecast summary will be populated here -->
+                         {{template "forecastsummary" .}}
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
+    <!-- report content -->
 
 
-    <script src="https://unpkg.com/htmx.org@2.0.2"></script>
     <script> 
-
         var map = L.map('map').setView([33.800832, -121.157227], 5);
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
-
-        // IMPORTAANT: this is the data from the server
-        //let localMapData = {{.LocalMapData}};
 
         popup = L.popup();
         
@@ -163,9 +168,7 @@
 
         map.on('click', onMapClick);
 
-
         async function getBuoyReport(stationId, name) {
-            // const url =  'https://corsproxy.io/?' + 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.spec';
             const base_url = window.location.origin;
             const url = base_url + '/realtime/' + stationId;
             const response = await fetch(url, {
@@ -237,18 +240,6 @@
             }
         }
 
-        document.addEventListener('htmx:afterRequest', (event) => {
-            const button = event.target.closest('button');
-            if (button) {
-                button.disabled = false;  // Re-enable the button
-            }
-        });
-
-        document.body.addEventListener('htmx:afterSwap', (event) => {
-            if (event.detail.target.id === "report-container") {
-                console.log('Report content swapped');
-            }
-        });
 
         async function plotBuoys() {
             buoyData.forEach(buoy => {
@@ -287,9 +278,6 @@
                     </div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
                     .bindPopup(popupContent, {minWidth: 250})
-                    .on('popupopen', () => {
-                        htmx.process(document.querySelector('.leaflet-popup-content'));
-                    });
             });
         }
 
