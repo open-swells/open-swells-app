@@ -10,8 +10,12 @@ import (
     "fmt"
 	"log"
 	"net/http"
+
 	"github.com/gin-gonic/gin"
     "github.com/go-resty/resty/v2"
+    "firebase.google.com/go/v4"
+    "firebase.google.com/go/v4/auth"
+    "google.golang.org/api/option"
 )
 
 
@@ -322,6 +326,18 @@ func getForecast(c *gin.Context, cache *Cache, stationId string) (map[string]int
 
 
 func main() {
+    // start firebase auth
+    opt := option.WithCredentialsFile("path/to/firebase-config.json")
+    app, err := firebase.NewApp(context.Background(), nil, opt)
+    if err != nil {
+        panic(fmt.Sprintf("Error initializing Firebase: %v", err))
+    }
+
+    authClient, err = app.Auth(context.Background())
+    if err != nil {
+        panic(fmt.Sprintf("Error getting Auth client: %v", err))
+    }
+
     // gin.SetMode(gin.ReleaseMode)
     router := gin.Default()
     cache := NewCache()

@@ -10,6 +10,7 @@
             margin: 0 auto;
             padding: 10px;
             align-items: center;
+            z-index: 10; /* Add this line */
         }
         #searchResults {
             position: absolute;
@@ -118,6 +119,23 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
             </a>
+            <a href="#" id="signInBtn" class="login-link py-2 px-4">
+                Log In
+            </a>
+
+            <!-- Sign-in Modal -->
+            <div id="signInModal" class="fixed z-50 inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+                <div class="bg-white p-8 rounded-lg shadow-lg">
+                    <button onclick="googleSignIn()" class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow flex items-center">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="mr-2" style="width: 18px; height: 18px;">
+                        Sign in with Google
+                    </button>
+                    <button id="closeModal" class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Close</button>
+                </div>
+            </div>
+
+             
+
         </div>
     </div>
 
@@ -149,6 +167,77 @@
     </div>
     <!-- report content -->
 
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+
+    <!-- firebase sign in script --> 
+    <script type="module">
+      // Add SDKs for Firebase products that you want to use
+      // https://firebase.google.com/docs/web/setup#available-libraries
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+      import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKZUgrKoU8MxXIm9H0mGubjfL8TANdH5g",
+            authDomain: "open-swells-89714.firebaseapp.com",
+            projectId: "open-swells-89714",
+            storageBucket: "open-swells-89714.appspot.com",
+            messagingSenderId: "764680526760",
+            appId: "1:764680526760:web:6c3378a25a31aa7e9b1b9d",
+            measurementId: "G-SDSL0VKQHV"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+
+        firebase.auth().onAuthStateChanged(updateUIForSignedInUser);
+
+    </script>
+    <script> 
+        function googleSignIn() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            firebase.auth().signInWithPopup(provider)
+                .then(result => {
+                    updateUIForSignedInUser(result.user);
+                })
+                .catch(error => console.error('Sign-in error:', error));
+        }
+
+        function updateUIForSignedInUser(user) {
+            const signInBtn = document.getElementById('signInBtn');
+            if (user) {
+                // User is signed in
+                signInBtn.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="w-8 h-8 rounded-full">`;
+                signInBtn.onclick = () => firebase.auth().signOut().then(() => updateUIForSignedInUser(null));
+            } else {
+                // User is signed out
+                signInBtn.innerHTML = 'Sign In';
+                signInBtn.onclick = () => document.getElementById('signInModal').classList.remove('hidden');
+            }
+            document.getElementById('signInModal').classList.add('hidden');
+        }
+
+        document.getElementById('signInBtn').addEventListener('click', function() {
+            document.getElementById('signInModal').classList.remove('hidden');
+        });
+
+        document.getElementById('closeModal').addEventListener('click', function() {
+            document.getElementById('signInModal').classList.add('hidden');
+        });
+
+        // Close the modal if clicking outside of it
+        window.onclick = function(event) {
+            var modal = document.getElementById('signInModal');
+            if (event.target == modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // Check auth state on page load
+    </script> 
 
     <script> 
         var map = L.map('map').setView([33.800832, -121.157227], 5);
@@ -536,7 +625,6 @@
 
         //center the map
         map.setView([33.101608, -119.069824], 6);
-
 
     </script>
     
