@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
     "strconv"
+    "sort"
 
 	"github.com/gin-gonic/gin"
     "github.com/go-resty/resty/v2"
@@ -317,16 +318,14 @@ func getForecast(c *gin.Context, cache *Cache, stationId string) (map[string]int
         now = now.Add(-6 * time.Hour)
     }
 
-    if err != nil {
-        return nil, fmt.Errorf("failed to fetch forecast data: %w", err)
-    }
 
     parsedData, err := parseBullFile(data)
     if err != nil {
         return nil, fmt.Errorf("failed to parse bull file: %w", err)
     }
 
-    date := getDate(data)
+    date := now.Format("2006010215")[:10] // Format as YYYYMMDDHH
+    // date := getDate(data)
 
     returndata = map[string]interface{}{
         "forecast":    parsedData,
@@ -338,7 +337,7 @@ func getForecast(c *gin.Context, cache *Cache, stationId string) (map[string]int
 }
 
 func formatDate(date string) string {
-	parsedDate, err := time.Parse("2006-01-02 15:04:05", date)
+	parsedDate, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		return date
 	}
@@ -347,11 +346,18 @@ func formatDate(date string) string {
 
 func calculateAverageWaveHeight(forecast []ForecastRow) float64 {
 	total := 0.0
+	count := 0
 	for _, row := range forecast {
-		height, _ := strconv.ParseFloat(row.PrimaryWaveHeight, 64)
-		total += height
+		height, err := strconv.ParseFloat(row.PrimaryWaveHeight, 64)
+		if err == nil {
+			total += height
+			count++
+		}
 	}
-	return total / float64(len(forecast))
+	if count == 0 {
+		return 0
+	}
+	return total / float64(count)
 }
 
 func determineCondition(avgWaveHeight float64) string {
@@ -365,7 +371,13 @@ func determineCondition(avgWaveHeight float64) string {
 }
 
 
-func renderForecastSummary(w http.ResponseWriter, r *http.Request, cache *Cache, c *gin.Context) {
+func sortForecastSummary(summary []ForecastSummary) {
+	sort.Slice(summary, func(i, j int) bool {
+		return summary[i].Date < summary[j].Date
+	})
+}
+
+func renderForecastSummary(w http.ResponseWriter, cache *Cache) {
 	buoyIDs := []string{"46221", "46232"}
 	var buoys []struct {
 		Buoy
@@ -385,25 +397,41 @@ func renderForecastSummary(w http.ResponseWriter, r *http.Request, cache *Cache,
 			return
 		}
 
+		initialDate, ok := forecastData["date"].(string)
+		if !ok {
+			http.Error(w, fmt.Sprintf("Invalid initial date for buoy %s", buoyID), http.StatusInternalServerError)
+			return
+		}
+
+		baseTime, err := time.Parse("2006010215", initialDate)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error parsing initial date for buoy %s: %v", buoyID, err), http.StatusInternalServerError)
+			return
+		}
+
 		groupedForecast := make(map[string][]ForecastRow)
-		for _, row := range forecast {
-			date := strings.Split(row.Date, " ")[0]
-			groupedForecast[date] = append(groupedForecast[date], row)
+		for i, row := range forecast {
+			forecastTime := baseTime.Add(time.Duration(i) * time.Hour)
+			day := forecastTime.Format("2006-01-02")
+			groupedForecast[day] = append(groupedForecast[day], row)
 		}
 
 		var summary []ForecastSummary
-		for date, rows := range groupedForecast {
+		for day, rows := range groupedForecast {
 			avgWaveHeight := calculateAverageWaveHeight(rows)
 			condition := determineCondition(avgWaveHeight)
 			waveHeightFeet := fmt.Sprintf("%.1fft", avgWaveHeight*3.28084)
 
 			summary = append(summary, ForecastSummary{
-				Date:       date,
-				DateAbv:    formatDate(date + " 00:00:00"),
+				Date:       day,
+				DateAbv:    formatDate(day),
 				Condition:  condition,
 				WaveHeight: waveHeightFeet,
 			})
 		}
+
+		// Sort the summary slice by date
+		sortForecastSummary(summary)
 
 		buoys = append(buoys, struct {
 			Buoy
@@ -439,7 +467,7 @@ var (
 
 func main() {
     // start firebase auth
-    opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
+    opt := option.WithCredentialsFile("/Users/evancoons/Downloads/open-swells-89714-firebase-adminsdk-ghfog-cab6d41e1d.json")
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
        panic(fmt.Sprintf("error initializing app: %v", err))
@@ -477,7 +505,6 @@ func main() {
 
         forecastdata, err := getForecast(c, cache, "46221")
         // print foreacsta dat
-        // fmt.Println(forecastdata)
 
         var returndata map[string]interface{}
         returndata = map[string]interface{}{"forecastdata": forecastdata, "windreport": windreport, "swellreport": swellreport}
@@ -655,7 +682,7 @@ func main() {
     })
 
     router.GET("/forecast-summary", func(c *gin.Context) {
-		renderForecastSummary(c.Writer, c.Request, cache, c)
+		renderForecastSummary(c.Writer,  cache)
 	})
 
     router.Run(":8081")
