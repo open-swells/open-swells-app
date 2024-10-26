@@ -1,0 +1,58 @@
+{{ define "forecastsummary3" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast Summary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .buoy {
+            margin-bottom: 30px;
+        }
+        .buoy-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .forecast-summary {
+            display: flex;
+            overflow-x: auto;
+            padding: 1rem 0;
+            gap: 1rem;
+        }
+        .date-abv {
+            font-weight: bold;
+        }
+        .condition {
+            margin: 5px 0;
+        }
+        .wave-height {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    {{range .Buoys}}
+    <div class="buoy">
+        <div class="buoy-name">{{.Name}}</div>
+        <div class="forecast-summary">
+            {{range .Summary}}
+            <div class="forecast-day bg-white border border-2 py-4 px-2 flex flex-col items-center">
+                <div class="date-abv">{{.DateAbv}}</div>
+                <div class="condition">{{.Condition}}</div>
+                <div class="wave-height">{{.WaveHeight}}</div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+</body>
+</html>
+
+{{ end }}

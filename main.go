@@ -1,6 +1,7 @@
 package main
 
 import (
+    "context"
     "io"
     "strings"
     "sync"
@@ -10,6 +11,7 @@ import (
     "fmt"
 	"log"
 	"net/http"
+    "strconv"
 
 	"github.com/gin-gonic/gin"
     "github.com/go-resty/resty/v2"
@@ -35,6 +37,24 @@ type ForecastRow struct {
     QuaternaryDegrees string
 }
 
+type ForecastData struct {
+    Forecast    []ForecastRow
+    Date        string
+}
+
+type Buoy struct {
+    ID       string
+    Name     string
+    Forecast map[string]interface{}
+}
+
+type ForecastSummary struct {
+	Date       string
+	DateAbv    string
+	Condition  string
+	WaveHeight string
+}
+
 type SwellReport struct {
     StationId string
     Date string
@@ -57,12 +77,6 @@ type WindReport struct {
     WaterTemp string
 }
 
-type ForecastData struct {
-    Forecast    []ForecastRow
-    Date        string
-    //WindReport  WindReport
-    //SwellReport SwellReport
-}
 
 
 type CacheItem struct {
@@ -323,14 +337,112 @@ func getForecast(c *gin.Context, cache *Cache, stationId string) (map[string]int
     return returndata, nil
 }
 
+func formatDate(date string) string {
+	parsedDate, err := time.Parse("2006-01-02 15:04:05", date)
+	if err != nil {
+		return date
+	}
+	return parsedDate.Format("Mon 1/2")
+}
+
+func calculateAverageWaveHeight(forecast []ForecastRow) float64 {
+	total := 0.0
+	for _, row := range forecast {
+		height, _ := strconv.ParseFloat(row.PrimaryWaveHeight, 64)
+		total += height
+	}
+	return total / float64(len(forecast))
+}
+
+func determineCondition(avgWaveHeight float64) string {
+	heightInFeet := avgWaveHeight * 3.28084
+	if heightInFeet < 0.5 {
+		return "poor"
+	} else if heightInFeet < 1.5 {
+		return "fair"
+	}
+	return "good"
+}
+
+
+func renderForecastSummary(w http.ResponseWriter, r *http.Request, cache *Cache, c *gin.Context) {
+	buoyIDs := []string{"46221", "46232"}
+	var buoys []struct {
+		Buoy
+		Summary []ForecastSummary
+	}
+
+	for _, buoyID := range buoyIDs {
+		forecastData, err := getForecast(nil, cache, buoyID)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error fetching data for buoy %s: %v", buoyID, err), http.StatusInternalServerError)
+			return
+		}
+
+		forecast, ok := forecastData["forecast"].([]ForecastRow)
+		if !ok {
+			http.Error(w, fmt.Sprintf("Invalid forecast data for buoy %s", buoyID), http.StatusInternalServerError)
+			return
+		}
+
+		groupedForecast := make(map[string][]ForecastRow)
+		for _, row := range forecast {
+			date := strings.Split(row.Date, " ")[0]
+			groupedForecast[date] = append(groupedForecast[date], row)
+		}
+
+		var summary []ForecastSummary
+		for date, rows := range groupedForecast {
+			avgWaveHeight := calculateAverageWaveHeight(rows)
+			condition := determineCondition(avgWaveHeight)
+			waveHeightFeet := fmt.Sprintf("%.1fft", avgWaveHeight*3.28084)
+
+			summary = append(summary, ForecastSummary{
+				Date:       date,
+				DateAbv:    formatDate(date + " 00:00:00"),
+				Condition:  condition,
+				WaveHeight: waveHeightFeet,
+			})
+		}
+
+		buoys = append(buoys, struct {
+			Buoy
+			Summary []ForecastSummary
+		}{
+			Buoy: Buoy{
+				ID:       buoyID,
+				Name:     fmt.Sprintf("Buoy %s", buoyID),
+				Forecast: forecastData,
+			},
+			Summary: summary,
+		})
+	}
+
+	tmpl := template.Must(template.ParseFiles("templates/forecastsummary3.html"))
+	err := tmpl.ExecuteTemplate(w, "forecastsummary3", struct {
+		Buoys []struct {
+			Buoy
+			Summary []ForecastSummary
+		}
+	}{Buoys: buoys})
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+
+var (
+	authClient *auth.Client
+)
 
 
 func main() {
     // start firebase auth
-    opt := option.WithCredentialsFile("path/to/firebase-config.json")
+    opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
-        panic(fmt.Sprintf("Error initializing Firebase: %v", err))
+       panic(fmt.Sprintf("error initializing app: %v", err))
     }
 
     authClient, err = app.Auth(context.Background())
@@ -351,7 +463,7 @@ func main() {
         "127.0.0.1",                     
         "::1",
     }
-    err := router.SetTrustedProxies(trustedProxies)
+    err = router.SetTrustedProxies(trustedProxies)
     if err != nil {
         log.Fatalf("failed to set proxies: %v",  err) 
     }
@@ -513,6 +625,38 @@ func main() {
         c.Header("Content-Type", "text/html; charset=utf-8")
         c.Status(http.StatusOK)
     })
+
+    router.POST("/auth", func (c *gin.Context) {
+        var req struct {
+            IDToken string `json:"idToken"`
+        }
+
+        if err := c.BindJSON(&req); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+            return
+        }
+
+        token, err := authClient.VerifyIDToken(context.Background(), req.IDToken)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid ID token"})
+            return
+        }
+
+        user, err := authClient.GetUser(context.Background(), token.UID)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Error fetching user"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "name":  user.DisplayName,
+            "email": user.Email,
+        })
+    })
+
+    router.GET("/forecast-summary", func(c *gin.Context) {
+		renderForecastSummary(c.Writer, c.Request, cache, c)
+	})
 
     router.Run(":8081")
 }

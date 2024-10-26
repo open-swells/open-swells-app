@@ -134,10 +134,13 @@
                 </div>
             </div>
 
-             
-
+            <!-- Test Auth Button -->
+            <button id="testAuthBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-4">
+                Test Auth
+            </button>
         </div>
     </div>
+    <!-- This is all the header --> 
 
     <!-- report content --> 
     <div class="content max-w-[95%] min-w-[320px] mx-auto">
@@ -155,12 +158,9 @@
                 </div>
             </div>
             <div class="w-full lg:w-1/3 mt-4 lg:mt-0">
-                <div id="favorites-container" class="favorites">
+                <div id="favorites-container" class="favorites h-[500px] overflow-hidden">
                     <h2 class="text-xl font-bold mb-4">Saved</h2>
-                    <div id="favorites-list">
-                        <!-- Forecast summary will be populated here -->
-                         {{template "forecastsummary" .}}
-                    </div>
+                    <div id="buoy-containers" class="overflow-y-auto h-[calc(100%-2rem)]"> </div>
                 </div>
             </div>
         </div>
@@ -176,14 +176,15 @@
       // https://firebase.google.com/docs/web/setup#available-libraries
       import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
+      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
-            apiKey: "",
-            authDomain: "",
-            projectId: "",
-            storageBucket: "",
-            messagingSenderId: "",
-            appId: "",
-            measurementId: ""
+          apiKey: "AIzaSyBKZUgrKoU8MxXIm9H0mGubjfL8TANdH5g",
+          authDomain: "open-swells-89714.firebaseapp.com",
+          projectId: "open-swells-89714",
+          storageBucket: "open-swells-89714.appspot.com",
+          messagingSenderId: "764680526760",
+          appId: "1:764680526760:web:77bf8034f0f8df259b1b9d",
+          measurementId: "G-BJTLM29FYZ"
         };
 
         // Initialize Firebase
@@ -197,6 +198,34 @@
 
     </script>
     <script> 
+        async function loadForecastSummary() {
+            try {
+                const response = await fetch('/forecast-summary');
+                if (!response.ok) {
+                    console.log("error, could not load buoys")
+                }
+                const html = await response.text();
+                document.getElementById('buoy-containers').innerHTML = html;
+            } catch (error) {
+                console.error('Error loading forecast summary:', error);
+                document.getElementById('buoy-containers').innerHTML =
+                    '<p>Failed to load forecast summary. Please try again later.</p>';
+            }
+        }
+          // Wait for Firebase authentication
+    document.addEventListener('DOMContentLoaded', () => {
+        firebase.auth().onAuthStateChanged(async (user) => {
+            if (user) {
+                console.log(`User signed in: ${user.uid}`);
+                await loadForecastSummary();
+            } else {
+                console.log('User not signed in.');
+                document.getElementById('buoy-containers').innerHTML =
+                    '<p>Please sign in to view your favorite buoys.</p>';
+            }
+        });
+    });
+
         function googleSignIn() {
             const provider = new firebase.auth.GoogleAuthProvider();
             firebase.auth().signInWithPopup(provider)
@@ -627,6 +656,39 @@
         map.setView([33.101608, -119.069824], 6);
 
     </script>
+
+    <script>
+    document.getElementById('testAuthBtn').addEventListener('click', async function() {
+        try {
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                alert('Please sign in first');
+                return;
+            }
+
+            const idToken = await user.getIdToken();
+            
+            const response = await fetch('/auth', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ idToken: idToken }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Auth request failed');
+            }
+
+            const data = await response.json();
+            alert(`Authentication successful!\nName: ${data.name}\nEmail: ${data.email}`);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Authentication failed. Please check the console for more details.');
+        }
+    });
+</script>
+
     
 
 </body>
