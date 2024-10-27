@@ -19,15 +19,47 @@
             overflow-x: auto;
             padding: 1rem 0;
             gap: 1rem;
+            height: 180px;
+            position: relative;
+        }
+        .forecast-summary::-webkit-scrollbar {
+            height: 8px;
+        }
+        .forecast-summary::-webkit-scrollbar-thumb {
+            background-color: #888;
+            border-radius: 4px;
+        }
+        .forecast-summary::-webkit-scrollbar-track {
+            background-color: #f1f1f1;
+        }
+        .forecast-day {
+            width: 100px;
+            min-width: 100px;
+            text-align: center;
         }
         .date-abv {
-            font-weight: bold;
+            white-space: nowrap;
         }
         .condition {
             margin: 5px 0;
         }
         .wave-height {
             font-size: 0.9em;
+        }
+        .scroll-indicator {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 20px;
+            background-color: rgba(0, 0, 0, 0.1);
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            color: #888;
         }
     </style>
 </head>
@@ -37,10 +69,13 @@
         <div class="buoy-name">{{.Name}}</div>
         <div class="forecast-summary">
             {{range .Summary}}
-            <div class="forecast-day bg-white border border-2 py-4 px-2 flex flex-col items-center">
-                <div class="date-abv">{{.DateAbv}}</div>
-                <div class="condition">{{.Condition}}</div>
-                <div class="wave-height">{{.WaveHeight}}</div>
+            <div class="forecast-day bg-white border border-2 py-4 px-2 flex flex-col items-center justify-center">
+                <div class="flex items-center space-x-1 mb-1"> 
+                    <div class="font-medium">{{slice .DateAbv 0 3}}</div>
+                    <div class="text-sm font-semibold">{{slice .DateAbv 3}}</div>
+                </div> 
+                <div class="wave-height text-sm font-semibold">{{.WaveHeight}}</div>
+                <div class="condition font-semibold" style="color: {{if eq .Condition "good"}}green{{else if eq .Condition "fair"}}orange{{else if eq .Condition "poor"}}red{{end}};">{{.Condition}}</div>
             </div>
             {{end}}
         </div>

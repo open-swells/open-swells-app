@@ -142,9 +142,9 @@
                 const dayOfWeek = days[tempdate.getDay()];
 
 
-                const datefull = date.split('T')[0];
-                let abbreviatedDate = datefull.slice(0, 4);
-                abbreviatedDate = abbreviatedDate.replace(/^0+/, '').replace('-', '/');
+                const month = tempdate.getMonth() + 1; // getMonth() returns 0-11
+                const day = tempdate.getDate();
+                const abbreviatedDate = `${month}/${day}`;
 
 
                 // keep track of total primary swell
