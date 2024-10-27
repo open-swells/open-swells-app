@@ -94,15 +94,18 @@
 
 
     <!-- This is all the header --> 
-    <div class="header flex flex-row justify-evenly items-center p-4">
+    <div class="header flex flex-row justify-evenly items-center p-2">
+        <!-- Logo -->
         <div class="title width:20%">
             <h1 class="text-xl font-bold">OpenSwells;</h1> 
             <!--<img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" alt="surfing" width="160"> -->
         </div>
+        <!-- Search -->
         <div class="search w-1/2">
             <input type="text" id="search" class="w-full border border-gray-300 p-2" placeholder="Search for a buoy">
             <div id="searchResults" class="mt-2"></div>
         </div>
+        <!-- Icons -->
         <div class="width:20% flex items-center">
             <a href="/about" class="w-10 h-10 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
@@ -143,7 +146,7 @@
     <!-- This is all the header --> 
 
     <!-- report content --> 
-    <div class="content max-w-[95%] min-w-[320px] mx-auto">
+    <div class="content max-w-[95%] min-w-[320px] mx-auto py-4 ">
         <div class="flex flex-wrap">
             <div class="w-full lg:w-2/3 pr-0 lg:pr-4">
                 <div id="map" class="h-[300px]"></div>

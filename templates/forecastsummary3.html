@@ -6,62 +6,84 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forecast Summary</title>
     <style>
-        .buoy {
-            margin-bottom: 30px;
-        }
-        .buoy-name {
-            font-size: 1.2em;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        .forecast-summary {
-            display: flex;
-            overflow-x: auto;
-            padding: 1rem 0;
-            gap: 1rem;
-            height: 180px;
-            position: relative;
-        }
-        .forecast-summary::-webkit-scrollbar {
-            height: 8px;
-        }
-        .forecast-summary::-webkit-scrollbar-thumb {
-            background-color: #888;
-            border-radius: 4px;
-        }
-        .forecast-summary::-webkit-scrollbar-track {
-            background-color: #f1f1f1;
-        }
-        .forecast-day {
-            width: 100px;
-            min-width: 100px;
-            text-align: center;
-        }
-        .date-abv {
-            white-space: nowrap;
-        }
-        .condition {
-            margin: 5px 0;
-        }
-        .wave-height {
-            font-size: 0.9em;
-        }
-        .scroll-indicator {
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 50px;
-            height: 20px;
-            background-color: rgba(0, 0, 0, 0.1);
-            border-radius: 10px 10px 0 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 12px;
-            color: #888;
-        }
-    </style>
+            :root {
+                --bg-color: #ffffff;
+                --text-color: #000000;
+                --card-bg-color: #ffffff;
+                --border-color: #000000;
+                --scrollbar-thumb-color: #888;
+                --scrollbar-track-color: #f1f1f1;
+            }
+            body.dark {
+                --bg-color: #1a1a1a;
+                --text-color: #ffffff;
+                --card-bg-color: #333;
+                --border-color: #555;
+                --scrollbar-thumb-color: #555;
+                --scrollbar-track-color: #333;
+            }
+            body {
+                background-color: var(--bg-color);
+                color: var(--text-color);
+            }
+            .buoy {
+                margin-bottom: 30px;
+            }
+            .buoy-name {
+                font-size: 1.2em;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+            .forecast-summary {
+                display: flex;
+                overflow-x: auto;
+                padding: 1rem 0;
+                gap: 1rem;
+                height: 180px;
+                position: relative;
+            }
+            .forecast-summary::-webkit-scrollbar {
+                height: 8px;
+            }
+            .forecast-summary::-webkit-scrollbar-thumb {
+                background-color: var(--scrollbar-thumb-color);
+                border-radius: 4px;
+            }
+            .forecast-summary::-webkit-scrollbar-track {
+                background-color: var(--scrollbar-track-color);
+            }
+            .forecast-day {
+                width: 100px;
+                min-width: 100px;
+                text-align: center;
+                background-color: var(--card-bg-color);
+                border-color: var(--border-color);
+            }
+            .date-abv {
+                white-space: nowrap;
+            }
+            .condition {
+                margin: 5px 0;
+            }
+            .wave-height {
+                font-size: 0.9em;
+            }
+            .scroll-indicator {
+                position: absolute;
+                bottom: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 50px;
+                height: 20px;
+                background-color: rgba(128, 128, 128, 0.1);
+                border-radius: 10px 10px 0 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 12px;
+                color: var(--text-color);
+            }
+        </style>
 </head>
 <body>
     {{range .Buoys}}
