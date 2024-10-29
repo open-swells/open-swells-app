@@ -9,11 +9,13 @@ import (
     "bytes"
 	"html/template"
     "fmt"
-	"log"
 	"net/http"
     "strconv"
     "sort"
+    "database/sql"
+    "log"
 
+    _ "github.com/mattn/go-sqlite3"
 	"github.com/gin-gonic/gin"
     "github.com/go-resty/resty/v2"
     "firebase.google.com/go/v4"
@@ -62,7 +64,7 @@ type SwellReport struct {
     PrimaryWaveHeight string
     PrimaryPeriod string
     PrimaryDegrees string
-    SecondaryWaveHeight string
+SecondaryWaveHeight string
     SecondaryPeriod string
     SecondaryDegrees string
     Steepness string
@@ -377,12 +379,27 @@ func sortForecastSummary(summary []ForecastSummary) {
 	})
 }
 
-func renderForecastSummary(w http.ResponseWriter, cache *Cache) {
+func renderForecastSummary(w http.ResponseWriter, cache *Cache,  uid string, db *sql.DB) {
 	buoyIDs := []string{"46221", "46232"}
 	var buoys []struct {
 		Buoy
 		Summary []ForecastSummary
 	}
+
+	if uid == "" {
+		http.Error(w, "UID is required", http.StatusBadRequest)
+		return
+	}
+
+	//buoyIDs := []string{"46221", "46232"}
+	buoyIDs, err := getBuoysForUser(db, uid)
+	if err != nil {
+	    http.Error(w, "no favorites", http.StatusBadRequest)
+	    return
+	}
+	// print the buoy ids 
+	fmt.Println("Buoy IDs:", buoyIDs)
+
 
 	for _, buoyID := range buoyIDs {
 		forecastData, err := getForecast(nil, cache, buoyID)
@@ -447,7 +464,7 @@ func renderForecastSummary(w http.ResponseWriter, cache *Cache) {
 	}
 
 	tmpl := template.Must(template.ParseFiles("templates/forecastsummary3.html"))
-	err := tmpl.ExecuteTemplate(w, "forecastsummary3", struct {
+	err = tmpl.ExecuteTemplate(w, "forecastsummary3", struct {
 		Buoys []struct {
 			Buoy
 			Summary []ForecastSummary
@@ -464,10 +481,58 @@ var (
 	authClient *auth.Client
 )
 
+// Open the database connection
+func openDatabase() *sql.DB {
+    db, err := sql.Open("sqlite3", "../open-swells-db/main.db")
+    if err != nil {
+        log.Fatalf("Failed to connect to database: %v", err)
+    }
+
+    if err := db.Ping(); err != nil {
+        log.Fatalf("Failed to ping database: %v", err)
+    }
+
+    return db
+}
+
+func insertUserBuoy(db *sql.DB, uid, buoyID string) error {
+    // Insert user if not exists
+    _, err := db.Exec(`INSERT OR IGNORE INTO users (uid) VALUES (?)`, uid)
+    if err != nil {
+        return err
+    }
+
+    // Insert the user-buoy mapping
+    _, err = db.Exec(`INSERT INTO user_buoys (uid, buoy_id) VALUES (?, ?)`, uid, buoyID)
+    return err
+}
+
+func getBuoysForUser(db *sql.DB, uid string) ([]string, error) {
+    rows, err := db.Query(`SELECT buoy_id FROM user_buoys WHERE uid = ?`, uid)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var buoys []string
+    for rows.Next() {
+        var buoyID string
+        if err := rows.Scan(&buoyID); err != nil {
+            return nil, err
+        }
+        buoys = append(buoys, buoyID)
+    }
+    return buoys, nil
+}
+
+func verifyUserID(uid string) error {
+    _, err := authClient.GetUser(context.Background(), uid)
+    return err
+}
 
 func main() {
     // start firebase auth
-    opt := option.WithCredentialsFile("/Users/evancoons/Downloads/open-swells-89714-firebase-adminsdk-ghfog-cab6d41e1d.json")
+    opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
        panic(fmt.Sprintf("error initializing app: %v", err))
@@ -477,6 +542,10 @@ func main() {
     if err != nil {
         panic(fmt.Sprintf("Error getting Auth client: %v", err))
     }
+
+    //start db
+    db := openDatabase()
+    defer db.Close()
 
     // gin.SetMode(gin.ReleaseMode)
     router := gin.Default()
@@ -682,8 +751,37 @@ func main() {
     })
 
     router.GET("/forecast-summary", func(c *gin.Context) {
-		renderForecastSummary(c.Writer,  cache)
+        uid := c.Query("uid")
+		renderForecastSummary(c.Writer,  cache, uid, db)
 	})
+
+    router.GET("/add", func(c *gin.Context) {
+        uid := c.Query("uid")
+        buoyID := c.Query("buoyid")
+
+        if uid == "" || buoyID == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Both uid and buoyid are required"})
+            return
+        }
+
+        // Verify the user ID with Firebase
+        err := verifyUserID(uid)
+        if err != nil {
+            log.Printf("Failed to verify user ID: %v", err)
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+            return
+        }
+
+        err = insertUserBuoy(db, uid, buoyID)
+        if err != nil {
+            errorMsg := fmt.Sprintf("Failed to insert user buoy: %v", err)
+            log.Println(errorMsg)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to insert user buoy"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"message": "User buoy added successfully"})
+    })
 
     router.Run(":8081")
 }

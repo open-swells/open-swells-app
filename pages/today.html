@@ -161,9 +161,8 @@
                 </div>
             </div>
             <div class="w-full lg:w-1/3 mt-4 lg:mt-0">
-                <h2 class="text-xl font-bold mb-4">Saved</h2>
-                <div id="buoy-containers" class="favorites h-[500px] overflow-hidden">
-                </div>
+                <h2 class="text-xl font-bold mb-4">Favorites</h2>
+                <div id="buoy-containers" class="favorites h-[500px] overflow-auto"> </div>
             </div>
         </div>
     </div>
@@ -200,11 +199,12 @@
 
     </script>
     <script> 
-        async function loadForecastSummary() {
+        async function loadForecastSummary(uid) {
             try {
-                const response = await fetch('/forecast-summary');
+                const response = await fetch(`/forecast-summary?uid=${encodeURIComponent(uid)}`);
                 if (!response.ok) {
                     console.log("error, could not load buoys")
+                    throw new Error('Failed to load forecast summary');
                 }
                 const html = await response.text();
                 document.getElementById('buoy-containers').innerHTML = html;
@@ -219,7 +219,7 @@
         firebase.auth().onAuthStateChanged(async (user) => {
             if (user) {
                 console.log(`User signed in: ${user.uid}`);
-                await loadForecastSummary();
+                await loadForecastSummary(user.uid);
             } else {
                 console.log('User not signed in.');
                 document.getElementById('buoy-containers').innerHTML =
@@ -361,6 +361,25 @@
         }
 
 
+        async function addBuoyToFavorites(stationId) {
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                alert('Please sign in to add favorites');
+                return;
+            }
+            const uid = user.uid;
+            try {
+                const response = await fetch(`/add?uid=${uid}&buoyid=${stationId}`);
+                if (!response.ok) {
+                    throw new Error('Failed to add buoy to favorites');
+                }
+                alert('Buoy added to favorites');
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to add buoy to favorites');
+            }
+        }
+
         async function plotBuoys() {
             buoyData.forEach(buoy => {
                 const popupContent = `
@@ -371,29 +390,23 @@
                     <br>
                     <button
                         onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')"
-                        class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2  px-4"
+                        class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
                     >
                     Show Report
                     </button>
-
-                    <!--
-                    <button
-                        hx-get="/report/${buoy.stationId}/?t=${new Date().getTime()}"
-                        hx-target="#report-container"
-                        hx-swap="innerHTML"
-                        hx-on="click"
-                        hx-boost="true"
-                        class="bg-gray-200 hover:bg-blue-200 font-bold py-2 px-3"
-                    >
-                    Show Faster Report
-                    </button>
-                    -->
 
                     <button
                         onclick="window.location.href='/forecast/${buoy.stationId}'"
                         class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
                     >
                     16 Day Forecast
+                    </button>
+
+                    <button
+                        onclick="addBuoyToFavorites('${buoy.stationId}')"
+                        class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4 ml-2"
+                    >
+                    +
                     </button>
                     </div>`;
                 L.marker([buoy.latitude, buoy.longitude]).addTo(map)
