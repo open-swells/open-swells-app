@@ -128,19 +128,31 @@
 
             <!-- Sign-in Modal -->
             <div id="signInModal" class="fixed z-50 inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-                <div class="bg-white p-8 rounded-lg shadow-lg">
+                <div class="bg-white p-8 shadow-lg relative">
+                    <button id="closeModal" class="absolute top-3 left-4 text-gray-500 hover:text-gray-700 text-xl font-bold">&times;</button>
                     <button onclick="googleSignIn()" class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow flex items-center">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="mr-2" style="width: 18px; height: 18px;">
                         Sign in with Google
                     </button>
-                    <button id="closeModal" class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Close</button>
+                    <!-- <button id="closeModal" class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Close</button> -->
                 </div>
             </div>
 
-            <!-- Test Auth Button -->
+            <!-- User Popup -->
+            <div id="userPopup" class="absolute right-3 mt-12 w-48 bg-white overflow-hidden shadow-xl z-10 hidden">
+                <button id="closeUserPopup" class="absolute top-3 left-3 text-xl text-gray-500 hover:text-gray-700">&times;</button>
+                <div class="px-4 py-2 flex flex-col mt-8">
+                    <p id="userName" class="text-sm font-medium text-gray-900"></p>
+                    <p id="userEmail" class="text-sm font-medium text-gray-500"></p>
+                </div>
+                <a href="#" id="signOutBtn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sign out</a>
+            </div>
+
+            <!-- Test Auth Button 
             <button id="testAuthBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-4">
                 Test Auth
             </button>
+            --> 
         </div>
     </div>
     <!-- This is all the header --> 
@@ -150,7 +162,7 @@
         <div class="flex flex-wrap">
             <div class="w-full lg:w-2/3 pr-0 lg:pr-4">
                 <div id="map" class="h-[300px]"></div>
-                <h3 class="report-title text-center my-5 text-lg font-bold">Choose buoy to begin</h3>
+                <h3 class="report-title text-center my-2 text-lg font-bold">Choose Buoy</h3>
                 <div id="report-container" class="report mt-4">
                     <div>
                         {{template "report" .}}
@@ -242,7 +254,10 @@
             if (user) {
                 // User is signed in
                 signInBtn.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="w-8 h-8 rounded-full">`;
-                signInBtn.onclick = () => firebase.auth().signOut().then(() => updateUIForSignedInUser(null));
+                // signInBtn.onclick = () => firebase.auth().signOut().then(() => updateUIForSignedInUser(null));
+                signInBtn.onclick = () => document.getElementById('userPopup').classList.remove('hidden');
+                document.getElementById('userName').textContent = user.displayName;
+                document.getElementById('userEmail').textContent = user.email;
             } else {
                 // User is signed out
                 signInBtn.innerHTML = 'Sign In';
@@ -251,12 +266,19 @@
             document.getElementById('signInModal').classList.add('hidden');
         }
 
-        document.getElementById('signInBtn').addEventListener('click', function() {
-            document.getElementById('signInModal').classList.remove('hidden');
+        document.getElementById('closeUserPopup').addEventListener('click', function() {
+            document.getElementById('userPopup').classList.add('hidden');
         });
 
         document.getElementById('closeModal').addEventListener('click', function() {
             document.getElementById('signInModal').classList.add('hidden');
+        });
+
+        document.getElementById('signOutBtn').addEventListener('click', function() {
+            firebase.auth().signOut().then(() => {
+                updateUIForSignedInUser(null);
+                document.getElementById('userPopup').classList.add('hidden');
+            });
         });
 
         // Close the modal if clicking outside of it
