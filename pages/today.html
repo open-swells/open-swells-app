@@ -211,19 +211,42 @@
 
     </script>
     <script> 
+        let userBuoys = [];
         async function loadForecastSummary(uid) {
             try {
-                const response = await fetch(`/forecast-summary?uid=${encodeURIComponent(uid)}`);
-                if (!response.ok) {
-                    console.log("error, could not load buoys")
+                const summaryResponse = await fetch(`/forecast-summary?uid=${encodeURIComponent(uid)}`);
+        
+                if (!summaryResponse.ok) {
+                    console.log("Error: Could not load forecast summary");
                     throw new Error('Failed to load forecast summary');
                 }
-                const html = await response.text();
+        
+                const html = await summaryResponse.text();
                 document.getElementById('buoy-containers').innerHTML = html;
+        
             } catch (error) {
                 console.error('Error loading forecast summary:', error);
                 document.getElementById('buoy-containers').innerHTML =
                     '<p>Failed to load forecast summary. Please try again later.</p>';
+            }
+        }
+        
+        async function loadUserBuoys(uid) {
+            try {
+                const userBuoysResponse = await fetch(`/get-user-buoys?uid=${encodeURIComponent(uid)}`);
+        
+                if (!userBuoysResponse.ok) {
+                    console.log("Error: Could not load user buoys");
+                    throw new Error('Failed to load user buoys');
+                }
+        
+                userBuoys = await userBuoysResponse.json();
+                userBuoys = userBuoys.buoys || [];
+        
+                console.log('User buoys:', userBuoys);
+            } catch (error) {
+                console.error('Error loading user buoys:', error);
+                userBuoys = [];
             }
         }
           // Wait for Firebase authentication
@@ -232,6 +255,7 @@
             if (user) {
                 console.log(`User signed in: ${user.uid}`);
                 await loadForecastSummary(user.uid);
+                await loadUserBuoys(user.uid);
             } else {
                 console.log('User not signed in.');
                 document.getElementById('buoy-containers').innerHTML =
@@ -290,9 +314,8 @@
         }
 
         // Check auth state on page load
-    </script> 
+        // script end and beginning was here
 
-    <script> 
         var map = L.map('map').setView([33.800832, -121.157227], 5);
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -402,39 +425,116 @@
             }
         }
 
+        function createPopupContent(buoy) {
+            return `
+                <div>
+                    <div class="text-md">
+                    ${buoy.name}
+                    </div>
+                <br>
+                <button
+                    onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')"
+                    class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
+                >
+                Show Report
+                </button>
+
+                <button
+                    onclick="window.location.href='/forecast/${buoy.stationId}'"
+                    class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
+                >
+                16 Day Forecast
+                </button>
+
+                <button
+                    id="fav-${buoy.stationId}"
+                    onclick="toggleFavorite('${buoy.stationId}')"
+                    class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4 ml-2"
+                >
+                ${userBuoys.includes(buoy.stationId) ? 'x' : '+'}
+                </button>
+                </div>`;
+        }
+
         async function plotBuoys() {
             buoyData.forEach(buoy => {
-                const popupContent = `
-                    <div div="">
-                        <div class="text-md">
-                        ${buoy.name}
-                        </div>
-                    <br>
-                    <button
-                        onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')"
-                        class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
-                    >
-                    Show Report
-                    </button>
-
-                    <button
-                        onclick="window.location.href='/forecast/${buoy.stationId}'"
-                        class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
-                    >
-                    16 Day Forecast
-                    </button>
-
-                    <button
-                        onclick="addBuoyToFavorites('${buoy.stationId}')"
-                        class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4 ml-2"
-                    >
-                    +
-                    </button>
-                    </div>`;
-                L.marker([buoy.latitude, buoy.longitude]).addTo(map)
-                    .bindPopup(popupContent, {minWidth: 250})
+                const marker = L.marker([buoy.latitude, buoy.longitude]).addTo(map);
+                marker.bindPopup(() => createPopupContent(buoy), {minWidth: 250});
             });
         }
+
+        async function toggleFavorite(stationId) {
+            console.log(`Toggling favorite for station ID: ${stationId}`);
+            const user = firebase.auth().currentUser;
+            if (!user) {
+                alert('Please sign in to manage favorites');
+                return;
+            }
+            const uid = user.uid;
+            
+            if (userBuoys && userBuoys.includes(stationId)) {
+                // Remove from favorites
+                try {
+                    const response = await fetch(`/delete?uid=${uid}&buoyid=${stationId}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to remove buoy from favorites');
+                    }
+                    userBuoys = userBuoys.filter(id => id !== stationId);
+                    alert('Buoy removed from favorites');
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to remove buoy from favorites');
+                }
+            } else {
+                // Add to favorites
+                try {
+                    const response = await fetch(`/add?uid=${uid}&buoyid=${stationId}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to add buoy to favorites');
+                    }
+                    userBuoys.push(stationId);
+                    alert('Buoy added to favorites');
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to add buoy to favorites');
+                }
+            }
+            
+            // Refresh the favorites display and update popup content
+            await loadForecastSummary(uid);
+            updatePopupContent(stationId);
+        }
+
+        function updatePopupContent(stationId) {
+            map.eachLayer(function(layer) {
+                if (layer instanceof L.Marker) {
+                    const popup = layer.getPopup();
+                    if (popup) {
+                        const content = popup.getContent();
+                        if (content && content.includes(`id="fav-${stationId}"`)) {
+                            const buoy = buoyData.find(b => b.stationId === stationId);
+                            if (buoy) {
+                                layer.setPopupContent(createPopupContent(buoy));
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateFavoriteButtons() {
+            buoyData.forEach(buoy => {
+                const button = document.getElementById(`fav-${buoy.stationId}`);
+                if (button) {
+                    if (userBuoys.includes(buoy.stationId)) {
+                        button.textContent = 'x';
+                    } else {
+                        button.textContent = '+';
+                    }
+                }
+            });
+        }
+
 
 
         // these are all the buoys that have "spectral" data

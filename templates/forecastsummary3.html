@@ -88,7 +88,13 @@
 <body>
     {{range .Buoys}}
     <div class="buoy">
-        <div class="buoy-name">{{.Name}}</div>
+               <div class="buoy-name flex justify-between items-center">
+                    <span>{{.Name}}</span>
+                    <div>
+                        <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite border border-red-900 text-red-900 px-1 py-0.5 text-xs">Remove from Favorites</button>
+                        <button onclick="window.location.href='/forecast/{{.ID}}'" class="border border-blue-900 text-blue-900 px-1 py-0.5 text-xs">View Forecast</button>
+                    </div>
+                </div>
         <div class="forecast-summary">
             {{range .Summary}}
             <div class="forecast-day bg-white border border-2 py-4 px-2 flex flex-col items-center justify-center">

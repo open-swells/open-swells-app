@@ -397,8 +397,6 @@ func renderForecastSummary(w http.ResponseWriter, cache *Cache,  uid string, db 
 	    http.Error(w, "no favorites", http.StatusBadRequest)
 	    return
 	}
-	// print the buoy ids 
-	fmt.Println("Buoy IDs:", buoyIDs)
 
 
 	for _, buoyID := range buoyIDs {
@@ -504,6 +502,12 @@ func insertUserBuoy(db *sql.DB, uid, buoyID string) error {
 
     // Insert the user-buoy mapping
     _, err = db.Exec(`INSERT INTO user_buoys (uid, buoy_id) VALUES (?, ?)`, uid, buoyID)
+    return err
+}
+
+func deleteUserBuoy(db *sql.DB, uid, buoyID string) error {
+    // Delete the user-buoy mapping
+    _, err := db.Exec(`DELETE FROM user_buoys WHERE uid = ? AND buoy_id = ?`, uid, buoyID)
     return err
 }
 
@@ -781,6 +785,60 @@ func main() {
         }
 
         c.JSON(http.StatusOK, gin.H{"message": "User buoy added successfully"})
+    })
+
+    router.GET("/delete", func(c *gin.Context) {
+        uid := c.Query("uid")
+        buoyID := c.Query("buoyid")
+
+        if uid == "" || buoyID == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Both uid and buoyid are required"})
+            return
+        }
+
+        // Verify the user ID with Firebase
+        err := verifyUserID(uid)
+        if err != nil {
+            log.Printf("Failed to verify user ID: %v", err)
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+            return
+        }
+
+        err = deleteUserBuoy(db, uid, buoyID)
+        if err != nil {
+            errorMsg := fmt.Sprintf("Failed to delete user buoy: %v", err)
+            log.Println(errorMsg)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user buoy"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"message": "User buoy deleted successfully"})
+    })
+
+    router.GET("/get-user-buoys", func(c *gin.Context) {
+        uid := c.Query("uid")
+
+        if uid == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "uid is required"})
+            return
+        }
+
+        // Verify the user ID with Firebase
+        err := verifyUserID(uid)
+        if err != nil {
+            log.Printf("Failed to verify user ID: %v", err)
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID"})
+            return
+        }
+
+        buoys, err := getBuoysForUser(db, uid)
+        if err != nil {
+            log.Printf("Failed to get user buoys: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user buoys"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{"buoys": buoys})
     })
 
     router.Run(":8081")
