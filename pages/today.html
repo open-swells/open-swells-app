@@ -318,9 +318,21 @@
 
         var map = L.map('map').setView([33.800832, -121.157227], 5);
 
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        // topo
+         // L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                 // attribution: '&copy; <a href="https://www.opentopomap.org">OpenTopoMap</a> contributors'
+         // }).addTo(map);
+
+        // physical
+          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: US National Park Service',
+          }).addTo(map);
+
+
+        // dark or light
+        // L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            // attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        // }).addTo(map);
 
         popup = L.popup();
         
@@ -521,21 +533,6 @@
                 }
             });
         }
-
-        function updateFavoriteButtons() {
-            buoyData.forEach(buoy => {
-                const button = document.getElementById(`fav-${buoy.stationId}`);
-                if (button) {
-                    if (userBuoys.includes(buoy.stationId)) {
-                        button.textContent = 'x';
-                    } else {
-                        button.textContent = '+';
-                    }
-                }
-            });
-        }
-
-
 
         // these are all the buoys that have "spectral" data
         let currentBuoy = {};

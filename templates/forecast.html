@@ -285,11 +285,11 @@
 
             // y should not start at 0, but  just below the minimum swell height
             var y = d3.scaleLinear()
-                .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])
+                .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight)) * 3.28084])
                 .range([ height, 0 ]);
 
             var yScale = d3.scaleLinear()
-                .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])
+                .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight)) * 3.28084])
                 .range([ height, 0 ]);
 
             var yAxis = d3.axisLeft(yScale);
@@ -305,21 +305,21 @@
                 // Line generator for primary swell height
                 const linePrimary = d3.line()
                     .x(d => x(d.hour))
-                    .y(d => y(d.PrimaryWaveHeight));
+                    .y(d => y(d.PrimaryWaveHeight * 3.28084));
 
                 // Line generator for secondary swell height
                 const lineSecondary = d3.line()
                     .x(d => x(d.hour))
-                    .y(d => y(d.SecondaryWaveHeight));
+                    .y(d => y(d.SecondaryWaveHeight * 3.28084));
 
                 //Draw tertiary swell line
                 const lineTertiary = d3.line()
                     .x(d => x(d.hour))
-                    .y(d => y(d.TertiaryWaveHeight));
+                    .y(d => y(d.TertiaryWaveHeight * 3.28084));
 
                 const lineQuaternary = d3.line()
                     .x(d => x(d.hour))
-                    .y(d => y(d.QuaternaryWaveHeight));
+                    .y(d => y(d.QuaternaryWaveHeight * 3.28084));
 
                 // Draw or update primary swell line
                 svg.selectAll(".linePrimary").data([data], d => d.hour)
@@ -355,7 +355,7 @@
                 svg.selectAll(".primaryPoint").data(data)
                     .join("path")
                     .attr("class", "primaryPoint")
-                    .attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight)}) rotate(${d.PrimaryDegrees - 135}) skewY(25)`)
+                    .attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${d.PrimaryDegrees - 135}) skewY(25)`)
                     .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
                     .attr("fill", "steelblue");
 
@@ -363,7 +363,7 @@
                 svg.selectAll(".secondaryPoint").data(data)
                     .join("path")
                     .attr("class", "secondaryPoint")
-                    .attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight)}) rotate(${d.SecondaryDegrees - 135}) skewY(25)`)
+                    .attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${d.SecondaryDegrees - 135}) skewY(25)`)
                     .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
                     .attr("stroke", "orange")
                     .attr("fill", "orange");
@@ -372,7 +372,7 @@
                 svg.selectAll(".tertiaryPoint").data(data)
                     .join("path")
                     .attr("class", "tertiaryPoint")
-                    .attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight)}) rotate(${d.TertiaryDegrees - 135}) skewY(25)`)
+                    .attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${d.TertiaryDegrees - 135}) skewY(25)`)
                     .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
                     .attr("stroke", "green")
                     .attr("fill", "green");
@@ -386,7 +386,7 @@
                 svg.selectAll(".quaternaryPoint").data(data)
                     .join("path")
                     .attr("class", "quaternaryPoint")
-                    .attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight)}) rotate(${d.QuaternaryDegrees - 135}) skewY(25)`)
+                    .attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight * 3.28084)}) rotate(${d.QuaternaryDegrees - 135}) skewY(25)`)
                     .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
                     .attr("stroke", "purple")
                     .attr("fill", "purple");
@@ -407,10 +407,10 @@
                     tooltip.style("visibility", "visible")
                         .style("top", (event.pageY + 15) + "px")
                         .style("left", (event.pageX + 15) + "px")
-                        .html(`Hour: ${closestData.hour}<br>${closestData.PrimaryWaveHeight}m at ${closestData.PrimaryPeriod}s
-                            <br>${closestData.SecondaryWaveHeight}m at ${closestData.SecondaryPeriod}s
-                            <br>${closestData.TertiaryWaveHeight}m at ${closestData.TertiaryPeriod}s
-                            <br>${closestData.QuaternaryWaveHeight}m at ${closestData.QuaternaryPeriod}s`);
+                        .html(`Hour: ${closestData.hour}<br>${(closestData.PrimaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.PrimaryPeriod}s
+                            <br>${(closestData.SecondaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.SecondaryPeriod}s
+                            <br>${(closestData.TertiaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.TertiaryPeriod}s
+                            <br>${(closestData.QuaternaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.QuaternaryPeriod}s`);
                 });
 
                 // Mouse leave handler to hide tooltip
@@ -420,7 +420,7 @@
             }
 
             function rescale() {
-                yScale.domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))])  // change scale to 0, to between 10 and 100
+                yScale.domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight)) * 3.28084])  // change scale to 0, to between 10 and 100
                 svg.select(".yaxis")
                         .transition().duration(200)  // https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
                         .call(yAxis);  
