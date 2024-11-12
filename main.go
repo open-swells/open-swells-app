@@ -835,11 +835,17 @@ func main() {
         swellreport, err := getSwellReport(stationId)
         windreport, err := getWindReport(stationId)
 
+        // Get buoy name from BuoyLocations map
+        buoyName := fmt.Sprintf("Buoy %s", stationId) // default name if not found
+        if location, ok := BuoyLocations[stationId]; ok {
+            buoyName = location.Name
+        }
 
         returndata := map[string]interface{}{
             "forecastdata":    forecastdata,
             "swellreport": swellreport,
             "windreport":  windreport,
+            "buoyName":    buoyName,
         }
 
         if err != nil {

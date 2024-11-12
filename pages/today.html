@@ -72,6 +72,9 @@
         .leaflet-popup-content-wrapper { 
             border-radius: 0px !important;
         } 
+        .buoy-name { 
+            background-color: #ffffff;
+        } 
 
         
         /* Dark mode styles */
@@ -106,6 +109,11 @@
             border-width: 1px;
             border-style: solid;
         } 
+        body.dark .buoy-name { 
+            color: #ffffff;
+            background-color: #333;
+            border-color: #555;
+        }
 
 
    </style>
@@ -204,7 +212,7 @@
                 <div id="map" class="h-[400px] md:h-[80vh] z-10"></div>
                 <!-- Positioned Report Container Over Map -->
                 <div id="report-container" class="report md:absolute md:bottom-5 md:left-0 w-full  bg-opacity-90 p-4 z-20">
-                    <div class="buoy-name bg-white border border-black-900 p-2 flex justify-between items-center">
+                    <div class="buoy-name border border-black-900 p-2 flex justify-between items-center">
                         <span class="report-title" >Choose buoy</span>
                         <div>
                             <!-- TODO: implement toggle favorite button -->
