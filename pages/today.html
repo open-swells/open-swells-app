@@ -220,7 +220,7 @@
                             <button  id="forecastBtn" class="forecast border border-blue-900 text-blue-900 px-1 py-0.5 text-xs">View Forecast</button>
                         </div>
                     </div>
-                    <div>
+                    <div id="report-content">
                         {{template "report" .}}
                     </div>
                 </div>
@@ -398,76 +398,24 @@
 
         map.on('click', onMapClick);
 
-        async function getBuoyReport(stationId, name) {
-            const base_url = window.location.origin;
-            const url = base_url + '/realtime/' + stationId;
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
+
+        async function getBuoyReport(buoyId) {
+            try {
+                const summaryResponse = await fetch(`/report/${buoyId}`);
+
+                if (!summaryResponse.ok) {
+                    console.log("Error: Could not find buoy report");
+                    throw new Error('Failed to load report');
                 }
-            });
 
-            // raise an error to user if the fetch fails
-            if (!response.ok) {
-                // I don't want an alert, I want to display the error on the page
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.text()
-            const line = data.split('\n')[2].split(/\s+/);
+                const html = await summaryResponse.text();
+                document.getElementById('report-container').innerHTML = html;
+                window.initializeSwellDirection();
 
-            // formate date from year, month, day, hour, minute
-            const date = new Date(line[0], line[1] - 1, line[2], line[3], line[4]);
-
-            // #YY  MM DD hh mm WVHT  SwH  SwP  WWH  WWP SwD WWD  STEEPNESS  APD MWD
-
-            // how can I translate the time to the users time zone
-            const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const localdate = date.toLocaleString('en-US', { timeZone: timezone });    
-
-            document.getElementsByClassName("report-title")[0].innerHTML = "Current Report - Buoy " + stationId + " " + name ;
-            // + " - last reading at " + localdate + " " + timezone;
-            document.getElementsByClassName("swhswp")[0].innerHTML = line[6] + 'm' + ' at ' + line[7] + 's';
-            document.getElementsByClassName("wwhwwp")[0].innerHTML = line[8] + 'm' + ' at ' + line[9] + 's';
-            document.getElementsByClassName("wwd")[0].innerHTML = line[11];
-            document.getElementsByClassName("mwd")[0].innerHTML = line[14] + 'º';
-            document.getElementsByClassName("steep")[0].innerHTML = line[12];
-
-            // for each arrow, we need to change the direction. The first arrow is rotated based on line[14] (degrees) and the second arrow is rotated based on line[11] (direction)
-            document.getElementsByClassName("swellsymbol")[0].style.transform = "rotate(" + line[14] + "deg)";
-            document.getElementsByClassName("windswellsymbol")[0].style.transform = "rotate(" + directionmap[line[11]] + "deg)";
-
-            getWindReport(stationId);
-
-            currentBuoy = { stationId: stationId, name: name, latitude: line[0], longitude: line[1] };
-
-        }
-
-        async function getWindReport(stationId) {
-            // const url = 'https://corsproxy.io/?' + 'https://www.ndbc.noaa.gov/data/realtime2/' + stationId + '.txt';
-            const base_url = window.location.origin;
-            const url = base_url + '/realtime/wind/' + stationId;
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            });
-
-            const data = await response.text();
-            const line = data.split('\n')[2].split(/\s+/);
-
-            document.getElementsByClassName("wdspd")[0].innerHTML = 'speed: ' + line[6] + 'mph';
-            document.getElementsByClassName("wddir")[0].innerHTML = line[5] + 'º';
-            document.getElementsByClassName("gust")[0].innerHTML = 'gusts: ' + line[7] + 'mph';
-            document.getElementsByClassName("temp")[0].innerHTML = "water temp: " + line[14] + 'ºC';
-            document.getElementsByClassName("airtemp")[0].innerHTML = "air temp: " + line[15] + 'ºC';
-            document.getElementsByClassName("windsymbol")[0].style.transform = "rotate(" + line[5] + "deg)";
-
-            // raise an error to user if the fetch fails
-            if (!response.ok) {
-                // I don't want an alert, I want to display the error on the page
-                throw new Error(`HTTP error! status: ${response.status}`);
+            } catch (error) {
+                console.error('Error loading report summary:', error);
+                document.getElementById('buoy-containers').innerHTML =
+                    '<p>Failed to load report summary. Please try again later.</p>';
             }
         }
 
@@ -499,7 +447,7 @@
                     </div>
                 <br>
                 <button
-                    onclick="getBuoyReport('${buoy.stationId}','${buoy.name}')"
+                    onclick="getBuoyReport('${buoy.stationId}')"
                     class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
                 >
                 Show Report
@@ -786,7 +734,7 @@
                     div.classList.add('search-result');
                     div.textContent = match.name;
                     div.onclick = function() { 
-                        getBuoyReport(match.stationId, match.name);
+                        getBuoyReport(match.stationId);
                         searchResults.innerHTML = ''; 
                         currentBuoy = match;
                         map.eachLayer(function(layer) {

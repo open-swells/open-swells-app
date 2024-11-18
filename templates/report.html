@@ -20,13 +20,19 @@
             'NNW': 337.5
         };
 
-        // after the dom has loaded
-        document.addEventListener('DOMContentLoaded', () => {
+        // Define a global function that can be called after template insertion
+        window.initializeSwellDirection = function() {
             let secondaryswell = {{.swellreport.SecondaryDegrees}};
             let swelldir = document.querySelector('.windswellsymbol');
-            swelldir.style.transform = `rotate(${directionmap[secondaryswell]}deg)`;
-        });
+            console.log("Direction: " + secondaryswell);
+            if (swelldir) {
+                console.log("rotating");
+                swelldir.style.transform = `rotate(${directionmap[secondaryswell]}deg)`;
+            }
+        };
 
+        // Also try to execute immediately in case it's needed
+        initializeSwellDirection();
     </script> 
     <style> 
         body.dark .card {
@@ -65,8 +71,8 @@
             <h2 class="text-lg  text-gray-800 mb-2">Secondary Swell</h2>
             <div class="content flex flex-row justify-evenly">
                 <div class="direction flex flex-col items-center space-x-2">
-                    <div class="windswellsymbol text-6xl">&#8595;</div>
-                    <p class="wwd text-center">{{.swellreport.SecondaryDegrees}}</p>
+                    <div class="windswellsymbol text-6xl" style="transform: rotate({{.swellreport.SecondaryDegrees}}deg);">&#8595;</div>
+                    <p class="wwd text-center">{{.swellreport.SecondaryDegrees}}º</p>
                 </div>
                 <div class="details space text-base grid content-center">
                     <p class="wwhwwp text-center">{{.swellreport.SecondaryWaveHeight}}ft at {{.swellreport.SecondaryPeriod}}s</p>

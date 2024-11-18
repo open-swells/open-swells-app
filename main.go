@@ -240,20 +240,38 @@ var BuoyLocations = map[string]BuoyLocation{
     "63115": {"63115", "Magnus AWS", 61.6, 1.3},
 }
 
+var directionMap = map[string]float64{
+    "N":   0,
+    "NNE": 22.5,
+    "NE":  45,
+    "ENE": 67.5,
+    "E":   90,
+    "ESE": 112.5,
+    "SE":  135,
+    "SSE": 157.5,
+    "S":   180,
+    "SSW": 202.5,
+    "SW":  225,
+    "WSW": 247.5,
+    "W":   270,
+    "WNW": 292.5,
+    "NW":  315,
+    "NNW": 337.5,
+}
+
 type ForecastSummary struct {
 	Date       string
 	DateAbv    string
 	Condition  string
 	WaveHeight string
 }
-
 type SwellReport struct {
     StationId string
     Date string
     PrimaryWaveHeight string
     PrimaryPeriod string
     PrimaryDegrees string
-SecondaryWaveHeight string
+    SecondaryWaveHeight string
     SecondaryPeriod string
     SecondaryDegrees string
     Steepness string
@@ -420,6 +438,12 @@ func getSwellReport(stationId string) (SwellReport, error) {
     line := lines[2]
     // split by space
     parts := strings.Fields(line)
+
+    secondaryDegrees := parts[10]
+    if degrees, ok := directionMap[secondaryDegrees]; ok {
+        secondaryDegrees = fmt.Sprintf("%.0f", degrees)
+    }
+
     report := SwellReport{
         StationId: stationId,
         Date: parts[0] + " " + parts[1] + " " + parts[2] + " " + parts[3],
@@ -428,7 +452,7 @@ func getSwellReport(stationId string) (SwellReport, error) {
         PrimaryDegrees: parts[14],
         SecondaryWaveHeight: parts[8],
         SecondaryPeriod: parts[9],
-        SecondaryDegrees: parts[10],
+        SecondaryDegrees: secondaryDegrees,
         Steepness: parts[12],
     }
     return report, nil
