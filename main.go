@@ -1063,5 +1063,44 @@ func main() {
         c.JSON(http.StatusOK, gin.H{"buoys": buoys})
     })
 
+    router.GET("/heatmap", func(c *gin.Context) {
+        // Open connection to wave_forecast database
+        waveDB, err := sql.Open("sqlite3", "../grib-parse-collect/wave_forecast.db")
+        if err != nil {
+            log.Printf("Failed to connect to wave_forecast database: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection failed"})
+            return
+        }
+        defer waveDB.Close()
+
+        // Query the database for lat, lon, and wave_height
+        rows, err := waveDB.Query(`
+            SELECT latitude, longitude, wave_height 
+            FROM wave_forecast 
+            WHERE datetime = '2024-11-24 19:00:00'
+        `)
+        if err != nil {
+            log.Printf("Failed to query database: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Query failed"})
+            return
+        }
+        defer rows.Close()
+
+        // Create slice to store the data points
+        var heatmapData [][]float64
+
+        // Iterate through results and format data
+        for rows.Next() {
+            var lat, lon, height float64
+            if err := rows.Scan(&lat, &lon, &height); err != nil {
+                log.Printf("Error scanning row: %v", err)
+                continue
+            }
+            heatmapData = append(heatmapData, []float64{lat, lon, height})
+        }
+
+        c.JSON(http.StatusOK, heatmapData)
+    }) 
+
     router.Run(":8081")
 }
