@@ -752,7 +752,7 @@ func verifyUserID(uid string) error {
 
 func main() {
     // start firebase auth
-    opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
+    opt := option.WithCredentialsFile("/Users/evancoons/Downloads/open-swells-89714-firebase-adminsdk-ghfog-cab6d41e1d.json")
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
        panic(fmt.Sprintf("error initializing app: %v", err))
@@ -1065,7 +1065,7 @@ func main() {
 
     router.GET("/heatmap", func(c *gin.Context) {
         // Open connection to wave_forecast database
-        waveDB, err := sql.Open("sqlite3", "../grib-parse-collect/wave_forecast.db")
+        waveDB, err := sql.Open("sqlite3", "../grib-parse-collect/pythonscripts/wave_forecast.db")
         if err != nil {
             log.Printf("Failed to connect to wave_forecast database: %v", err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection failed"})
@@ -1077,7 +1077,6 @@ func main() {
         rows, err := waveDB.Query(`
             SELECT latitude, longitude, wave_height 
             FROM wave_forecast 
-            WHERE datetime = '2024-11-24 19:00:00'
         `)
         if err != nil {
             log.Printf("Failed to query database: %v", err)
