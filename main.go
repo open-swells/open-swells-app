@@ -446,7 +446,7 @@ func getSwellReport(stationId string) (SwellReport, error) {
 
     report := SwellReport{
         StationId: stationId,
-        Date: parts[0] + " " + parts[1] + " " + parts[2] + " " + parts[3],
+        Date: parts[0] + "/" + parts[1] + "/" + parts[2] + " " + parts[3] + ":" + parts[4],
         PrimaryWaveHeight: parts[5],
         PrimaryPeriod: parts[7],
         PrimaryDegrees: parts[14],
