@@ -1,46 +1,46 @@
 <!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <html>
-<head>
+    <head>
 
-    <title>OpenSwells;</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Mobile styles - placed at top for higher specificity */
-        @media (max-width: 768px) {
-            body .header {
-                display: grid;
-                grid-template-areas:
-                    "logo icons"
-                    "search search";
-                grid-template-columns: 1fr auto;
-                grid-gap: 2px;
-                padding: 5px;
-                width: 100%;
-            }
+        <title>OpenSwells;</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+/* Mobile styles - placed at top for higher specificity */
+@media (max-width: 768px) {
+    body .header {
+        display: grid;
+        grid-template-areas:
+            "logo icons"
+        "search search";
+    grid-template-columns: 1fr auto;
+    grid-gap: 2px;
+    padding: 5px;
+    width: 100%;
+    }
 
-            
-            body .header .title {
-                grid-area: logo;
-                justify-self: start;
-                min-width: fit-content;
-            }
 
-            
-            body .header .search {
-                grid-area: search;
-                width: 100%;
-            }
+    body .header .title {
+        grid-area: logo;
+        justify-self: start;
+        min-width: fit-content;
+    }
 
-            body .header .icons {
-                grid-area: icons;
-                justify-self: end;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                min-width: fit-content;
-            }
-        }
+
+    body .header .search {
+        grid-area: search;
+        width: 100%;
+    }
+
+    body .header .icons {
+        grid-area: icons;
+        justify-self: end;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: fit-content;
+    }
+}
 
         #map { 
             /* height: 500px; width: 100%; */ 
@@ -76,7 +76,7 @@
             background-color: #ffffff;
         } 
 
-        
+
         /* Dark mode styles */
         body.dark .leaflet-popup-content-wrapper { 
             background-color: #333;
@@ -121,137 +121,163 @@
         }
 
 
-   </style>
-</head>
+        </style>
+    </head>
 
-<body class="mb-10 mx-2 sm:mx-8 md:mx-12 lg:mx-20 font-mono" >
+    <body class="mb-10 mx-2 sm:mx-8 md:mx-12 lg:mx-20 font-mono" >
 
-    <script>
-        // applying in body
-        (function() {
-            if (localStorage.getItem('darkMode') === 'true') {
-                document.body.classList.add('dark'); // Apply dark mode before body renders
-            }
-        })();
-    </script>
+        <script>
+            // applying in body
+            (function() {
+                if (localStorage.getItem('darkMode') === 'true') {
+                    document.body.classList.add('dark'); // Apply dark mode before body renders
+                }
+            })();
+        </script>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-                           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-                           crossorigin=""/>
-    <!-- Make sure you put this AFTER Leaflet's CSS -->
-
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-            crossorigin=""></script>
+        <script src='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js'></script>
+        <link href='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css' rel='stylesheet' />
 
 
-    <!-- This is all the header --> 
-    <div class="header flex flex-row justify-evenly items-center p-2">
-        <!-- Logo -->
-        <div class="title width:20%">
-            <h1 class="text-xl font-bold">OpenSwells;</h1> 
-            <!--<img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" alt="surfing" width="160"> -->
-        </div>
-        <!-- Search -->
-        <div class="search w-1/2">
-            <input type="text" id="search" class="w-full border border-gray-300 p-2" placeholder="Search for a buoy">
-            <div id="searchResults" class="mt-2"></div>
-        </div>
-        <!-- Icons -->
-        <div class="icons width:20% flex items-center">
-            <a href="/about" class="w-10 h-10 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </a>
-            <a href="https://github.com/evancoons22/go-mb-surf" class="w-10 h-10 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-                </svg>
-            </a>
-            <a id="darkModeToggle" class="w-10 h-10 flex items-center justify-center cursor-pointer">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-            </a>
-            <a href="#" id="signInBtn" class="login-link py-2 px-4">
-                Sign In
-            </a>
+        <!-- This is all the header --> 
+        <div class="header flex flex-row justify-evenly items-center p-2">
+            <!-- Logo -->
+            <div class="title width:20%">
+                <h1 class="text-xl font-bold">OpenSwells;</h1> 
+                <!--<img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" alt="surfing" width="160"> -->
+            </div>
+            <!-- Search -->
+            <div class="search w-1/2">
+                <input type="text" id="search" class="w-full border border-gray-300 p-2" placeholder="Search for a buoy">
+                <div id="searchResults" class="mt-2"></div>
+            </div>
+            <!-- Icons -->
+            <div class="icons width:20% flex items-center">
+                <a href="/about" class="w-10 h-10 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </a>
+                <a href="https://github.com/evancoons22/go-mb-surf" class="w-10 h-10 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                        <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                </a>
+                <a id="darkModeToggle" class="w-10 h-10 flex items-center justify-center cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                </a>
+                <a href="#" id="signInBtn" class="login-link py-2 px-4">
+                    Sign In
+                </a>
 
-            <!-- Sign-in Modal -->
-            <div id="signInModal" class="fixed z-50 inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
-                <div class="signinmodal bg-white p-8 shadow-lg relative">
-                    <button id="closeModal" class="absolute top-3 left-4 text-gray-500 hover:text-gray-700 text-xl font-bold">&times;</button>
-                    <button onclick="googleSignIn()" class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow flex items-center">
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="mr-2" style="width: 18px; height: 18px;">
-                        Sign in with Google
+                <!-- Sign-in Modal -->
+                <div id="signInModal" class="fixed z-50 inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+                    <div class="signinmodal bg-white p-8 shadow-lg relative">
+                        <button id="closeModal" class="absolute top-3 left-4 text-gray-500 hover:text-gray-700 text-xl font-bold">&times;</button>
+                        <button onclick="googleSignIn()" class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow flex items-center">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="mr-2" style="width: 18px; height: 18px;">
+                            Sign in with Google
+                        </button>
+                        <!-- <button id="closeModal" class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Close</button> -->
+                    </div>
+                </div>
+
+                <!-- User Popup -->
+                <div id="userPopup" class="absolute right-3 mt-12 w-48 bg-white overflow-hidden shadow-xl z-10 hidden">
+                    <button id="closeUserPopup" class="absolute top-3 left-3 text-xl text-gray-500 hover:text-gray-700">&times;</button>
+                    <div class="px-4 py-2 flex flex-col mt-8">
+                        <p id="userName" class="text-sm font-medium text-gray-900"></p>
+                        <p id="userEmail" class="text-sm font-medium text-gray-500"></p>
+                    </div>
+                    <a href="#" id="signOutBtn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sign out</a>
+                </div>
+
+                <!-- Test Auth Button 
+                    <button id="testAuthBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-4">
+                    Test Auth
                     </button>
-                    <!-- <button id="closeModal" class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Close</button> -->
-                </div>
+                --> 
             </div>
-
-            <!-- User Popup -->
-            <div id="userPopup" class="absolute right-3 mt-12 w-48 bg-white overflow-hidden shadow-xl z-10 hidden">
-                <button id="closeUserPopup" class="absolute top-3 left-3 text-xl text-gray-500 hover:text-gray-700">&times;</button>
-                <div class="px-4 py-2 flex flex-col mt-8">
-                    <p id="userName" class="text-sm font-medium text-gray-900"></p>
-                    <p id="userEmail" class="text-sm font-medium text-gray-500"></p>
-                </div>
-                <a href="#" id="signOutBtn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sign out</a>
-            </div>
-
-            <!-- Test Auth Button 
-            <button id="testAuthBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ml-4">
-                Test Auth
-            </button>
-            --> 
         </div>
-    </div>
-    <!-- This is all the header --> 
+        <!-- This is all the header --> 
 
 
-    <!-- report content -->
-    <div class="content max-w-[95%] min-w-[320px] mx-auto py-4">
-        <div class="flex flex-wrap">
-            <div class="w-full lg:w-2/3 pr-0 lg:pr-4 relative">
-                <div id="map" class="h-[400px] md:h-[80vh] z-10"></div>
-                <!-- Positioned Report Container Over Map -->
-                <div id="report-container" class="report md:absolute md:bottom-5 md:left-0 w-full  bg-opacity-90 p-4 z-20">
-                    <div class="buoy-name border border-black-900 p-2 flex justify-between items-center">
-                        <div id="report-title" class="report-title text-sm">Choose buoy</div>
-                        <div>
-                            <!-- TODO: implement toggle favorite button -->
-                            <!-- <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite border border-red-900 text-red-900 px-1 py-0.5 text-xs">Remove from Favorites</button> --> 
-                            <button  id="forecastBtn" class="forecast border border-blue-900 text-blue-900 px-1 py-0.5 text-xs">View Forecast</button>
+        <!-- Toggle Buttons -->
+        <div class="flex justify-start gap-2 mb-4 ml-4">
+            <button 
+                id="showMapBtn" 
+                class="w-24 py-1 px-3 text-sm font-bold border border-black text-black bg-gray-200"
+                onclick="toggleView('map')"
+            >
+                Map
+            </button>
+            <button 
+                id="showFavoritesBtn" 
+                class="w-24 py-1 px-3 text-sm font-bold border border-black text-gray-700"
+                onclick="toggleView('favorites')"
+            >
+                Favorites
+            </button>
+        </div>
+
+        <!-- Content Container -->
+        <div class="content max-w-[95%] min-w-[320px] mx-auto">
+            <!-- Map View -->
+            <div id="mapView" class="w-full">
+                <div class="relative">
+                    <div id="map" class="h-[80vh] z-10"></div>
+                    <!-- Positioned Report Container Over Map -->
+                    <div id="report-container" class="report absolute bottom-0 left-0 w-auto max-w-[600px] bg-white/95 dark:bg-gray-800/95 shadow-lg z-20 m-4">
+                        <div class="buoy-name border-b border-black dark:border-gray-600 p-2 flex justify-between items-center">
+                            <div id="report-title" class="report-title text-sm">Choose buoy</div>
+                            <div>
+                                <button id="forecastBtn" class="forecast border border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400 px-2 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/30">View Forecast</button>
+                            </div>
+                        </div>
+                        <div id="report-content" class="p-2">
+                            {{template "report_small" .}}
                         </div>
                     </div>
-                    <div id="report-content">
-                        {{template "report" .}}
-                    </div>
                 </div>
             </div>
-            <div class="w-full lg:w-1/3 mt-4 lg:mt-0">
-                <h2 class="text-xl font-bold mb-4">Favorites</h2>
-                <div id="buoy-containers" class="favorites h-[800px] overflow-auto"> </div>
+
+            <!-- Favorites View (hidden by default) -->
+            <div id="favoritesView" class="w-full hidden">
+                <div id="buoy-containers" class="favorites h-[80vh] overflow-auto"></div>
             </div>
         </div>
-    </div>
-    <!-- report content -->
 
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
-    <script> 
-        /* (c) 2014, Vladimir Agafonkin simpleheat, a tiny JavaScript library for drawing heatmaps with Canvas https://github.com/mourner/simpleheat */
-        !function(){"use strict";function t(i){return this instanceof t?(this._canvas=i="string"==typeof i?document.getElementById(i):i,this._ctx=i.getContext("2d", {willReadFrequently:true}),this._width=i.width,this._height=i.height,this._max=1,void this.clear()):new t(i)}t.prototype={defaultRadius:25,defaultGradient:{.4:"blue",.6:"cyan",.7:"lime",.8:"yellow",1:"red"},data:function(t,i){return this._data=t,this},max:function(t){return this._max=t,this},add:function(t){return this._data.push(t),this},clear:function(){return this._data=[],this},radius:function(t,i){i=i||15;var a=this._circle=document.createElement("canvas"),s=a.getContext("2d"),e=this._r=t+i;return a.width=a.height=2*e,s.shadowOffsetX=s.shadowOffsetY=200,s.shadowBlur=i,s.shadowColor="black",s.beginPath(),s.arc(e-200,e-200,t,0,2*Math.PI,!0),s.closePath(),s.fill(),this},gradient:function(t){var i=document.createElement("canvas"),a=i.getContext("2d"),s=a.createLinearGradient(0,0,0,256);i.width=1,i.height=256;for(var e in t)s.addColorStop(e,t[e]);return a.fillStyle=s,a.fillRect(0,0,1,256),this._grad=a.getImageData(0,0,1,256).data,this},draw:function(t){this._circle||this.radius(this.defaultRadius),this._grad||this.gradient(this.defaultGradient);var i=this._ctx;i.clearRect(0,0,this._width,this._height);for(var a,s=0,e=this._data.length;e>s;s++)a=this._data[s],i.globalAlpha=Math.max(a[2]/this._max,t||.05),i.drawImage(this._circle,a[0]-this._r,a[1]-this._r);var n=i.getImageData(0,0,this._width,this._height);return this._colorize(n.data,this._grad),i.putImageData(n,0,0),this},_colorize:function(t,i){for(var a,s=3,e=t.length;e>s;s+=4)a=4*t[s],a&&(t[s-3]=i[a],t[s-2]=i[a+1],t[s-1]=i[a+2])}},window.simpleheat=t}(),
-            /* (c) 2014, Vladimir Agafonkin Leaflet.heat, a tiny and fast heatmap plugin for Leaflet. https://github.com/Leaflet/Leaflet.heat */
-        L.HeatLayer=(L.Layer?L.Layer:L.Class).extend({initialize:function(t,i){this._latlngs=t,L.setOptions(this,i)},setLatLngs:function(t){return this._latlngs=t,this.redraw()},addLatLng:function(t){return this._latlngs.push(t),this.redraw()},setOptions:function(t){return L.setOptions(this,t),this._heat&&this._updateOptions(),this.redraw()},redraw:function(){return!this._heat||this._frame||this._map._animating||(this._frame=L.Util.requestAnimFrame(this._redraw,this)),this},onAdd:function(t){this._map=t,this._canvas||this._initCanvas(),t._panes.overlayPane.appendChild(this._canvas),t.on("moveend",this._reset,this),t.options.zoomAnimation&&L.Browser.any3d&&t.on("zoomanim",this._animateZoom,this),this._reset()},onRemove:function(t){t.getPanes().overlayPane.removeChild(this._canvas),t.off("moveend",this._reset,this),t.options.zoomAnimation&&t.off("zoomanim",this._animateZoom,this)},addTo:function(t){return t.addLayer(this),this},_initCanvas:function(){var t=this._canvas=L.DomUtil.create("canvas","leaflet-heatmap-layer leaflet-layer"),i=L.DomUtil.testProp(["transformOrigin","WebkitTransformOrigin","msTransformOrigin"]);t.style[i]="50% 50%";var a=this._map.getSize();t.width=a.x,t.height=a.y;var s=this._map.options.zoomAnimation&&L.Browser.any3d;L.DomUtil.addClass(t,"leaflet-zoom-"+(s?"animated":"hide")),this._heat=simpleheat(t),this._updateOptions()},_updateOptions:function(){this._heat.radius(this.options.radius||this._heat.defaultRadius,this.options.blur),this.options.gradient&&this._heat.gradient(this.options.gradient),this.options.max&&this._heat.max(this.options.max)},_reset:function(){var t=this._map.containerPointToLayerPoint([0,0]);L.DomUtil.setPosition(this._canvas,t);var i=this._map.getSize();this._heat._width!==i.x&&(this._canvas.width=this._heat._width=i.x),this._heat._height!==i.y&&(this._canvas.height=this._heat._height=i.y),this._redraw()},_redraw:function(){var t,i,a,s,e,n,h,o,r,d=[],_=this._heat._r,l=this._map.getSize(),m=new L.Bounds(L.point([-_,-_]),l.add([_,_])),c=void 0===this.options.max?1:this.options.max,u=void 0===this.options.maxZoom?this._map.getMaxZoom():this.options.maxZoom,f=1/Math.pow(2,Math.max(0,Math.min(u-this._map.getZoom(),12))),g=_/2,p=[],v=this._map._getMapPanePos(),w=v.x%g,y=v.y%g;for(t=0,i=this._latlngs.length;i>t;t++)if(a=this._map.latLngToContainerPoint(this._latlngs[t]),m.contains(a)){e=Math.floor((a.x-w)/g)+2,n=Math.floor((a.y-y)/g)+2;var x=void 0!==this._latlngs[t].alt?this._latlngs[t].alt:void 0!==this._latlngs[t][2]?+this._latlngs[t][2]:1;r=x*f,p[n]=p[n]||[],s=p[n][e],s?(s[0]=(s[0]*s[2]+a.x*r)/(s[2]+r),s[1]=(s[1]*s[2]+a.y*r)/(s[2]+r),s[2]+=r):p[n][e]=[a.x,a.y,r]}for(t=0,i=p.length;i>t;t++)if(p[t])for(h=0,o=p[t].length;o>h;h++)s=p[t][h],s&&d.push([Math.round(s[0]),Math.round(s[1]),Math.min(s[2],c)]);this._heat.data(d).draw(this.options.minOpacity),this._frame=null},_animateZoom:function(t){var i=this._map.getZoomScale(t.zoom),a=this._map._getCenterOffset(t.center)._multiplyBy(-i).subtract(this._map._getMapPanePos());L.DomUtil.setTransform?L.DomUtil.setTransform(this._canvas,a,i):this._canvas.style[L.DomUtil.TRANSFORM]=L.DomUtil.getTranslateString(a)+" scale("+i+")"}}),L.heatLayer=function(t,i){return new L.HeatLayer(t,i)};
-    </script> 
+        <script>
+            function toggleView(view) {
+                const mapView = document.getElementById('mapView');
+                const favoritesView = document.getElementById('favoritesView');
+                const mapBtn = document.getElementById('showMapBtn');
+                const favBtn = document.getElementById('showFavoritesBtn');
 
-    <!-- firebase sign in script --> 
-    <script type="module">
-      // Add SDKs for Firebase products that you want to use
-      // https://firebase.google.com/docs/web/setup#available-libraries
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+                if (view === 'map') {
+                    mapView.classList.remove('hidden');
+                    favoritesView.classList.add('hidden');
+                    mapBtn.classList.add('bg-gray-200');
+                    favBtn.classList.remove('bg-gray-200');
+                } else {
+                    mapView.classList.add('hidden');
+                    favoritesView.classList.remove('hidden');
+                    favBtn.classList.add('bg-gray-200');
+                    mapBtn.classList.remove('bg-gray-200');
+                }
+            }
+        </script>
+
+        <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+
+        <!-- firebase sign in script --> 
+        <script type="module">
+            // Add SDKs for Firebase products that you want to use
+            // https://firebase.google.com/docs/web/setup#available-libraries
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
       import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
       // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
@@ -273,493 +299,493 @@
 
         firebase.auth().onAuthStateChanged(updateUIForSignedInUser);
 
-    </script>
-    <script> 
-        let userBuoys = [];
-        async function loadForecastSummary(uid) {
-            try {
-                const summaryResponse = await fetch(`/forecast-summary?uid=${encodeURIComponent(uid)}`);
-        
-                if (!summaryResponse.ok) {
-                    console.log("Error: Could not load forecast summary");
-                    throw new Error('Failed to load forecast summary');
+        </script>
+        <script> 
+            let userBuoys = [];
+            async function loadForecastSummary(uid) {
+                try {
+                    const summaryResponse = await fetch(`/forecast-summary?uid=${encodeURIComponent(uid)}`);
+
+                    if (!summaryResponse.ok) {
+                        console.log("Error: Could not load forecast summary");
+                        throw new Error('Failed to load forecast summary');
+                    }
+
+                    const html = await summaryResponse.text();
+                    document.getElementById('buoy-containers').innerHTML = html;
+
+                } catch (error) {
+                    console.error('Error loading forecast summary:', error);
+                    document.getElementById('buoy-containers').innerHTML =
+                        '<p>Failed to load forecast summary. Please try again later.</p>';
                 }
-        
-                const html = await summaryResponse.text();
-                document.getElementById('buoy-containers').innerHTML = html;
-        
-            } catch (error) {
-                console.error('Error loading forecast summary:', error);
-                document.getElementById('buoy-containers').innerHTML =
-                    '<p>Failed to load forecast summary. Please try again later.</p>';
             }
-        }
-        
-        async function loadUserBuoys(uid) {
-            try {
-                const userBuoysResponse = await fetch(`/get-user-buoys?uid=${encodeURIComponent(uid)}`);
-        
-                if (!userBuoysResponse.ok) {
-                    console.log("Error: Could not load user buoys");
-                    throw new Error('Failed to load user buoys');
+
+            async function loadUserBuoys(uid) {
+                try {
+                    const userBuoysResponse = await fetch(`/get-user-buoys?uid=${encodeURIComponent(uid)}`);
+
+                    if (!userBuoysResponse.ok) {
+                        console.log("Error: Could not load user buoys");
+                        throw new Error('Failed to load user buoys');
+                    }
+
+                    userBuoys = await userBuoysResponse.json();
+                    userBuoys = userBuoys.buoys || [];
+
+                    console.log('User buoys:', userBuoys);
+                } catch (error) {
+                    console.error('Error loading user buoys:', error);
+                    userBuoys = [];
                 }
-        
-                userBuoys = await userBuoysResponse.json();
-                userBuoys = userBuoys.buoys || [];
-        
-                console.log('User buoys:', userBuoys);
-            } catch (error) {
-                console.error('Error loading user buoys:', error);
-                userBuoys = [];
+                plotBuoys();
             }
-        }
-          // Wait for Firebase authentication
-    document.addEventListener('DOMContentLoaded', () => {
-        firebase.auth().onAuthStateChanged(async (user) => {
-            if (user) {
-                console.log(`User signed in: ${user.uid}`);
-                await loadForecastSummary(user.uid);
-                await loadUserBuoys(user.uid);
-            } else {
-                console.log('User not signed in.');
-                document.getElementById('buoy-containers').innerHTML =
-                    '<p>Please sign in to view your favorite buoys.</p>';
+            // Wait for Firebase authentication
+            document.addEventListener('DOMContentLoaded', () => {
+                firebase.auth().onAuthStateChanged(async (user) => {
+                    if (user) {
+                        console.log(`User signed in: ${user.uid}`);
+                        await loadForecastSummary(user.uid);
+                        await loadUserBuoys(user.uid);
+                        // Update all popup contents after loading user buoys
+                        console.log("first user buoy load successfull: ", userBuoys);
+                    } else {
+                        console.log('User not signed in.');
+                        document.getElementById('buoy-containers').innerHTML =
+                            '<p>Please sign in to view your favorite buoys.</p>';
+                    }
+                });
+            });
+
+            function googleSignIn() {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                firebase.auth().signInWithPopup(provider)
+                    .then(result => {
+                        updateUIForSignedInUser(result.user);
+                    })
+                    .catch(error => console.error('Sign-in error:', error));
             }
-        });
-    });
 
-        function googleSignIn() {
-            const provider = new firebase.auth.GoogleAuthProvider();
-            firebase.auth().signInWithPopup(provider)
-                .then(result => {
-                    updateUIForSignedInUser(result.user);
-                })
-                .catch(error => console.error('Sign-in error:', error));
-        }
-
-        function updateUIForSignedInUser(user) {
-            const signInBtn = document.getElementById('signInBtn');
-            if (user) {
-                // User is signed in
-                signInBtn.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="w-8 h-8 rounded-full">`;
-                // signInBtn.onclick = () => firebase.auth().signOut().then(() => updateUIForSignedInUser(null));
-                signInBtn.onclick = () => document.getElementById('userPopup').classList.remove('hidden');
-                document.getElementById('userName').textContent = user.displayName;
-                document.getElementById('userEmail').textContent = user.email;
-            } else {
-                // User is signed out
-                signInBtn.innerHTML = 'Sign In';
-                signInBtn.onclick = () => document.getElementById('signInModal').classList.remove('hidden');
+            function updateUIForSignedInUser(user) {
+                const signInBtn = document.getElementById('signInBtn');
+                if (user) {
+                    // User is signed in
+                    signInBtn.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="w-8 h-8 rounded-full">`;
+                    // signInBtn.onclick = () => firebase.auth().signOut().then(() => updateUIForSignedInUser(null));
+                    signInBtn.onclick = () => document.getElementById('userPopup').classList.remove('hidden');
+                    document.getElementById('userName').textContent = user.displayName;
+                    document.getElementById('userEmail').textContent = user.email;
+                } else {
+                    // User is signed out
+                    signInBtn.innerHTML = 'Sign In';
+                    signInBtn.onclick = () => document.getElementById('signInModal').classList.remove('hidden');
+                }
+                document.getElementById('signInModal').classList.add('hidden');
             }
-            document.getElementById('signInModal').classList.add('hidden');
-        }
 
-        document.getElementById('closeUserPopup').addEventListener('click', function() {
-            document.getElementById('userPopup').classList.add('hidden');
-        });
-
-        document.getElementById('closeModal').addEventListener('click', function() {
-            document.getElementById('signInModal').classList.add('hidden');
-        });
-
-        document.getElementById('signOutBtn').addEventListener('click', function() {
-            firebase.auth().signOut().then(() => {
-                updateUIForSignedInUser(null);
+            document.getElementById('closeUserPopup').addEventListener('click', function() {
                 document.getElementById('userPopup').classList.add('hidden');
             });
-        });
 
-        // Close the modal if clicking outside of it
-        window.onclick = function(event) {
-            var modal = document.getElementById('signInModal');
-            if (event.target == modal) {
-                modal.classList.add('hidden');
-            }
-        }
-
-        // Check auth state on page load
-        // script end and beginning was here
-
-        var map = L.map('map').setView([33.800832, -121.157227], 5);
-
-        // topo
-         // L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-                 // attribution: '&copy; <a href="https://www.opentopomap.org">OpenTopoMap</a> contributors'
-         // }).addTo(map);
-
-        // physical
-          L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri &mdash; Source: US National Park Service',
-          }).addTo(map);
-
-
-         
-
-        // dark or light
-        // L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            // attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-        // }).addTo(map);
-
-        popup = L.popup();
-        
-        function onMapClick(e) {
-            popup
-                .setLatLng(e.latlng)
-                .setContent("Lat, Lon : " + e.latlng.toString())
-                .openOn(map);
-        }
-
-        map.on('click', onMapClick);
-
-        // Make request to heatmap endpoint
-        async function getHeatmapData() {
-            try {
-                const response = await fetch('/heatmap');
-                if (!response.ok) {
-                    throw new Error('Heatmap request failed');
-                }
-                const data = await response.json();
-                console.log('Heatmap data:', data);
-                var heat = L.heatLayer( data , {radius: 25}).addTo(map);
-                return data;
-            } catch (error) {
-                console.error('Error fetching heatmap data:', error);
-            }
-        }
-        getHeatmapData(); // Call the heatmap function
-        // go to https://github.com/Leaflet/Leaflet.heat/blob/gh-pages/dist/leaflet-heat.js for heatmap
-
-        async function getBuoyReport(buoyId, buoyName) {
-            try {
-                const summaryResponse = await fetch(`/report/${buoyId}`);
-
-                if (!summaryResponse.ok) {
-                    console.log("Error: Could not find buoy report");
-                    throw new Error('Failed to load report');
-                }
-
-                const html = await summaryResponse.text();
-                document.getElementById('report-content').innerHTML = html;
-                window.initializeSwellDirection();
-
-                // console.log(buoyName);
-                document.getElementById('report-title').textContent = buoyName;
-
-            } catch (error) {
-                console.error('Error loading report summary:', error);
-            }
-        }
-
-
-        async function addBuoyToFavorites(stationId) {
-            const user = firebase.auth().currentUser;
-            if (!user) {
-                alert('Please sign in to add favorites');
-                return;
-            }
-            const uid = user.uid;
-            try {
-                const response = await fetch(`/add?uid=${uid}&buoyid=${stationId}`);
-                if (!response.ok) {
-                    throw new Error('Failed to add buoy to favorites');
-                }
-                alert('Buoy added to favorites');
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to add buoy to favorites');
-            }
-        }
-
-        function createPopupContent(buoy) {
-            return `
-                <div>
-                    <div class="text-md">
-                    ${buoy.name}
-                    </div>
-                <br>
-                <button
-                    onclick="getBuoyReport('${buoy.stationId}', '${buoy.name}')"
-                    class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
-                >
-                Show Report
-                </button>
-
-                <button
-                    onclick="window.location.href='/forecast/${buoy.stationId}'"
-                    class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4"
-                >
-                16 Day Forecast
-                </button>
-
-                <button
-                    id="fav-${buoy.stationId}"
-                    onclick="toggleFavorite('${buoy.stationId}')"
-                    class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-2 px-4 ml-2"
-                >
-                ${userBuoys.includes(buoy.stationId) ? 'x' : '+'}
-                </button>
-                </div>`;
-        }
-
-        async function plotBuoys() {
-            buoyData.forEach(buoy => {
-                const marker = L.marker([buoy.latitude, buoy.longitude]).addTo(map);
-                marker.bindPopup(() => createPopupContent(buoy), {minWidth: 250});
+            document.getElementById('closeModal').addEventListener('click', function() {
+                document.getElementById('signInModal').classList.add('hidden');
             });
-        }
 
-        async function toggleFavorite(stationId) {
-            console.log(`Toggling favorite for station ID: ${stationId}`);
-            const user = firebase.auth().currentUser;
-            if (!user) {
-                alert('Please sign in to manage favorites');
-                return;
-            }
-            const uid = user.uid;
-            
-            if (userBuoys && userBuoys.includes(stationId)) {
-                // Remove from favorites
-                try {
-                    const response = await fetch(`/delete?uid=${uid}&buoyid=${stationId}`);
-                    if (!response.ok) {
-                        throw new Error('Failed to remove buoy from favorites');
-                    }
-                    userBuoys = userBuoys.filter(id => id !== stationId);
-                    alert('Buoy removed from favorites');
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Failed to remove buoy from favorites');
+            document.getElementById('signOutBtn').addEventListener('click', function() {
+                firebase.auth().signOut().then(() => {
+                    updateUIForSignedInUser(null);
+                    document.getElementById('userPopup').classList.add('hidden');
+                });
+            });
+
+            // Close the modal if clicking outside of it
+            window.onclick = function(event) {
+                var modal = document.getElementById('signInModal');
+                if (event.target == modal) {
+                    modal.classList.add('hidden');
                 }
-            } else {
-                // Add to favorites
+            }
+
+            // Check auth state on page load
+            // Initialize MapLibre map
+            var map = new maplibregl.Map({
+                container: 'map',
+                style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+                center: [-121.157227, 33.800832], // Note: MapLibre uses [lng, lat] order
+                zoom: 5
+            });
+
+            // Create a popup but don't add it to the map yet
+            var popup = new maplibregl.Popup({
+                closeButton: false,
+                closeOnClick: false
+            });
+
+
+            async function getBuoyReport(buoyId, buoyName) {
+                try {
+                    const summaryResponse = await fetch(`/report_small/${buoyId}`);
+
+                    if (!summaryResponse.ok) {
+                        console.log("Error: Could not find buoy report");
+                        throw new Error('Failed to load report');
+                    }
+
+                    const html = await summaryResponse.text();
+                    document.getElementById('report-content').innerHTML = html;
+                    window.initializeSwellDirection();
+
+                    // console.log(buoyName);
+                    document.getElementById('report-title').textContent = buoyName;
+
+                } catch (error) {
+                    console.error('Error loading report summary:', error);
+                }
+            }
+
+
+            async function addBuoyToFavorites(stationId) {
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    alert('Please sign in to add favorites');
+                    return;
+                }
+                const uid = user.uid;
                 try {
                     const response = await fetch(`/add?uid=${uid}&buoyid=${stationId}`);
                     if (!response.ok) {
                         throw new Error('Failed to add buoy to favorites');
                     }
-                    userBuoys.push(stationId);
                     alert('Buoy added to favorites');
                 } catch (error) {
                     console.error('Error:', error);
                     alert('Failed to add buoy to favorites');
                 }
             }
-            
-            // Refresh the favorites display and update popup content
-            await loadForecastSummary(uid);
-            updatePopupContent(stationId);
-        }
 
-        function updatePopupContent(stationId) {
-            map.eachLayer(function(layer) {
-                if (layer instanceof L.Marker) {
-                    const popup = layer.getPopup();
-                    if (popup) {
-                        const content = popup.getContent();
-                        if (content && content.includes(`id="fav-${stationId}"`)) {
-                            const buoy = buoyData.find(b => b.stationId === stationId);
-                            if (buoy) {
-                                layer.setPopupContent(createPopupContent(buoy));
-                            }
+
+            // Function to update favorite button appearance
+            function updateFavoriteButton(button) {
+                const stationId = button.dataset.stationId;
+                const isFavorite = userBuoys.includes(stationId);
+                button.textContent = isFavorite ? '-' : '+';
+                button.className = `favorite-btn text-black font-bold py-1 px-2 text-sm w-8 flex items-center justify-center ${
+                    isFavorite ? 'bg-red-100 hover:bg-red-200' : 'bg-green-100 hover:bg-green-200'
+                }`;
+            }
+
+            // Create a MutationObserver to watch for new buttons
+            const observer = new MutationObserver(mutations => {
+                mutations.forEach(mutation => {
+                    mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === 1) { // ELEMENT_NODE
+                            const favButtons = node.getElementsByClassName('favorite-btn');
+                            Array.from(favButtons).forEach(updateFavoriteButton);
                         }
+                    });
+                });
+            });
+
+            // Start observing the document with the configured parameters
+            observer.observe(document.body, { childList: true, subtree: true });
+
+            function createPopupContent(buoy) {
+                return `
+                <div class="w-[400px]">
+                <div class="text-md mb-2 break-words w-[400px]" style="word-wrap: break-word; overflow-wrap: break-word;">
+                <span class="inline-block break-words">${buoy.name}</span>
+                </div>
+                <div class="flex gap-1">
+                <button
+            onclick="getBuoyReport('${buoy.stationId}', '${buoy.name}')"
+            class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-1 px-2 text-sm"
+                >
+                Report
+                </button>
+                <button
+            onclick="window.location.href='/forecast/${buoy.stationId}'"
+            class="bg-gray-200 hover:bg-blue-200 text-black font-bold py-1 px-2 text-sm"
+                >
+                Forecast
+                </button>
+                <button
+            id="fav-${buoy.stationId}"
+            onclick="toggleFavorite('${buoy.stationId}')"
+            data-station-id="${buoy.stationId}"
+            class="favorite-btn text-black font-bold py-1 px-2 text-sm w-8 flex items-center justify-center"
+            >
+            </button>
+                </div>
+                </div>`;
+            }
+
+            async function plotBuoys() {
+                console.log("user buoys at plot buoys: ", userBuoys);
+                buoyData.forEach(buoy => {
+                    // Create a DOM element for the marker
+                    const el = document.createElement('div');
+                    el.className = 'marker';
+                    el.id = `buoymarker-${buoy.stationId}`;
+                    el.style.width = '25px';
+                    el.style.height = '25px';
+                    el.style.backgroundImage = 'url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0yMSAxMGMwIDctOSAxMy05IDEzcy05LTYtOS0xM2E5IDkgMCAwIDEgMTgtMHoiPjwvcGF0aD48Y2lyY2xlIGN4PSIxMiIgY3k9IjEwIiByPSIzIj48L2NpcmNsZT48L3N2Zz4=)';
+                    el.style.backgroundSize = '100%';
+                    el.style.cursor = 'pointer';
+
+                    // Create the popup with unique ID
+                    const popup = new maplibregl.Popup({ 
+                        offset: 25
+                    })
+                    .setHTML(createPopupContent(buoy));
+
+                    // Create the marker and store references
+                    const marker = new maplibregl.Marker(el)
+                        .setLngLat([buoy.longitude, buoy.latitude])
+                        .setPopup(popup)
+                        .addTo(map);
+
+                    // Store marker reference on the element
+                    el._marker = marker;
+                });
+            }
+
+            async function toggleFavorite(stationId) {
+                console.log(`Toggling favorite for station ID: ${stationId}`);
+                console.log("user buoys here: ", userBuoys);
+                console.log("station id here: ", stationId);
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    alert('Please sign in to manage favorites');
+                    return;
+                }
+                const uid = user.uid;
+
+                if (userBuoys && userBuoys.includes(stationId)) {
+                    // Remove from favorites
+                    try {
+                        const response = await fetch(`/delete?uid=${uid}&buoyid=${stationId}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to remove buoy from favorites');
+                        }
+                        userBuoys = userBuoys.filter(id => id !== stationId);
+                        alert('Buoy removed from favorites');
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Failed to remove buoy from favorites');
+                    }
+                } else {
+                    // Add to favorites
+                    try {
+                        const response = await fetch(`/add?uid=${uid}&buoyid=${stationId}`);
+                        if (!response.ok) {
+                            throw new Error('Failed to add buoy to favorites');
+                        }
+                        userBuoys.push(stationId);
+                        alert('Buoy added to favorites');
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert('Failed to add buoy to favorites');
                     }
                 }
+
+                // Refresh the favorites display and update popup content
+                await loadForecastSummary(uid);
+            }
+
+
+            // these are all the buoys that have "spectral" data
+            let currentBuoy = {};
+            const buoyData = [
+                { stationId: '41002', name: 'SOUTH HATTERAS - 225 NM South of Cape Hatteras', latitude: 31.759, longitude: -74.936},
+                { stationId: '41004', name: 'EDISTO - 41 NM Southeast of Charleston, SC', latitude: 32.502, longitude: -79.099},
+                { stationId: '41008', name: 'GRAYS REEF - 40 NM Southeast of Savannah, GA', latitude: 31.4, longitude: -80.866},
+                { stationId: '41009', name: 'CANAVERAL 20 NM East of Cape Canaveral, FL', latitude: 28.508, longitude: -80.185},
+                { stationId: '41013', name: 'Frying Pan Shoals, NC', latitude: 33.441, longitude: -77.764},
+                { stationId: '41025', name: 'Diamond Shoals, NC', latitude: 35.01, longitude: -75.454},
+                { stationId: '41040', name: 'NORTH EQUATORIAL ONE- 470 NM East of Martinique', latitude: 14.541, longitude: -53.137},
+                { stationId: '41043', name: 'NE PUERTO RICO - 170 NM NNE of San Juan, PR', latitude: 21.026, longitude: -64.793},
+                { stationId: '41044', name: 'NE ST MARTIN - 330 NM NE St Martin Is', latitude: 21.582, longitude: -58.63},
+                { stationId: '41046', name: 'EAST BAHAMAS - 335 NM East of San Salvador Is,  Bahamas ', latitude: 23.822, longitude: -68.393},
+                { stationId: '41047', name: 'NE BAHAMAS - 350 NM ENE of Nassau, Bahamas', latitude: 27.465, longitude: -71.452},
+                { stationId: '41049', name: 'SOUTH BERMUDA - 300 NM SSE of Bermuda', latitude: 27.545, longitude: -63.012},
+                { stationId: '41052', name: 'South of St. John, VI', latitude: 18.249, longitude: -64.763},
+                { stationId: '41053', name: 'San Juan, PR', latitude: 18.474, longitude: -66.099},
+                { stationId: '41056', name: 'Vieques Island, PR', latitude: 18.261, longitude: -65.464},
+                { stationId: '41065', name: 'Capers Nearshore Waves (CAP2WAVE)', latitude: 32.802, longitude: -79.619},
+                { stationId: '41067', name: 'FRP2WAVE', latitude: 32.276, longitude: -80.406},
+                { stationId: '41070', name: 'Ponce de Leon Inlet Waves (PNCWAVE)', latitude: 29.289, longitude: -80.803},
+                { stationId: '41076', name: 'CHR60WAVE', latitude: 32.536, longitude: -79.659},
+                { stationId: '41108', name: 'Wilmington Harbor, NC - (200)', latitude: 33.721, longitude: -78.016},
+                { stationId: '41110', name: 'Masonboro Inlet, ILM2, NC (150)', latitude: 34.143, longitude: -77.716},
+                { stationId: '41112', name: 'Offshore Fernandina Beach, FL (132)', latitude: 30.709, longitude: -81.292},
+                { stationId: '41113', name: 'Cape Canaveral Nearshore, FL (143)', latitude: 28.4, longitude: -80.533},
+                { stationId: '41114', name: 'Fort Pierce, FL (134)', latitude: 27.552, longitude: -80.216},
+                { stationId: '41115', name: 'Rincon, Puerto Rico (181)', latitude: 18.376, longitude: -67.28},
+                { stationId: '41117', name: 'St. Augustine, FL (194)', latitude: 30.0, longitude: -81.08},
+                { stationId: '41120', name: 'Cape Hatteras East, NC (250)', latitude: 35.258, longitude: -75.285},
+                { stationId: '41121', name: 'Arecibo, Puerto Rico (249)', latitude: 18.49, longitude: -66.701},
+                { stationId: '41159', name: 'Onslow Bay Outer, NC (217)', latitude: 34.213, longitude: -76.949},
+                { stationId: '42001', name: 'MID GULF - 180 nm South of Southwest Pass, LA', latitude: 25.926, longitude: -89.662},
+                { stationId: '42002', name: 'WEST GULF - 207 NM East of Brownsville, TX', latitude: 26.055, longitude: -93.646},
+                { stationId: '42012', name: 'ORANGE BEACH - 44 NM SE of Mobile, AL', latitude: 30.06, longitude: -87.548},
+                { stationId: '42019', name: 'FREEPORT, TX - 60 NM South of Freeport, TX', latitude: 27.91, longitude: -95.345},
+                { stationId: '42036', name: 'WEST TAMPA  - 112 NM WNW of Tampa, FL', latitude: 28.501, longitude: -84.508},
+                { stationId: '42040', name: 'LUKE OFFSHORE TEST PLATFORM - 63 NM South of Dauphin Island, AL', latitude: 29.207, longitude: -88.237},
+                { stationId: '42055', name: 'BAY OF CAMPECHE - 214 NM NE of Veracruz, MX', latitude: 22.14, longitude: -94.112},
+                { stationId: '42056', name: ' Yucatan Basin - 120 NM ESE of Cozumel, MX', latitude: 19.82, longitude: -84.945},
+                { stationId: '42057', name: 'Western Caribbean - 195 NM WSW of Negril, Jamaica', latitude: 16.973, longitude: -81.575},
+                { stationId: '42058', name: 'Central Caribbean - 210 NM SSE of Kingston, Jamaica', latitude: 14.844, longitude: -75.061},
+                { stationId: '42059', name: 'Eastern Caribbean Sea - 180 NM SSW of Ponce, PR', latitude: 15.3, longitude: -67.483},
+                { stationId: '42060', name: 'Caribbean Valley - 63 NM WSW of Montserrat', latitude: 16.434, longitude: -63.329},
+                { stationId: '42084', name: 'Southwest Pass Entrance W, LA (256)', latitude: 28.988, longitude: -89.649},
+                { stationId: '42085', name: 'Southeast of Ponce, PR', latitude: 17.87, longitude: -66.537},
+                { stationId: '42091', name: 'Trinity Shoal, LA (255)', latitude: 29.087, longitude: -92.506},
+                { stationId: '42097', name: 'Pulley Ridge, FL (226)', latitude: 25.714, longitude: -83.65},
+                { stationId: '42098', name: 'Egmont Channel Entrance, FL (214)', latitude: 27.59, longitude: -82.931},
+                { stationId: '42099', name: 'Offshore St. Petersburg, FL (144)', latitude: 27.349, longitude: -84.275},
+                { stationId: '44005', name: 'GULF OF MAINE - 78 NM East of Portsmouth, NH', latitude: 43.201, longitude: -69.127},
+                { stationId: '44007', name: 'PORTLAND - 12 NM Southeast of Portland,ME', latitude: 43.525, longitude: -70.14},
+                { stationId: '44008', name: 'NANTUCKET 54 NM Southeast of Nantucket', latitude: 40.496, longitude: -69.25},
+                { stationId: '44009', name: 'DELAWARE BAY 26 NM Southeast of Cape May, NJ', latitude: 38.46, longitude: -74.692},
+                { stationId: '44013', name: 'BOSTON 16 NM East of Boston, MA', latitude: 42.346, longitude: -70.651},
+                { stationId: '44014', name: 'VIRGINIA BEACH 64 NM East of Virginia Beach, VA', latitude: 36.603, longitude: -74.837},
+                { stationId: '44018', name: 'CAPE COD - 9 NM North of Provincetown, MA', latitude: 42.203, longitude: -70.154},
+                { stationId: '44020', name: 'NANTUCKET SOUND', latitude: 41.497, longitude: -70.283},
+                { stationId: '44027', name: 'Jonesport, ME - 20 NM SE of Jonesport, ME', latitude: 44.283, longitude: -67.3},
+                { stationId: '44056', name: 'Duck FRF, NC', latitude: 36.2, longitude: -75.714},
+                { stationId: '44065', name: 'New York Harbor Entrance - 15 NM SE of Breezy Point , NY', latitude: 40.369, longitude: -73.703},
+                { stationId: '44078', name: 'OOI Irminger Sea Surface Mooring', latitude: 59.94, longitude: -39.52},
+                { stationId: '44084', name: 'Bethany Beach, DE (263)', latitude: 38.537, longitude: -75.044},
+                { stationId: '44085', name: 'Buzzards Bay, MA (260)', latitude: 41.387, longitude: -71.032},
+                { stationId: '44086', name: 'Nags Head, NC (243)', latitude: 36.001, longitude: -75.421},
+                { stationId: '44087', name: 'Thimble Shoal, VA (240)', latitude: 37.026, longitude: -76.149},
+                { stationId: '44088', name: 'Virginia Beach Offshore, VA (171)', latitude: 36.614, longitude: -74.841},
+                { stationId: '44089', name: 'Wallops Island, VA (224)', latitude: 37.754, longitude: -75.325},
+                { stationId: '44090', name: 'Cape Cod Bay, MA (221)', latitude: 41.84, longitude: -70.329},
+                { stationId: '44091', name: 'Barnegat, NJ (209)', latitude: 39.768, longitude: -73.77},
+                { stationId: '44095', name: 'Oregon Inlet, NC (192)', latitude: 35.75, longitude: -75.33},
+                { stationId: '44097', name: 'Block Island, RI  (154)', latitude: 40.967, longitude: -71.124},
+                { stationId: '44098', name: 'Jeffreys Ledge, NH (160)', latitude: 42.8, longitude: -70.171},
+                { stationId: '44099', name: 'Cape Henry, VA (147)', latitude: 36.915, longitude: -75.722},
+                { stationId: '44100', name: 'Duck FRF 26m, NC (430)', latitude: 36.258, longitude: -75.593},
+                { stationId: '45161', name: 'Muskegon Buoy, MI', latitude: 43.185, longitude: -86.352},
+                { stationId: '45212', name: 'North Huron Spotter', latitude: 45.351, longitude: -82.84},
+                { stationId: '45213', name: 'East Superior Spotter', latitude: 47.585, longitude: -86.585},
+                { stationId: '45214', name: 'South Michigan Spotter', latitude: 42.674, longitude: -87.026},
+                { stationId: '46001', name: 'WESTERN GULF OF ALASKA  - 175NM SE of Kodiak, AK', latitude: 56.3, longitude: -148.018},
+                { stationId: '46005', name: 'WEST WASHINGTON - 300NM West of Aberdeen, WA', latitude: 46.143, longitude: -131.09},
+                { stationId: '46006', name: 'SOUTHEAST PAPA - 600NM West of Eureka, CA', latitude: 40.764, longitude: -137.377},
+                { stationId: '46011', name: 'SANTA MARIA - 21NM NW of Point Arguello, CA', latitude: 34.936, longitude: -120.998},
+                { stationId: '46013', name: 'BODEGA BAY - 48NM NW of San Francisco, CA', latitude: 38.235, longitude: -123.317},
+                { stationId: '46014', name: 'PT ARENA - 19NM North of Point Arena, CA', latitude: 39.225, longitude: -123.98},
+                { stationId: '46022', name: 'EEL RIVER - 17NM WSW of Eureka, CA', latitude: 40.716, longitude: -124.54},
+                { stationId: '46025', name: 'Santa Monica Basin - 33NM WSW of Santa Monica, CA', latitude: 33.755, longitude: -119.045},
+                { stationId: '46026', name: 'SAN FRANCISCO - 18NM West of San Francisco, CA', latitude: 37.754, longitude: -122.839},
+                { stationId: '46027', name: 'ST GEORGES - 8 NM NW of Crescent City, CA', latitude: 41.84, longitude: -124.382},
+                { stationId: '46028', name: 'CAPE SAN MARTIN - 55NM West NW of Morro Bay, CA', latitude: 35.77, longitude: -121.903},
+                { stationId: '46041', name: 'CAPE ELIZABETH - 45NM NW of Aberdeen, WA', latitude: 47.352, longitude: -124.739},
+                { stationId: '46047', name: 'TANNER BANK - 121 NM West of San Diego, CA', latitude: 32.388, longitude: -119.525},
+                { stationId: '46050', name: 'STONEWALL BANK - 20NM West of Newport, OR', latitude: 44.669, longitude: -124.546},
+                { stationId: '46053', name: 'EAST SANTA BARBARA  - 12NM Southwest of Santa Barbara, CA', latitude: 34.241, longitude: -119.839},
+                { stationId: '46054', name: 'WEST SANTA BARBARA  38 NM West of Santa Barbara, CA', latitude: 34.274, longitude: -120.468},
+                { stationId: '46059', name: 'WEST CALIFORNIA - 357NM West of San Francisco, CA', latitude: 38.069, longitude: -129.976},
+                { stationId: '46060', name: 'WEST ORCA BAY - 8NM NW of Hinchinbrook Is., AK', latitude: 60.571, longitude: -146.795},
+                { stationId: '46066', name: 'SOUTH KODIAK - 310NM SSW of Kodiak, AK', latitude: 52.765, longitude: -155.009},
+                { stationId: '46069', name: 'SOUTH SANTA ROSA - 14 NM SW of Santa Rosa Island, CA', latitude: 33.677, longitude: -120.213},
+                { stationId: '46070', name: 'SOUTHWEST BERING SEA - 142NM NNE OF ATTU IS, AK', latitude: 55.065, longitude: 175.268},
+                { stationId: '46071', name: 'WESTERN ALEUTIANS - 14NM SOUTH OF AMCHITKA IS, AK ', latitude: 51.022, longitude: 179.784},
+                { stationId: '46072', name: 'CENTRAL ALEUTIANS 230 NM SW Dutch Harbor', latitude: 51.666, longitude: -172.114},
+                { stationId: '46075', name: 'SHUMAGIN ISLANDS - 85NM South of Sand Point, AK', latitude: 53.969, longitude: -160.794},
+                { stationId: '46076', name: 'CAPE CLEARE - 17 NM South of Montague Is,  AK', latitude: 59.471, longitude: -148.009},
+                { stationId: '46077', name: 'SHELIKOF STRAIT, AK', latitude: 57.869, longitude: -154.211},
+                { stationId: '46078', name: 'ALBATROSS BANK - 104NM South of Kodiak Is., AK', latitude: 55.561, longitude: -152.599},
+                { stationId: '46080', name: 'PORTLOCK BANK - 76 NM ENE of Kodiak, AK', latitude: 57.916, longitude: -150.133},
+                { stationId: '46081', name: 'Western Prince William Sound', latitude: 60.802, longitude: -148.283},
+                { stationId: '46082', name: 'Cape Suckling - 35 NM SE of Kayak Is, AK', latitude: 59.67, longitude: -143.353},
+                { stationId: '46083', name: 'FAIRWEATHER GROUND - 105 NM West  of Juneau, AK', latitude: 58.27, longitude: -138.019},
+                { stationId: '46084', name: 'CAPE EDGECUMBE - 25NM SSW of Cape Edgecumbe, AK', latitude: 56.614, longitude: -136.04},
+                { stationId: '46086', name: 'SAN CLEMENTE BASIN - 27NM SE Of San Clemente Is, CA', latitude: 32.499, longitude: -118.052},
+                { stationId: '46088', name: 'NEW DUNGENESS - 17 NM NE of Port Angeles, WA', latitude: 48.332, longitude: -123.179},
+                { stationId: '46097', name: 'OOI Newport Shelf', latitude: 44.639, longitude: -124.304},
+                { stationId: '46098', name: 'OOI Waldport Offshore', latitude: 44.378, longitude: -124.947},
+                { stationId: '46099', name: 'OOI Westport Shelf', latitude: 46.988, longitude: -124.567},
+                { stationId: '46100', name: 'OOI Westport Offshore', latitude: 46.851, longitude: -124.964},
+                { stationId: '46108', name: 'Lower Cook Inlet (204)', latitude: 59.598, longitude: -151.828},
+                { stationId: '46211', name: 'Grays Harbor, WA (036)', latitude: 46.857, longitude: -124.244},
+                { stationId: '46213', name: 'Cape Mendocino, CA (094)', latitude: 40.295, longitude: -124.732},
+                { stationId: '46214', name: 'Point Reyes, CA (029)', latitude: 37.937, longitude: -123.463},
+                { stationId: '46215', name: 'Diablo Canyon, CA (076)', latitude: 35.204, longitude: -120.859},
+                { stationId: '46218', name: 'Harvest, CA (071)', latitude: 34.452, longitude: -120.78},
+                { stationId: '46219', name: 'San Nicolas Island, CA (067)', latitude: 33.219, longitude: -119.872},
+                { stationId: '46221', name: 'Santa Monica Bay, CA (028)', latitude: 33.86, longitude: -118.641},
+                { stationId: '46222', name: 'San Pedro, CA (092)', latitude: 33.618, longitude: -118.317},
+                { stationId: '46224', name: 'Oceanside Offshore, CA (045)', latitude: 33.178, longitude: -117.472},
+                { stationId: '46225', name: 'Torrey Pines Outer, CA (100)', latitude: 32.933, longitude: -117.391},
+                { stationId: '46229', name: 'UMPQUA OFFSHORE, OR (139)', latitude: 43.772, longitude: -124.549},
+                { stationId: '46232', name: 'Point Loma South, CA  (191)', latitude: 32.517, longitude: -117.425},
+                { stationId: '46235', name: 'Imperial Beach Nearshore, CA (155)', latitude: 32.57, longitude: -117.169},
+                { stationId: '46237', name: 'San Francisco Bar, CA  (142)', latitude: 37.788, longitude: -122.634},
+                { stationId: '46239', name: 'Point Sur, CA (157)', latitude: 36.335, longitude: -122.104},
+                { stationId: '46240', name: 'Cabrillo Point, Monterey Bay, CA  (158)', latitude: 36.626, longitude: -121.907},
+                { stationId: '46243', name: 'Clatsop Spit, OR (162)', latitude: 46.216, longitude: -124.128},
+                { stationId: '46244', name: 'Humboldt Bay, North Spit, CA (168)', latitude: 40.896, longitude: -124.357},
+                { stationId: '46251', name: 'Santa Cruz Basin, CA (203)', latitude: 33.769, longitude: -119.565},
+                { stationId: '46253', name: 'San Pedro South, CA (213)', latitude: 33.576, longitude: -118.181},
+                { stationId: '46254', name: 'SCRIPPS Nearshore, CA (201)', latitude: 32.868, longitude: -117.267},
+                { stationId: '46256', name: 'Long Beach Channel, CA (215)', latitude: 33.7, longitude: -118.201},
+                { stationId: '46258', name: 'Mission Bay West, CA (220)', latitude: 32.749, longitude: -117.502},
+                { stationId: '46259', name: 'Santa Lucia Escarpment, CA (222)', latitude: 34.767, longitude: -121.498},
+                { stationId: '46266', name: 'Del Mar Nearshore, CA (153)', latitude: 32.957, longitude: -117.279},
+                { stationId: '46267', name: 'Angeles Point, WA (248)', latitude: 48.173, longitude: -123.607},
+                { stationId: '46268', name: 'Topanga Nearshore, CA (103)', latitude: 34.022, longitude: -118.578},
+                { stationId: '46274', name: 'Leucadia Nearshore, CA (262)', latitude: 33.062, longitude: -117.314},
+                { stationId: '46275', name: 'Red Beach Nearshore, CA (264)', latitude: 33.29, longitude: -117.5},
+                { stationId: '46276', name: 'Pajaro Beach, CA (266)', latitude: 36.845, longitude: -121.825},
+                { stationId: '46277', name: 'Green Beach Offshore, CA (271)', latitude: 33.336, longitude: -117.659},
+                { stationId: '46278', name: 'Tillamook Bay South Jetty, OR (270)', latitude: 45.561, longitude: -123.991},
+                { stationId: '46279', name: 'Pajaro Beach South, CA (267)', latitude: 36.838, longitude: -121.82},
+                { stationId: '51000', name: 'NORTHERN HAWAII ONE - 245NM NE of Honolulu HI', latitude: 23.528, longitude: -153.792},
+                { stationId: '51001', name: 'NORTHWESTERN HAWAII ONE - 188 NM NW of Kauai Island, HI', latitude: 24.451, longitude: -162.008},
+                { stationId: '51003', name: 'WESTERN  HAWAII - 205 NM SW of Honolulu, HI', latitude: 19.196, longitude: -160.639},
+                { stationId: '51004', name: 'SOUTHEAST HAWAII - 205 NM Southeast of Hilo, HI', latitude: 17.538, longitude: -152.23},
+                { stationId: '51101', name: 'NORTHWESTERN HAWAII TWO - 186 NM NW of Kauai Is., HI   ', latitude: 24.359, longitude: -162.081},
+                { stationId: '51201', name: 'Waimea Bay, HI (106)', latitude: 21.671, longitude: -158.118},
+                { stationId: '51202', name: 'Mokapu Point, HI (098)', latitude: 21.417, longitude: -157.68},
+                { stationId: '51205', name: 'Pauwela, Maui, HI (187)', latitude: 21.018, longitude: -156.425},
+                { stationId: '51207', name: 'Kaneohe Bay, HI (198)', latitude: 21.477, longitude: -157.752},
+                { stationId: '51210', name: 'Kaneohe Bay, WETS, HI (225)', latitude: 21.477, longitude: -157.757},
+                { stationId: '51211', name: 'Pearl Harbor Entrance, HI (233)', latitude: 21.297, longitude: -157.959},
+                { stationId: '51212', name: 'Barbers Point, Kalaeloa, HI (238)', latitude: 21.323, longitude: -158.149},
+                { stationId: '52200', name: 'Ipan, Guam (121)', latitude: 13.354, longitude: 144.788},
+                { stationId: '52201', name: 'Kalo, Majuro, Marshall Islands (163)', latitude: 7.079, longitude: 171.384},
+                { stationId: '52211', name: 'Tanapag, Saipan, NMI (197)', latitude: 15.268, longitude: 145.662},
+                { stationId: '52212', name: 'Ngaraard, Babeldaob, Palau (219)', latitude: 7.63, longitude: 134.671},
+                { stationId: '62107', name: 'Sevenstones Lightship', latitude: 50.102, longitude: -6.1},
+                { stationId: '62127', name: 'Cleeton AWS', latitude: 54.0, longitude: 0.7},
+                { stationId: '62130', name: 'Brae A', latitude: 58.7, longitude: 1.3},
+                { stationId: '62144', name: 'Clipper AWS', latitude: 53.4, longitude: 1.7},
+                { stationId: '62145', name: 'North Sea', latitude: 53.102, longitude: 2.8},
+                { stationId: '62146', name: 'Lomond AWS', latitude: 57.2, longitude: 2.1},
+                { stationId: '62149', name: 'West Sole "A" AWS', latitude: 53.7, longitude: 1.1},
+                { stationId: '62165', name: 'Ravenspurn North AWS', latitude: 54.0, longitude: 1.1},
+                { stationId: '62170', name: 'F3 Light Vessel', latitude: 51.24, longitude: 2.0},
+                { stationId: '62304', name: 'Sandettie Lightship', latitude: 51.102, longitude: 1.8},
+                { stationId: '62305', name: 'Greenwich Lightship', latitude: 50.4, longitude: 0.0},
+                { stationId: '63110', name: 'Beryl A AWS', latitude: 59.5, longitude: 1.5},
+                { stationId: '63112', name: 'Cormorant AWS', latitude: 61.1, longitude: 1.0},
+                { stationId: '63115', name: 'Magnus AWS', latitude: 61.6, longitude: 1.3},
+            ];
+
+            document.getElementById('search').addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase();
+                let matches = buoyData.filter(buoy => buoy.name.toLowerCase().includes(searchTerm));
+                displayMatches(matches);
             });
-        }
 
-        // these are all the buoys that have "spectral" data
-        let currentBuoy = {};
-        const buoyData = [
-            { stationId: '41002', name: 'SOUTH HATTERAS - 225 NM South of Cape Hatteras', latitude: 31.759, longitude: -74.936},
-            { stationId: '41004', name: 'EDISTO - 41 NM Southeast of Charleston, SC', latitude: 32.502, longitude: -79.099},
-            { stationId: '41008', name: 'GRAYS REEF - 40 NM Southeast of Savannah, GA', latitude: 31.4, longitude: -80.866},
-            { stationId: '41009', name: 'CANAVERAL 20 NM East of Cape Canaveral, FL', latitude: 28.508, longitude: -80.185},
-            { stationId: '41013', name: 'Frying Pan Shoals, NC', latitude: 33.441, longitude: -77.764},
-            { stationId: '41025', name: 'Diamond Shoals, NC', latitude: 35.01, longitude: -75.454},
-            { stationId: '41040', name: 'NORTH EQUATORIAL ONE- 470 NM East of Martinique', latitude: 14.541, longitude: -53.137},
-            { stationId: '41043', name: 'NE PUERTO RICO - 170 NM NNE of San Juan, PR', latitude: 21.026, longitude: -64.793},
-            { stationId: '41044', name: 'NE ST MARTIN - 330 NM NE St Martin Is', latitude: 21.582, longitude: -58.63},
-            { stationId: '41046', name: 'EAST BAHAMAS - 335 NM East of San Salvador Is,  Bahamas ', latitude: 23.822, longitude: -68.393},
-            { stationId: '41047', name: 'NE BAHAMAS - 350 NM ENE of Nassau, Bahamas', latitude: 27.465, longitude: -71.452},
-            { stationId: '41049', name: 'SOUTH BERMUDA - 300 NM SSE of Bermuda', latitude: 27.545, longitude: -63.012},
-            { stationId: '41052', name: 'South of St. John, VI', latitude: 18.249, longitude: -64.763},
-            { stationId: '41053', name: 'San Juan, PR', latitude: 18.474, longitude: -66.099},
-            { stationId: '41056', name: 'Vieques Island, PR', latitude: 18.261, longitude: -65.464},
-            { stationId: '41065', name: 'Capers Nearshore Waves (CAP2WAVE)', latitude: 32.802, longitude: -79.619},
-            { stationId: '41067', name: 'FRP2WAVE', latitude: 32.276, longitude: -80.406},
-            { stationId: '41070', name: 'Ponce de Leon Inlet Waves (PNCWAVE)', latitude: 29.289, longitude: -80.803},
-            { stationId: '41076', name: 'CHR60WAVE', latitude: 32.536, longitude: -79.659},
-            { stationId: '41108', name: 'Wilmington Harbor, NC - (200)', latitude: 33.721, longitude: -78.016},
-            { stationId: '41110', name: 'Masonboro Inlet, ILM2, NC (150)', latitude: 34.143, longitude: -77.716},
-            { stationId: '41112', name: 'Offshore Fernandina Beach, FL (132)', latitude: 30.709, longitude: -81.292},
-            { stationId: '41113', name: 'Cape Canaveral Nearshore, FL (143)', latitude: 28.4, longitude: -80.533},
-            { stationId: '41114', name: 'Fort Pierce, FL (134)', latitude: 27.552, longitude: -80.216},
-            { stationId: '41115', name: 'Rincon, Puerto Rico (181)', latitude: 18.376, longitude: -67.28},
-            { stationId: '41117', name: 'St. Augustine, FL (194)', latitude: 30.0, longitude: -81.08},
-            { stationId: '41120', name: 'Cape Hatteras East, NC (250)', latitude: 35.258, longitude: -75.285},
-            { stationId: '41121', name: 'Arecibo, Puerto Rico (249)', latitude: 18.49, longitude: -66.701},
-            { stationId: '41159', name: 'Onslow Bay Outer, NC (217)', latitude: 34.213, longitude: -76.949},
-            { stationId: '42001', name: 'MID GULF - 180 nm South of Southwest Pass, LA', latitude: 25.926, longitude: -89.662},
-            { stationId: '42002', name: 'WEST GULF - 207 NM East of Brownsville, TX', latitude: 26.055, longitude: -93.646},
-            { stationId: '42012', name: 'ORANGE BEACH - 44 NM SE of Mobile, AL', latitude: 30.06, longitude: -87.548},
-            { stationId: '42019', name: 'FREEPORT, TX - 60 NM South of Freeport, TX', latitude: 27.91, longitude: -95.345},
-            { stationId: '42036', name: 'WEST TAMPA  - 112 NM WNW of Tampa, FL', latitude: 28.501, longitude: -84.508},
-            { stationId: '42040', name: 'LUKE OFFSHORE TEST PLATFORM - 63 NM South of Dauphin Island, AL', latitude: 29.207, longitude: -88.237},
-            { stationId: '42055', name: 'BAY OF CAMPECHE - 214 NM NE of Veracruz, MX', latitude: 22.14, longitude: -94.112},
-            { stationId: '42056', name: ' Yucatan Basin - 120 NM ESE of Cozumel, MX', latitude: 19.82, longitude: -84.945},
-            { stationId: '42057', name: 'Western Caribbean - 195 NM WSW of Negril, Jamaica', latitude: 16.973, longitude: -81.575},
-            { stationId: '42058', name: 'Central Caribbean - 210 NM SSE of Kingston, Jamaica', latitude: 14.844, longitude: -75.061},
-            { stationId: '42059', name: 'Eastern Caribbean Sea - 180 NM SSW of Ponce, PR', latitude: 15.3, longitude: -67.483},
-            { stationId: '42060', name: 'Caribbean Valley - 63 NM WSW of Montserrat', latitude: 16.434, longitude: -63.329},
-            { stationId: '42084', name: 'Southwest Pass Entrance W, LA (256)', latitude: 28.988, longitude: -89.649},
-            { stationId: '42085', name: 'Southeast of Ponce, PR', latitude: 17.87, longitude: -66.537},
-            { stationId: '42091', name: 'Trinity Shoal, LA (255)', latitude: 29.087, longitude: -92.506},
-            { stationId: '42097', name: 'Pulley Ridge, FL (226)', latitude: 25.714, longitude: -83.65},
-            { stationId: '42098', name: 'Egmont Channel Entrance, FL (214)', latitude: 27.59, longitude: -82.931},
-            { stationId: '42099', name: 'Offshore St. Petersburg, FL (144)', latitude: 27.349, longitude: -84.275},
-            { stationId: '44005', name: 'GULF OF MAINE - 78 NM East of Portsmouth, NH', latitude: 43.201, longitude: -69.127},
-            { stationId: '44007', name: 'PORTLAND - 12 NM Southeast of Portland,ME', latitude: 43.525, longitude: -70.14},
-            { stationId: '44008', name: 'NANTUCKET 54 NM Southeast of Nantucket', latitude: 40.496, longitude: -69.25},
-            { stationId: '44009', name: 'DELAWARE BAY 26 NM Southeast of Cape May, NJ', latitude: 38.46, longitude: -74.692},
-            { stationId: '44013', name: 'BOSTON 16 NM East of Boston, MA', latitude: 42.346, longitude: -70.651},
-            { stationId: '44014', name: 'VIRGINIA BEACH 64 NM East of Virginia Beach, VA', latitude: 36.603, longitude: -74.837},
-            { stationId: '44018', name: 'CAPE COD - 9 NM North of Provincetown, MA', latitude: 42.203, longitude: -70.154},
-            { stationId: '44020', name: 'NANTUCKET SOUND', latitude: 41.497, longitude: -70.283},
-            { stationId: '44027', name: 'Jonesport, ME - 20 NM SE of Jonesport, ME', latitude: 44.283, longitude: -67.3},
-            { stationId: '44056', name: 'Duck FRF, NC', latitude: 36.2, longitude: -75.714},
-            { stationId: '44065', name: 'New York Harbor Entrance - 15 NM SE of Breezy Point , NY', latitude: 40.369, longitude: -73.703},
-            { stationId: '44078', name: 'OOI Irminger Sea Surface Mooring', latitude: 59.94, longitude: -39.52},
-            { stationId: '44084', name: 'Bethany Beach, DE (263)', latitude: 38.537, longitude: -75.044},
-            { stationId: '44085', name: 'Buzzards Bay, MA (260)', latitude: 41.387, longitude: -71.032},
-            { stationId: '44086', name: 'Nags Head, NC (243)', latitude: 36.001, longitude: -75.421},
-            { stationId: '44087', name: 'Thimble Shoal, VA (240)', latitude: 37.026, longitude: -76.149},
-            { stationId: '44088', name: 'Virginia Beach Offshore, VA (171)', latitude: 36.614, longitude: -74.841},
-            { stationId: '44089', name: 'Wallops Island, VA (224)', latitude: 37.754, longitude: -75.325},
-            { stationId: '44090', name: 'Cape Cod Bay, MA (221)', latitude: 41.84, longitude: -70.329},
-            { stationId: '44091', name: 'Barnegat, NJ (209)', latitude: 39.768, longitude: -73.77},
-            { stationId: '44095', name: 'Oregon Inlet, NC (192)', latitude: 35.75, longitude: -75.33},
-            { stationId: '44097', name: 'Block Island, RI  (154)', latitude: 40.967, longitude: -71.124},
-            { stationId: '44098', name: 'Jeffreys Ledge, NH (160)', latitude: 42.8, longitude: -70.171},
-            { stationId: '44099', name: 'Cape Henry, VA (147)', latitude: 36.915, longitude: -75.722},
-            { stationId: '44100', name: 'Duck FRF 26m, NC (430)', latitude: 36.258, longitude: -75.593},
-            { stationId: '45161', name: 'Muskegon Buoy, MI', latitude: 43.185, longitude: -86.352},
-            { stationId: '45212', name: 'North Huron Spotter', latitude: 45.351, longitude: -82.84},
-            { stationId: '45213', name: 'East Superior Spotter', latitude: 47.585, longitude: -86.585},
-            { stationId: '45214', name: 'South Michigan Spotter', latitude: 42.674, longitude: -87.026},
-            { stationId: '46001', name: 'WESTERN GULF OF ALASKA  - 175NM SE of Kodiak, AK', latitude: 56.3, longitude: -148.018},
-            { stationId: '46005', name: 'WEST WASHINGTON - 300NM West of Aberdeen, WA', latitude: 46.143, longitude: -131.09},
-            { stationId: '46006', name: 'SOUTHEAST PAPA - 600NM West of Eureka, CA', latitude: 40.764, longitude: -137.377},
-            { stationId: '46011', name: 'SANTA MARIA - 21NM NW of Point Arguello, CA', latitude: 34.936, longitude: -120.998},
-            { stationId: '46013', name: 'BODEGA BAY - 48NM NW of San Francisco, CA', latitude: 38.235, longitude: -123.317},
-            { stationId: '46014', name: 'PT ARENA - 19NM North of Point Arena, CA', latitude: 39.225, longitude: -123.98},
-            { stationId: '46022', name: 'EEL RIVER - 17NM WSW of Eureka, CA', latitude: 40.716, longitude: -124.54},
-            { stationId: '46025', name: 'Santa Monica Basin - 33NM WSW of Santa Monica, CA', latitude: 33.755, longitude: -119.045},
-            { stationId: '46026', name: 'SAN FRANCISCO - 18NM West of San Francisco, CA', latitude: 37.754, longitude: -122.839},
-            { stationId: '46027', name: 'ST GEORGES - 8 NM NW of Crescent City, CA', latitude: 41.84, longitude: -124.382},
-            { stationId: '46028', name: 'CAPE SAN MARTIN - 55NM West NW of Morro Bay, CA', latitude: 35.77, longitude: -121.903},
-            { stationId: '46041', name: 'CAPE ELIZABETH - 45NM NW of Aberdeen, WA', latitude: 47.352, longitude: -124.739},
-            { stationId: '46047', name: 'TANNER BANK - 121 NM West of San Diego, CA', latitude: 32.388, longitude: -119.525},
-            { stationId: '46050', name: 'STONEWALL BANK - 20NM West of Newport, OR', latitude: 44.669, longitude: -124.546},
-            { stationId: '46053', name: 'EAST SANTA BARBARA  - 12NM Southwest of Santa Barbara, CA', latitude: 34.241, longitude: -119.839},
-            { stationId: '46054', name: 'WEST SANTA BARBARA  38 NM West of Santa Barbara, CA', latitude: 34.274, longitude: -120.468},
-            { stationId: '46059', name: 'WEST CALIFORNIA - 357NM West of San Francisco, CA', latitude: 38.069, longitude: -129.976},
-            { stationId: '46060', name: 'WEST ORCA BAY - 8NM NW of Hinchinbrook Is., AK', latitude: 60.571, longitude: -146.795},
-            { stationId: '46066', name: 'SOUTH KODIAK - 310NM SSW of Kodiak, AK', latitude: 52.765, longitude: -155.009},
-            { stationId: '46069', name: 'SOUTH SANTA ROSA - 14 NM SW of Santa Rosa Island, CA', latitude: 33.677, longitude: -120.213},
-            { stationId: '46070', name: 'SOUTHWEST BERING SEA - 142NM NNE OF ATTU IS, AK', latitude: 55.065, longitude: 175.268},
-            { stationId: '46071', name: 'WESTERN ALEUTIANS - 14NM SOUTH OF AMCHITKA IS, AK ', latitude: 51.022, longitude: 179.784},
-            { stationId: '46072', name: 'CENTRAL ALEUTIANS 230 NM SW Dutch Harbor', latitude: 51.666, longitude: -172.114},
-            { stationId: '46075', name: 'SHUMAGIN ISLANDS - 85NM South of Sand Point, AK', latitude: 53.969, longitude: -160.794},
-            { stationId: '46076', name: 'CAPE CLEARE - 17 NM South of Montague Is,  AK', latitude: 59.471, longitude: -148.009},
-            { stationId: '46077', name: 'SHELIKOF STRAIT, AK', latitude: 57.869, longitude: -154.211},
-            { stationId: '46078', name: 'ALBATROSS BANK - 104NM South of Kodiak Is., AK', latitude: 55.561, longitude: -152.599},
-            { stationId: '46080', name: 'PORTLOCK BANK - 76 NM ENE of Kodiak, AK', latitude: 57.916, longitude: -150.133},
-            { stationId: '46081', name: 'Western Prince William Sound', latitude: 60.802, longitude: -148.283},
-            { stationId: '46082', name: 'Cape Suckling - 35 NM SE of Kayak Is, AK', latitude: 59.67, longitude: -143.353},
-            { stationId: '46083', name: 'FAIRWEATHER GROUND - 105 NM West  of Juneau, AK', latitude: 58.27, longitude: -138.019},
-            { stationId: '46084', name: 'CAPE EDGECUMBE - 25NM SSW of Cape Edgecumbe, AK', latitude: 56.614, longitude: -136.04},
-            { stationId: '46086', name: 'SAN CLEMENTE BASIN - 27NM SE Of San Clemente Is, CA', latitude: 32.499, longitude: -118.052},
-            { stationId: '46088', name: 'NEW DUNGENESS - 17 NM NE of Port Angeles, WA', latitude: 48.332, longitude: -123.179},
-            { stationId: '46097', name: 'OOI Newport Shelf', latitude: 44.639, longitude: -124.304},
-            { stationId: '46098', name: 'OOI Waldport Offshore', latitude: 44.378, longitude: -124.947},
-            { stationId: '46099', name: 'OOI Westport Shelf', latitude: 46.988, longitude: -124.567},
-            { stationId: '46100', name: 'OOI Westport Offshore', latitude: 46.851, longitude: -124.964},
-            { stationId: '46108', name: 'Lower Cook Inlet (204)', latitude: 59.598, longitude: -151.828},
-            { stationId: '46211', name: 'Grays Harbor, WA (036)', latitude: 46.857, longitude: -124.244},
-            { stationId: '46213', name: 'Cape Mendocino, CA (094)', latitude: 40.295, longitude: -124.732},
-            { stationId: '46214', name: 'Point Reyes, CA (029)', latitude: 37.937, longitude: -123.463},
-            { stationId: '46215', name: 'Diablo Canyon, CA (076)', latitude: 35.204, longitude: -120.859},
-            { stationId: '46218', name: 'Harvest, CA (071)', latitude: 34.452, longitude: -120.78},
-            { stationId: '46219', name: 'San Nicolas Island, CA (067)', latitude: 33.219, longitude: -119.872},
-            { stationId: '46221', name: 'Santa Monica Bay, CA (028)', latitude: 33.86, longitude: -118.641},
-            { stationId: '46222', name: 'San Pedro, CA (092)', latitude: 33.618, longitude: -118.317},
-            { stationId: '46224', name: 'Oceanside Offshore, CA (045)', latitude: 33.178, longitude: -117.472},
-            { stationId: '46225', name: 'Torrey Pines Outer, CA (100)', latitude: 32.933, longitude: -117.391},
-            { stationId: '46229', name: 'UMPQUA OFFSHORE, OR (139)', latitude: 43.772, longitude: -124.549},
-            { stationId: '46232', name: 'Point Loma South, CA  (191)', latitude: 32.517, longitude: -117.425},
-            { stationId: '46235', name: 'Imperial Beach Nearshore, CA (155)', latitude: 32.57, longitude: -117.169},
-            { stationId: '46237', name: 'San Francisco Bar, CA  (142)', latitude: 37.788, longitude: -122.634},
-            { stationId: '46239', name: 'Point Sur, CA (157)', latitude: 36.335, longitude: -122.104},
-            { stationId: '46240', name: 'Cabrillo Point, Monterey Bay, CA  (158)', latitude: 36.626, longitude: -121.907},
-            { stationId: '46243', name: 'Clatsop Spit, OR (162)', latitude: 46.216, longitude: -124.128},
-            { stationId: '46244', name: 'Humboldt Bay, North Spit, CA (168)', latitude: 40.896, longitude: -124.357},
-            { stationId: '46251', name: 'Santa Cruz Basin, CA (203)', latitude: 33.769, longitude: -119.565},
-            { stationId: '46253', name: 'San Pedro South, CA (213)', latitude: 33.576, longitude: -118.181},
-            { stationId: '46254', name: 'SCRIPPS Nearshore, CA (201)', latitude: 32.868, longitude: -117.267},
-            { stationId: '46256', name: 'Long Beach Channel, CA (215)', latitude: 33.7, longitude: -118.201},
-            { stationId: '46258', name: 'Mission Bay West, CA (220)', latitude: 32.749, longitude: -117.502},
-            { stationId: '46259', name: 'Santa Lucia Escarpment, CA (222)', latitude: 34.767, longitude: -121.498},
-            { stationId: '46266', name: 'Del Mar Nearshore, CA (153)', latitude: 32.957, longitude: -117.279},
-            { stationId: '46267', name: 'Angeles Point, WA (248)', latitude: 48.173, longitude: -123.607},
-            { stationId: '46268', name: 'Topanga Nearshore, CA (103)', latitude: 34.022, longitude: -118.578},
-            { stationId: '46274', name: 'Leucadia Nearshore, CA (262)', latitude: 33.062, longitude: -117.314},
-            { stationId: '46275', name: 'Red Beach Nearshore, CA (264)', latitude: 33.29, longitude: -117.5},
-            { stationId: '46276', name: 'Pajaro Beach, CA (266)', latitude: 36.845, longitude: -121.825},
-            { stationId: '46277', name: 'Green Beach Offshore, CA (271)', latitude: 33.336, longitude: -117.659},
-            { stationId: '46278', name: 'Tillamook Bay South Jetty, OR (270)', latitude: 45.561, longitude: -123.991},
-            { stationId: '46279', name: 'Pajaro Beach South, CA (267)', latitude: 36.838, longitude: -121.82},
-            { stationId: '51000', name: 'NORTHERN HAWAII ONE - 245NM NE of Honolulu HI', latitude: 23.528, longitude: -153.792},
-            { stationId: '51001', name: 'NORTHWESTERN HAWAII ONE - 188 NM NW of Kauai Island, HI', latitude: 24.451, longitude: -162.008},
-            { stationId: '51003', name: 'WESTERN  HAWAII - 205 NM SW of Honolulu, HI', latitude: 19.196, longitude: -160.639},
-            { stationId: '51004', name: 'SOUTHEAST HAWAII - 205 NM Southeast of Hilo, HI', latitude: 17.538, longitude: -152.23},
-            { stationId: '51101', name: 'NORTHWESTERN HAWAII TWO - 186 NM NW of Kauai Is., HI   ', latitude: 24.359, longitude: -162.081},
-            { stationId: '51201', name: 'Waimea Bay, HI (106)', latitude: 21.671, longitude: -158.118},
-            { stationId: '51202', name: 'Mokapu Point, HI (098)', latitude: 21.417, longitude: -157.68},
-            { stationId: '51205', name: 'Pauwela, Maui, HI (187)', latitude: 21.018, longitude: -156.425},
-            { stationId: '51207', name: 'Kaneohe Bay, HI (198)', latitude: 21.477, longitude: -157.752},
-            { stationId: '51210', name: 'Kaneohe Bay, WETS, HI (225)', latitude: 21.477, longitude: -157.757},
-            { stationId: '51211', name: 'Pearl Harbor Entrance, HI (233)', latitude: 21.297, longitude: -157.959},
-            { stationId: '51212', name: 'Barbers Point, Kalaeloa, HI (238)', latitude: 21.323, longitude: -158.149},
-            { stationId: '52200', name: 'Ipan, Guam (121)', latitude: 13.354, longitude: 144.788},
-            { stationId: '52201', name: 'Kalo, Majuro, Marshall Islands (163)', latitude: 7.079, longitude: 171.384},
-            { stationId: '52211', name: 'Tanapag, Saipan, NMI (197)', latitude: 15.268, longitude: 145.662},
-            { stationId: '52212', name: 'Ngaraard, Babeldaob, Palau (219)', latitude: 7.63, longitude: 134.671},
-            { stationId: '62107', name: 'Sevenstones Lightship', latitude: 50.102, longitude: -6.1},
-            { stationId: '62127', name: 'Cleeton AWS', latitude: 54.0, longitude: 0.7},
-            { stationId: '62130', name: 'Brae A', latitude: 58.7, longitude: 1.3},
-            { stationId: '62144', name: 'Clipper AWS', latitude: 53.4, longitude: 1.7},
-            { stationId: '62145', name: 'North Sea', latitude: 53.102, longitude: 2.8},
-            { stationId: '62146', name: 'Lomond AWS', latitude: 57.2, longitude: 2.1},
-            { stationId: '62149', name: 'West Sole "A" AWS', latitude: 53.7, longitude: 1.1},
-            { stationId: '62165', name: 'Ravenspurn North AWS', latitude: 54.0, longitude: 1.1},
-            { stationId: '62170', name: 'F3 Light Vessel', latitude: 51.24, longitude: 2.0},
-            { stationId: '62304', name: 'Sandettie Lightship', latitude: 51.102, longitude: 1.8},
-            { stationId: '62305', name: 'Greenwich Lightship', latitude: 50.4, longitude: 0.0},
-            { stationId: '63110', name: 'Beryl A AWS', latitude: 59.5, longitude: 1.5},
-            { stationId: '63112', name: 'Cormorant AWS', latitude: 61.1, longitude: 1.0},
-            { stationId: '63115', name: 'Magnus AWS', latitude: 61.6, longitude: 1.3},
-        ];
-
-        document.getElementById('search').addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            let matches = buoyData.filter(buoy => buoy.name.toLowerCase().includes(searchTerm));
-            displayMatches(matches);
-        });
-
-        function displayMatches(matches) {
+            function displayMatches(matches) {
                 const searchResults = document.getElementById('searchResults');
                 searchResults.innerHTML = ''; // Clear previous results
-    
+
                 matches.forEach(match => {
                     const div = document.createElement('div');
                     div.classList.add('search-result');
@@ -771,61 +797,60 @@
                         map.eachLayer(function(layer) {
                             if (layer instanceof L.Marker) {
                                 const latlng = layer.getLatLng();
-                                if (Math.abs(latlng.lat - match.latitude) < 0.001 && 
-                                    Math.abs(latlng.lng - match.longitude) < 0.001) {
-                                    layer.openPopup();
-                                }
-                            }
-                        });
-                        map.setView([match.latitude - 2.0, match.longitude], 6);
-                    };
-                    searchResults.appendChild(div);
-                });
+                                if (Math.abs(latlng.lat - match.latitude) < 0.001 && Math.abs(latlng.lng - match.longitude) < 0.001) {
+            layer.openPopup();
+            }
+            }
+            });
+            map.setView([match.latitude - 2.0, match.longitude], 6);
+            };
+            searchResults.appendChild(div);
+            });
             }
 
-        // Clicking outside the search results hides them
-        window.addEventListener('click', function(e) {
+            // Clicking outside the search results hides them
+            window.addEventListener('click', function(e) {
             const searchResults = document.getElementById('searchResults');
             if (!document.getElementById('search').contains(e.target)) {
-                searchResults.innerHTML = '';
+            searchResults.innerHTML = '';
             }
-        });
+            });
 
-        document.getElementById('forecastBtn').addEventListener('click', function() {
+            document.getElementById('forecastBtn').addEventListener('click', function() {
             if (currentBuoy.stationId === undefined) {
-                alert('Please select a buoy first');
-                return;
+            alert('Please select a buoy first');
+            return;
             }
             window.location.href = `/forecast/${currentBuoy.stationId}`;
-        });
+            });
 
-        function toggleDarkMode() {
-            // Check if the dark class exists on the body
-            if (document.body.classList.contains('dark')) {
+            function toggleDarkMode() {
+                // Check if the dark class exists on the body
+                if (document.body.classList.contains('dark')) {
                 // If dark mode is enabled, turn it off
                 document.body.classList.remove('dark');
                 // Save the preference in localStorage
                 localStorage.setItem('darkMode', 'false');
-            } else {
+                } else {
                 // If dark mode is not enabled, turn it on
                 document.body.classList.add('dark');
                 // Save the preference in localStorage
                 localStorage.setItem('darkMode', 'true');
+                }
             }
-        }
 
 
-        document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
+            document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
 
 
 
-        plotBuoys();
 
-        //center the map
-        map.setView([33.101608, -119.069824], 6);
+            //center the map
+            map.setCenter([-119.069824, 33.101608]);
+            map.setZoom(3);
 
-    </script>
+        </script>
 
 
-</body>
+    </body>
 </html>

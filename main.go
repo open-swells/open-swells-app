@@ -752,7 +752,7 @@ func verifyUserID(uid string) error {
 
 func main() {
     // start firebase auth
-    opt := option.WithCredentialsFile("/Users/evancoons/Downloads/open-swells-89714-firebase-adminsdk-ghfog-cab6d41e1d.json")
+    opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
        panic(fmt.Sprintf("error initializing app: %v", err))
@@ -799,7 +799,7 @@ func main() {
         returndata = map[string]interface{}{"forecastdata": forecastdata, "windreport": windreport, "swellreport": swellreport}
 
 
-        tmpl, err := template.ParseFiles("pages/today.html", "templates/report.html", "templates/forecastsummary.html")
+        tmpl, err := template.ParseFiles("pages/today.html", "templates/report_small.html", "templates/forecastsummary3.html")
         htmlBuffer := new(bytes.Buffer)
         err = tmpl.ExecuteTemplate(htmlBuffer, "today.html", returndata)
 
@@ -843,6 +843,45 @@ func main() {
 
         htmlBuffer := new(bytes.Buffer)
         err = tmpl.ExecuteTemplate(htmlBuffer, "report", returndata)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute template"})
+            return
+        }
+
+        c.Header("Content-Type", "text/html; charset=utf-8")
+        c.String(http.StatusOK, htmlBuffer.String())
+    })
+
+    router.GET("/report_small/:stationId", func(c *gin.Context) {
+        stationId := c.Param("stationId")
+        windreport, err := getWindReport(stationId)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get wind report"})
+            return
+        }
+        swellreport, err := getSwellReport(stationId)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get swell report"})
+            return
+        }
+
+        returndata := map[string]interface{}{
+            "windreport":  windreport,
+            "swellreport": swellreport,
+        }
+
+        tmpl, err := template.ParseFiles("templates/report_small.html")
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse template"})
+            return
+        }
+
+        htmlBuffer := new(bytes.Buffer)
+        err = tmpl.ExecuteTemplate(htmlBuffer, "report_small", returndata)
         if err != nil {
             log.Println(err)
             c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to execute template"})

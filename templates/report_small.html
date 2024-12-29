@@ -1,0 +1,110 @@
+{{define "report_small"}}
+<div>
+    <script> 
+        let directionmap = {
+            'N': 0,
+            'NNE': 22.5,
+            'NE': 45,
+            'ENE': 67.5,
+            'E': 90,
+            'ESE': 112.5,
+            'SE': 135,
+            'SSE': 157.5,   
+            'S': 180,
+            'SSW': 202.5,
+            'SW': 225,
+            'WSW': 247.5,
+            'W': 270,
+            'WNW': 292.5,
+            'NW': 315,
+            'NNW': 337.5
+        };
+
+        // Define a global function that can be called after template insertion
+        window.initializeSwellDirection = function() {
+            let secondaryswell = {{.swellreport.SecondaryDegrees}};
+            let swelldir = document.querySelector('.windswellsymbol');
+            console.log("Direction: " + secondaryswell);
+            if (swelldir) {
+                console.log("rotating");
+                swelldir.style.transform = `rotate(${directionmap[secondaryswell]}deg)`;
+            }
+        };
+
+        // Also try to execute immediately in case it's needed
+        initializeSwellDirection();
+    </script> 
+    <style> 
+        body.dark .card {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border-color: #555;
+        }
+
+        body.dark h2 {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            border-color: #555;
+        }
+
+
+    </style>
+    <!-- <h2 class="text-5x1 text-lg font-bold mb-4">Report</h2>-->
+
+    <!-- <div class="report flex justify-center"> -->
+    <div class="grid grid-cols-4 gap-1 bg-white/90 p-1">
+        <div class="card border border-gray-300 p-2">
+            <div class="text-xs font-semibold mb-1">Primary</div>
+            <div class="flex flex-col items-center">
+                <div class="mb-1">
+                    <div class="swellsymbol text-2xl leading-none" style="transform: rotate({{.swellreport.PrimaryDegrees}}deg);">&#8595;</div>
+                    <span class="text-xs">{{.swellreport.PrimaryDegrees}}º</span>
+                </div>
+                <div class="text-xs text-center">
+                    <div>{{.swellreport.PrimaryWaveHeight}}ft @ {{.swellreport.PrimaryPeriod}}s</div>
+                    <div class="text-gray-600">{{.swellreport.Steepness}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border border-gray-300 p-2">
+            <div class="text-xs font-semibold mb-1">Secondary</div>
+            <div class="flex flex-col items-center">
+                <div class="mb-1">
+                    <div class="windswellsymbol text-2xl leading-none" style="transform: rotate({{.swellreport.SecondaryDegrees}}deg);">&#8595;</div>
+                    <span class="text-xs">{{.swellreport.SecondaryDegrees}}º</span>
+                </div>
+                <div class="text-xs text-center">
+                    {{.swellreport.SecondaryWaveHeight}}ft @ {{.swellreport.SecondaryPeriod}}s
+                </div>
+            </div>
+        </div>
+
+        <div class="card border border-gray-300 p-2">
+            <div class="text-xs font-semibold mb-1">Wind</div>
+            <div class="flex items-center gap-2">
+                <div class="flex flex-col items-center">
+                    <div class="windsymbol text-2xl leading-none" style="transform: rotate({{.windreport.WindDir}}deg);">&#8595;</div>
+                    <span class="text-xs">{{.windreport.WindDir}}º</span>
+                </div>
+                <div class="text-xs">
+                    <div>{{.windreport.WindSpeed}}mph</div>
+                    <div class="text-gray-600">gust {{.windreport.WindGust}}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border border-gray-300 p-2">
+            <div class="text-xs font-semibold mb-1">Temp</div>
+            <div class="text-xs">
+                <div>Air: {{.windreport.AirTemp}}ºF</div>
+                <div>Water: {{.windreport.WaterTemp}}ºF</div>
+            </div>
+        </div>
+    </div>
+    <!-- </div> -->
+
+
+</div>
+{{end}}
+
