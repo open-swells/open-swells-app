@@ -228,16 +228,33 @@
             <div id="mapView" class="w-full">
                 <div class="relative">
                     <div id="map" class="h-[80vh] z-10"></div>
-                    <!-- Positioned Report Container Over Map -->
-                    <div id="report-container" class="report absolute bottom-0 left-0 w-auto max-w-[600px] bg-white/95 dark:bg-gray-800/95 shadow-lg z-20 m-4">
-                        <div class="buoy-name border-b border-black dark:border-gray-600 p-2 flex justify-between items-center">
-                            <div id="report-title" class="report-title text-sm">Choose buoy</div>
-                            <div>
-                                <button id="forecastBtn" class="forecast border border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400 px-2 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/30">View Forecast</button>
+                    <!-- Map Controls Container -->
+                    <div class="absolute bottom-0 left-0 right-0 flex justify-between items-end gap-4 m-4 z-20">
+                        <!-- Report Container -->
+                        <div id="report-container" class="report w-auto max-w-[600px] bg-white/95 dark:bg-gray-800/95 shadow-lg">
+                            <div class="buoy-name border-b border-black dark:border-gray-600 p-2 flex justify-between items-center">
+                                <div id="report-title" class="report-title text-sm">Choose buoy</div>
+                                <div>
+                                    <button id="forecastBtn" class="forecast border border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400 px-2 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/30">View Forecast</button>
+                                </div>
+                            </div>
+                            <div id="report-content" class="p-2">
+                                {{template "report_small" .}}
                             </div>
                         </div>
-                        <div id="report-content" class="p-2">
-                            {{template "report_small" .}}
+                        
+                        <!-- Time Slider Container -->
+                        <div class="bg-white/95 dark:bg-gray-800/95 p-2 shadow-lg rounded flex items-center gap-2 min-w-[200px]">
+                            <span class="text-xs font-semibold">Time:</span>
+                            <input 
+                                type="range" 
+                                id="timeSlider" 
+                                min="0" 
+                                max="24" 
+                                value="0" 
+                                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                            >
+                            <span id="timeValue" class="text-xs min-w-[2.5em]">+000 hrs</span>
                         </div>
                     </div>
                 </div>
@@ -268,7 +285,7 @@
                     mapBtn.classList.remove('bg-gray-200');
                 }
             }
-        </script>
+        </script> 
 
         <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
         <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
@@ -413,6 +430,46 @@
                 style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
                 center: [-121.157227, 33.800832], // Note: MapLibre uses [lng, lat] order
                 zoom: 5
+            });
+
+            map.on('load', () => {
+                // Notice the URL includes "/static/" because we did r.Static("/static", "./static")
+                map.addSource('contours', {
+                    type: 'geojson',
+                    data: '/static/contours_001.geojson'
+                });
+
+                map.addLayer({
+                    id: 'contour-fills',
+                    type: 'fill',
+                    source: 'contours',
+                    paint: {
+                        'fill-color': [
+                            'case',
+                            ['==', ['get', 'contour_level'], 2.0],  '#4575B4',
+                            ['==', ['get', 'contour_level'], 4.0],  '#74ADD1',
+                            ['==', ['get', 'contour_level'], 6.0],  '#F46D43',
+                            ['==', ['get', 'contour_level'], 8.0],  '#D73027',
+                            ['==', ['get', 'contour_level'], 10.0], '#A50026',
+                            '#ADD8E6'
+                        ],
+                        'fill-opacity': 0.8
+                    }
+                });
+
+                // Example: Add navigation
+                map.addControl(new maplibregl.NavigationControl());
+            });
+
+            // Example slider logic:
+            // Just update the data source to a different GeoJSON file in /static/ 
+            // (e.g., /static/contours_002.geojson, /static/contours_003.geojson, etc.)
+            const timeSlider = document.getElementById('timeSlider');
+            timeSlider.addEventListener('input', (event) => {
+                const val = parseInt(event.target.value);
+                const padded = String(val).padStart(3, '0');
+                timeValue.textContent = `+${padded} hrs`;
+                map.getSource('contours').setData(`/static/contours_${padded}.geojson`);
             });
 
             // Create a popup but don't add it to the map yet

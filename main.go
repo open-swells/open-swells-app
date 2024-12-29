@@ -773,6 +773,9 @@ func main() {
 
     cache.ClearEvery(6 * time.Hour)
 
+    router.Static("/static", "./static")
+
+
     router.ForwardedByClientIP = true
     //router.SetTrustedProxies([]string{"127.0.0.1","192.168.1.250", "192.168.1.1"})
     trustedProxies := []string {
