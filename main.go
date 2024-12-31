@@ -817,6 +817,25 @@ func main() {
 
     })
 
+    router.GET("/landing", func(c *gin.Context) {
+        tmpl, err := template.ParseFiles("pages/landing.html")
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+            return
+        }
+
+        err = tmpl.Execute(c.Writer, nil)
+        if err != nil {
+            log.Println(err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+            return
+        }
+
+        c.Header("Content-Type", "text/html; charset=utf-8")
+        c.Status(http.StatusOK)
+    })
+
     router.GET("/report/:stationId", func(c *gin.Context) {
         stationId := c.Param("stationId")
         windreport, err := getWindReport(stationId)
