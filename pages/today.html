@@ -244,7 +244,7 @@
                                 type="range" 
                                 id="timeSlider" 
                                 min="0" 
-                                max="96" 
+                                max="384" 
                                 value="0" 
                                 class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
                             >
@@ -349,7 +349,6 @@
                     console.error('Error loading user buoys:', error);
                     userBuoys = [];
                 }
-                plotBuoys();
             }
             // Wait for Firebase authentication
             document.addEventListener('DOMContentLoaded', () => {
@@ -406,6 +405,7 @@
                 firebase.auth().signOut().then(() => {
                     updateUIForSignedInUser(null);
                     document.getElementById('userPopup').classList.add('hidden');
+                    userBuoys = []
                 });
             });
 
@@ -900,6 +900,7 @@
             map.setCenter([-119.069824, 33.101608]);
             map.setZoom(3);
 
+            plotBuoys();
         </script>
 
 
