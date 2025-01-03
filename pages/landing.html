@@ -75,13 +75,13 @@
 </head>
 <body class="flex flex-col items-center justify-between min-h-screen">
     <!-- Header -->
-    <div class="header flex flex-row justify-evenly items-center p-4 w-full bg-white shadow">
+    <div class="header flex flex-row justify-between items-center p-4 w-full bg-white shadow">
         <!-- Logo -->
         <div class="title w-1/5 text-center">
             <h1 class="text-xl font-bold">OpenSwells;</h1>
         </div>
         <!-- Icons -->
-        <div class="icons w-1/5 flex items-center justify-end space-x-4">
+        <div class="icons w-1/5 flex items-center justify-center space-x-4">
             <a href="/about" class="w-8 h-8 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -101,11 +101,11 @@
     </div>
 
     <!-- Main Content -->
-    <div class="flex flex-col items-center justify-center text-center flex-grow">
-        <h1 class="text-5xl font-bold">OpenSwells;</h1>
+    <div class="flex flex-col items-center justify-center text-center flex-grow px-4 py-8 md:py-0">
+        <h1 class="text-5xl font-bold mt-4 md:mt-0">OpenSwells;</h1>
         <p class="text-lg mt-4 mb-2">Free 16 day swell forecast</p>
         <button class="start-mapping" onclick="window.location.href='/'">Start Mapping</button>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-16 max-w-4xl">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 md:mt-16 max-w-4xl w-full">
             <div class="features-card">
                 <h2>178 Locations</h2>
                 <p>Monitor wave activity across 178 buoy locations for precise tracking.</p>
