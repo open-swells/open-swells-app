@@ -6,41 +6,44 @@
         <title>OpenSwells;</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
-/* Mobile styles - placed at top for higher specificity */
-@media (max-width: 768px) {
-    body .header {
-        display: grid;
-        grid-template-areas:
-            "logo icons"
-        "search search";
-    grid-template-columns: 1fr auto;
-    grid-gap: 2px;
-    padding: 5px;
-    width: 100%;
-    }
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        /* Mobile styles - placed at top for higher specificity */
+        @media (max-width: 768px) {
+            body .header {
+                display: grid;
+                grid-template-areas:
+                    "logo icons"
+                "search search";
+            grid-template-columns: 1fr auto;
+            grid-gap: 2px;
+            padding: 5px;
+            width: 100%;
+            }
 
 
-    body .header .title {
-        grid-area: logo;
-        justify-self: start;
-        min-width: fit-content;
-    }
+            body .header .title {
+                grid-area: logo;
+                justify-self: start;
+                min-width: fit-content;
+            }
 
 
-    body .header .search {
-        grid-area: search;
-        width: 100%;
-    }
+            body .header .search {
+                grid-area: search;
+                width: 100%;
+            }
 
-    body .header .icons {
-        grid-area: icons;
-        justify-self: end;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: fit-content;
-    }
-}
+            body .header .icons {
+                grid-area: icons;
+                justify-self: end;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-width: fit-content;
+            }
+        }
+
 
         #map { 
             /* height: 500px; width: 100%; */ 
@@ -119,12 +122,15 @@
             background-color: #333;
             border-color: #555;
         }
+        body {
+            font-family: 'JetBrains Mono', monospace !important;
+        }
 
 
         </style>
     </head>
 
-    <body class="mb-10 mx-2 sm:mx-8 md:mx-12 lg:mx-20 font-mono" >
+    <body class="mb-10 mx-2 sm:mx-8 md:mx-12 lg:mx-20" >
 
         <script>
             // applying in body
@@ -143,7 +149,7 @@
         <div class="header flex flex-row justify-evenly items-center p-2">
             <!-- Logo -->
             <div class="title width:20%">
-                <h1 class="text-xl font-bold"><a href="https://openswells.com/landing">OpenSwells;</a></h1>
+                <h1 class="text-xl font-bold"><a href="/landing">OpenSwells;</a></h1>
                 <!--<img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" alt="surfing" width="160"> -->
             </div>
             <!-- Search -->
