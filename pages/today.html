@@ -161,7 +161,7 @@
           <!-- Logo -->
             <div class="title">
                 <h1 class="text-xl font-bold dark:text-white">
-                    <a href="/landing" class="bg-white/95 dark:bg-slate-800/95 px-3 py-1">OpenSwells;</a>
+                    <a href="/" class="bg-white/95 dark:bg-slate-800/95 px-3 py-1">OpenSwells;</a>
                 </h1>
             </div>
 
@@ -299,6 +299,37 @@
             </div>
 
 
+            <!-- Legend -->
+            <div class="legend absolute bottom-60 left-4 z-10 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg">
+                <div class="text-xs font-semibold mb-2 dark:text-white">Wave Height (m)</div>
+                <div class="flex flex-col gap-1">
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-4" style="background-color: #A50026;"></div>
+                        <span class="text-xs dark:text-white">10.0+</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-4" style="background-color: #D73027;"></div>
+                        <span class="text-xs dark:text-white">8.0</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-4" style="background-color: #F46D43;"></div>
+                        <span class="text-xs dark:text-white">6.0</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-4" style="background-color: #74ADD1;"></div>
+                        <span class="text-xs dark:text-white">4.0</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-4" style="background-color: #4575B4;"></div>
+                        <span class="text-xs dark:text-white">2.0</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-6 h-4" style="background-color: #ADD8E6;"></div>
+                        <span class="text-xs dark:text-white">&lt; 2.0</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- 5) Bottom Controls (overlay at bottom) -->
             <div class="bottom-controls absolute bottom-0 left-0 right-0 grid grid-cols-3 items-end gap-4 m-4 z-10">
                 <!-- Report Container - Left -->
@@ -325,10 +356,24 @@
                 </div>
 
                 <!-- Time Slider Container - Right -->
-                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 min-w-[200px] dark:text-white justify-self-end">
-                    <span class="text-xs font-semibold">Time:</span>
-                    <input type="range" id="timeSlider" min="0" max="384" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
-                    <span id="timeValue" class="text-xs min-w-[2.5em]">+000 hrs</span>
+                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 min-w-[300px] dark:text-white justify-self-end">
+                    <button id="playButton" class="w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 11.5V8.5l3.5 1.5-3.5 1.5z"/>
+                        </svg>
+                    </button>
+                    <div class="flex flex-col w-full">
+                        <div class="flex items-center gap-2">
+                            <input type="range" 
+                                   id="timeSlider" 
+                                   min="0" 
+                                   max="384" 
+                                   value="0" 
+                                   class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600">
+                            <span id="timeValue" class="text-xs min-w-[4em]">+000 hrs</span>
+                        </div>
+                        <span id="forecastTime" class="text-xs dark:text-gray-200 mt-1"></span>
+                    </div>
                 </div>
             </div>
 
@@ -344,6 +389,7 @@
 
                     // The single bottom-controls container
                     const bottomControls = document.querySelector('.bottom-controls');
+                    const legend = document.querySelector('.legend');
 
                     if (view === 'map') {
                         // Show map
@@ -352,6 +398,7 @@
 
                         // Show bottom controls
                         bottomControls.classList.remove('hidden');
+                        legend.classList.remove('hidden');
 
                         // Update button states
                         mapBtn.classList.add('font-bold','border-2');
@@ -363,6 +410,7 @@
 
                         // Hide bottom controls
                         bottomControls.classList.add('hidden');
+                        legend.classList.add('hidden');
 
                         // Update button states
                         favBtn.classList.add('font-bold', 'border-2');
@@ -557,12 +605,101 @@
                 map.moveLayer('contour-fills');
             });
 
-            // Also handle the timeSlider changes:
-            timeSlider.addEventListener('input', (event) => {
-                const val = parseInt(event.target.value);
-                const padded = String(val).padStart(3, '0');
+            let isPlaying = false;
+            let animationInterval;
+            let forecastStartTime;
+
+            // Fetch metadata and initialize time display
+            async function fetchMetadata() {
+                try {
+                    const response = await fetch('/static/metadata.json');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch metadata');
+                    }
+                    const metadata = await response.json();
+                    const timestamp = new Date(metadata.timestamp);
+                    
+                    // Parse the forecast_start format "20250104_00Z"
+                    const [datePart, timePart] = metadata.forecast_start.split('_');
+                    const year = datePart.substring(0, 4);
+                    const month = datePart.substring(4, 6);
+                    const day = datePart.substring(6, 8);
+                    const hour = timePart.substring(0, 2);
+                    
+                    forecastStartTime = new Date(Date.UTC(year, month - 1, day, hour));
+
+                    document.getElementById('metadataTimestamp').textContent = timestamp.toLocaleString();
+                    updateTimeDisplay(0); // Initialize time display
+                } catch (error) {
+                    console.error('Error fetching metadata:', error);
+                    document.getElementById('metadataTimestamp').textContent = 'Unable to load timestamp';
+                }
+            }
+
+            function updateTimeDisplay(hours) {
+                if (!forecastStartTime) return;
+
+                const currentTime = new Date(forecastStartTime.getTime() + hours * 60 * 60 * 1000);
+                const timeStr = currentTime.toLocaleString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                document.getElementById('forecastTime').textContent = timeStr;
+            }
+
+            function getNextTimeStep(currentHour) {
+                // After 120 hours (5 days), increment by 3 hours
+                if (currentHour >= 120) {
+                    return currentHour + 3;
+                }
+                // Before 120 hours, increment by 1 hour
+                return currentHour + 1;
+            }
+
+            function updateMap(hours) {
+                const padded = String(hours).padStart(3, '0');
                 timeValue.textContent = `+${padded} hrs`;
                 map.getSource('contours').setData(`/static/contours_${padded}.geojson`);
+                updateTimeDisplay(hours);
+            }
+
+            const playButton = document.getElementById('playButton');
+            const timeSlider = document.getElementById('timeSlider');
+
+            playButton.addEventListener('click', () => {
+                isPlaying = !isPlaying;
+                playButton.innerHTML = isPlaying ? 
+                    '<svg xmlns="http://www.w3.org/2000/svg" class="" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 8.5h2.5v3h-2.5v-3z"/></svg>' :
+                    '<svg xmlns="http://www.w3.org/2000/svg" class="" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 11.5V8.5l3.5 1.5-3.5 1.5z"/></svg>';
+
+                if (isPlaying) {
+                    animationInterval = setInterval(() => {
+                        let currentHour = parseInt(timeSlider.value);
+                        let nextHour = getNextTimeStep(currentHour);
+                        
+                        if (nextHour > 384) {
+                            nextHour = 0;
+                        }
+                        
+                        timeSlider.value = nextHour;
+                        updateMap(nextHour);
+                    }, 500); // Update every 500ms
+                } else {
+                    clearInterval(animationInterval);
+                }
+            });
+
+            timeSlider.addEventListener('input', (event) => {
+                const val = parseInt(event.target.value);
+                updateMap(val);
+                if (isPlaying) {
+                    clearInterval(animationInterval);
+                    isPlaying = false;
+                    playButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 11.5V8.5l3.5 1.5-3.5 1.5z"/></svg>';
+                }
             });
 
 
@@ -1016,24 +1153,6 @@
 
             plotBuoys();
         
-            // Fetch and display metadata
-            async function fetchMetadata() {
-                try {
-                    const response = await fetch('/static/metadata.json');
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch metadata');
-                    }
-                    const metadata = await response.json();
-                    const timestamp = new Date(metadata.timestamp);
-                    document.getElementById('metadataTimestamp').textContent = 
-                        timestamp.toLocaleString();
-                } catch (error) {
-                    console.error('Error fetching metadata:', error);
-                    document.getElementById('metadataTimestamp').textContent = 
-                        'Unable to load timestamp';
-                }
-            }
-
             // Fetch metadata when page loads
             fetchMetadata();
         </script>

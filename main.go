@@ -789,7 +789,7 @@ func main() {
     }
 
     // main route
-    router.GET("/", func(c *gin.Context) {
+    router.GET("/map", func(c *gin.Context) {
 
         //------------------- Use an Empty report for the opening page ----------------
         windreport, err := getWindReport("")
@@ -817,7 +817,7 @@ func main() {
 
     })
 
-    router.GET("/landing", func(c *gin.Context) {
+    router.GET("/", func(c *gin.Context) {
         tmpl, err := template.ParseFiles("pages/landing.html")
         if err != nil {
             log.Println(err)
