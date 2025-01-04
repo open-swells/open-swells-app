@@ -265,6 +265,7 @@
                 <div id="buoy-containers" class="favorites h-[80vh] overflow-auto"></div>
             </div>
         </div>
+    </body>
 
         <script>
             function toggleView(view) {
@@ -319,6 +320,7 @@
         </script>
         <script> 
             let userBuoys = [];
+            const popupMap = new Map(); // Use a Map to store popups by their ID
             async function loadForecastSummary(uid) {
                 try {
                     const summaryResponse = await fetch(`/forecast-summary?uid=${encodeURIComponent(uid)}`);
@@ -360,11 +362,9 @@
             document.addEventListener('DOMContentLoaded', () => {
                 firebase.auth().onAuthStateChanged(async (user) => {
                     if (user) {
-                        console.log(`User signed in: ${user.uid}`);
                         await loadForecastSummary(user.uid);
                         await loadUserBuoys(user.uid);
                         // Update all popup contents after loading user buoys
-                        console.log("first user buoy load successfull: ", userBuoys);
                     } else {
                         console.log('User not signed in.');
                         document.getElementById('buoy-containers').innerHTML =
@@ -472,11 +472,6 @@
                 map.getSource('contours').setData(`/static/contours_${padded}.geojson`);
             });
 
-            // Create a popup but don't add it to the map yet
-            var popup = new maplibregl.Popup({
-                closeButton: false,
-                closeOnClick: false
-            });
 
 
             async function getBuoyReport(buoyId, buoyName) {
@@ -577,7 +572,6 @@
             }
 
             async function plotBuoys() {
-                console.log("user buoys at plot buoys: ", userBuoys);
                 buoyData.forEach(buoy => {
                     // Create a DOM element for the marker
                     const el = document.createElement('div');
@@ -595,11 +589,14 @@
                     })
                     .setHTML(createPopupContent(buoy));
 
+
                     // Create the marker and store references
                     const marker = new maplibregl.Marker(el)
                         .setLngLat([buoy.longitude, buoy.latitude])
                         .setPopup(popup)
                         .addTo(map);
+
+                    popupMap.set(buoy.stationId, marker);
 
                     // Store marker reference on the element
                     el._marker = marker;
@@ -839,6 +836,8 @@
                 displayMatches(matches);
             });
 
+
+
             function displayMatches(matches) {
                 const searchResults = document.getElementById('searchResults');
                 searchResults.innerHTML = ''; // Clear previous results
@@ -847,23 +846,36 @@
                     const div = document.createElement('div');
                     div.classList.add('search-result');
                     div.textContent = match.name;
-                    div.onclick = function() { 
+                    div.onclick = function () {
                         getBuoyReport(match.stationId, match.name);
                         searchResults.innerHTML = ''; 
                         currentBuoy = match;
-                        map.eachLayer(function(layer) {
-                            if (layer instanceof L.Marker) {
-                                const latlng = layer.getLatLng();
-                                if (Math.abs(latlng.lat - match.latitude) < 0.001 && Math.abs(latlng.lng - match.longitude) < 0.001) {
-            layer.openPopup();
+
+                        console.log(`Jumping to buoy: ${match.stationId}`);
+
+                        // Retrieve the marker from markerMap
+                        const marker = popupMap.get(match.stationId);
+                        console.log(marker)
+
+                        if (marker) {
+                            // Trigger the popup
+                            marker.togglePopup();
+
+                            // Center the map on the marker with an offset
+                            map.flyTo({
+                                center: [match.longitude, match.latitude],
+                                zoom: 4,
+                                offset: [0, -100], // Offset to account for the popup
+                            });
+                        } else {
+                            console.warn(`No marker found for stationId: ${match.stationId}`);
+                        }
+                    };
+                    searchResults.appendChild(div);
+                });
             }
-            }
-            });
-            map.setView([match.latitude - 2.0, match.longitude], 6);
-            };
-            searchResults.appendChild(div);
-            });
-            }
+
+
 
             // Clicking outside the search results hides them
             window.addEventListener('click', function(e) {
@@ -910,5 +922,4 @@
         </script>
 
 
-    </body>
 </html>

@@ -24,9 +24,7 @@
         window.initializeSwellDirection = function() {
             let secondaryswell = {{.swellreport.SecondaryDegrees}};
             let swelldir = document.querySelector('.windswellsymbol');
-            console.log("Direction: " + secondaryswell);
             if (swelldir) {
-                console.log("rotating");
                 swelldir.style.transform = `rotate(${directionmap[secondaryswell]}deg)`;
             }
         };
