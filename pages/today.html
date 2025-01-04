@@ -3,8 +3,17 @@
 <html>
     <head>
 
+
         <title>OpenSwells;</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {}
+                }
+            }
+        </script>
         <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
         
@@ -130,163 +139,241 @@
         </style>
     </head>
 
-    <body class="mb-10 mx-2 sm:mx-8 md:mx-12 lg:mx-20" >
 
-        <script>
-            // applying in body
-            (function() {
-                if (localStorage.getItem('darkMode') === 'true') {
-                    document.body.classList.add('dark'); // Apply dark mode before body renders
-                }
-            })();
-        </script>
-
+    <body class="h-screen w-screen relative dark:bg-slate-800">
         <script src='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js'></script>
         <link href='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css' rel='stylesheet' />
 
+        <!-- 1) Wrap your map div inside #mapView so toggleView can hide/show it -->
+        <div id="mapView" class="absolute inset-0 z-0">
+            <div 
+                          id="map"
+                          class="absolute inset-0 z-0 h-screen w-screen" 
+                          style="background: #ccc;"
+                          >
+                          <!-- Initialize map -->
+            </div>
+        </div>
 
-        <!-- This is all the header --> 
-        <div class="header flex flex-row justify-evenly items-center p-2">
-            <!-- Logo -->
-            <div class="title width:20%">
-                <h1 class="text-xl font-bold"><a href="/landing">OpenSwells;</a></h1>
-                <!--<img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" alt="surfing" width="160"> -->
+        <!-- 2) Header “island” at the top -->
+        <div class="header flex flex-row justify-evenly items-center p-2 absolute top-0 left-0 right-0 z-10" >
+
+          <!-- Logo -->
+            <div class="title">
+                <h1 class="text-xl font-bold dark:text-white">
+                    <a href="/landing" class="bg-white/95 dark:bg-slate-800/95 px-3 py-1">OpenSwells;</a>
+                </h1>
             </div>
+
             <!-- Search -->
-            <div class="search w-1/2">
-                <input type="text" id="search" class="w-full border border-gray-300 p-2" placeholder="Search for a buoy">
-                <div id="searchResults" class="mt-2"></div>
+            <div class="search w-1/2 dark:text-white">
+                <input 
+                 type="text" 
+                 id="search" 
+                 class="w-full border p-2 dark:bg-slate-800 dark:text-white" 
+                 placeholder="Search for a buoy"
+                 >
+                 <div id="searchResults" class="mt-2"></div>
             </div>
+
             <!-- Icons -->
-            <div class="icons width:20% flex items-center">
-                <a href="/about" class="w-10 h-10 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <div class="icons flex items-center bg-white/95 dark:bg-slate-800/95">
+                <a href="/about" class="w-10 h-10 flex items-center justify-center dark:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" 
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor" 
+                                                         width="24" height="24">
+                        <path stroke-linecap="round" 
+                              stroke-linejoin="round" 
+                              stroke-width="2" 
+                              d="M13 16h-1v-4h-1m1-4h.01
+                                 M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </a>
-                <a href="https://github.com/evancoons22/go-mb-surf" class="w-10 h-10 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                        <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                <a href="https://github.com/evancoons22/go-mb-surf" 
+                   class="w-10 h-10 flex items-center justify-center dark:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" 
+                         viewBox="0 0 24 24" fill="currentColor"
+                                             width="24" height="24">
+                        <path d="M12 0C5.374 0 0 5.373 0 12c0
+                                 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577
+                                 v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756
+                                 -1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237
+                                 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604
+                                 -2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221
+                                 -.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487
+                                 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23
+                                 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221
+                                 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293
+                                 c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
                     </svg>
                 </a>
-                <a id="darkModeToggle" class="w-10 h-10 flex items-center justify-center cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                <a id="darkModeToggle" 
+                   class="w-10 h-10 flex items-center justify-center cursor-pointer dark:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" 
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor" 
+                                                         width="24" height="24">
+                        <path stroke-linecap="round" stroke-linejoin="round" 
+                                                     stroke-width="2" 
+                                                     d="M12 3v1m0 16v1m9-9h-1
+                                                        M4 12H3m15.364 6.364l-.707-.707
+                                                        M6.343 6.343l-.707-.707m12.728 0l-.707.707
+                                                        M6.343 17.657l-.707.707M16 12a4 4 0
+                                                        11-8 0 4 4 0 018 0z" />
                     </svg>
                 </a>
-                <a href="#" id="signInBtn" class="login-link py-2 px-4">
+                <a href="#" id="signInBtn" class="login-link py-1 px-2 dark:text-white">
                     Sign In
                 </a>
 
                 <!-- Sign-in Modal -->
-                <div id="signInModal" class="fixed z-50 inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden">
+                <div id="signInModal" 
+                     class="fixed z-50 inset-0 bg-gray-600 bg-opacity-50 
+                            flex items-center justify-center hidden">
                     <div class="signinmodal bg-white p-8 shadow-lg relative">
-                        <button id="closeModal" class="absolute top-3 left-4 text-gray-500 hover:text-gray-700 text-xl font-bold">&times;</button>
-                        <button onclick="googleSignIn()" class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow flex items-center">
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="mr-2" style="width: 18px; height: 18px;">
+                        <button id="closeModal" 
+                                class="absolute top-3 left-4 text-gray-500
+                                       hover:text-gray-700 text-xl font-bold">
+                            &times;
+                        </button>
+                        <button onclick="googleSignIn()" 
+                                class="bg-white hover:bg-gray-100 text-gray-800
+                                       font-semibold py-2 px-4 border border-gray-400
+                                       rounded shadow flex items-center">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+                                 alt="Google" class="mr-2" 
+                                              style="width: 18px; height: 18px;">
                             Sign in with Google
                         </button>
-                        <!-- <button id="closeModal" class="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Close</button> -->
                     </div>
                 </div>
 
                 <!-- User Popup -->
-                <div id="userPopup" class="absolute right-3 mt-12 w-48 bg-white overflow-hidden shadow-xl z-10 hidden">
-                    <button id="closeUserPopup" class="absolute top-3 left-3 text-xl text-gray-500 hover:text-gray-700">&times;</button>
+                <div id="userPopup" 
+                     class="absolute right-3 mt-12 w-48 bg-white overflow-hidden shadow-xl z-10 hidden dark:bg-slate-800 dark:text-white">
+                    <button id="closeUserPopup" 
+                            class="absolute top-3 left-3 text-xl text-gray-500
+                                   hover:text-gray-700 dark:text-white">
+                        &times;
+                    </button>
                     <div class="px-4 py-2 flex flex-col mt-8">
-                        <p id="userName" class="text-sm font-medium text-gray-900"></p>
-                        <p id="userEmail" class="text-sm font-medium text-gray-500"></p>
+                        <p id="userName" class="text-sm font-medium text-gray-900 dark:text-white"></p>
+                        <p id="userEmail" class="text-sm font-medium text-gray-500 dark:text-white"></p>
                     </div>
-                    <a href="#" id="signOutBtn" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sign out</a>
+                    <a href="#" id="signOutBtn" 
+                                class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-white">
+                        Sign out
+                    </a>
                 </div>
             </div>
         </div>
-        <!-- This is all the header --> 
+        <!-- End Header -->
 
 
-        <!-- Toggle Buttons -->
-        <div class="flex justify-start gap-2 mb-4 ml-4">
-            <button 
-                id="showMapBtn" 
-                class="w-24 py-1 px-3 text-sm font-bold border border-black text-black bg-gray-200"
-                onclick="toggleView('map')"
-            >
-                Map
+        <!-- 3) Toggle Buttons -->
+        <div class="absolute top-[4rem] left-4 z-10 flex gap-2" >
+            <button id="showMapBtn" 
+                    class="w-24 py-1 px-3 text-sm border font-bold border-2 border-black dark:border-white text-black bg-white dark:bg-slate-800 dark:text-white rounded"
+                    onclick="toggleView('map')" >
+                    Map
             </button>
-            <button 
-                id="showFavoritesBtn" 
-                class="w-24 py-1 px-3 text-sm font-bold border border-black text-gray-700"
-                onclick="toggleView('favorites')"
-            >
-                Favorites
+            <button id="showFavoritesBtn" 
+                    class="w-24 py-1 px-3 text-sm border text-black border-black dark:border-white bg-white dark:bg-slate-800 dark:text-white rounded"
+                    onclick="toggleView('favorites')" >
+                    Favorites
             </button>
         </div>
 
-        <!-- Content Container -->
-        <div class="content max-w-[95%] min-w-[320px] mx-auto">
-            <!-- Map View -->
-            <div id="mapView" class="w-full">
-                <div class="relative">
-                    <div id="map" class="h-[80vh] z-10"></div>
-                    <!-- Map Controls Container -->
-                    <div class="absolute bottom-0 left-0 right-0 flex justify-between items-end gap-4 m-4 z-20">
-                        <!-- Report Container -->
-                        <div id="report-container" class="report w-auto max-w-[600px] bg-white/95 dark:bg-gray-800/95 shadow-lg">
-                            <div class="buoy-name border-b border-black dark:border-gray-600 p-2 flex justify-between items-center">
-                                <div id="report-title" class="report-title text-sm">Choose buoy</div>
-                                <div>
-                                    <button id="forecastBtn" class="forecast border border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400 px-2 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/30">View Forecast</button>
+
+            <!-- 4) Favorites Section (main content area when active) -->
+            <div 
+                                id="favoritesView" 
+                                class="absolute top-[7rem] bottom-0 left-0 right-0 hidden z-10 px-4 w-full dark:bg-slate-800"
+                                >
+                                <div 
+                                id="buoy-containers" 
+                                class="favorites w-full h-full max-w-[90vw] mx-auto 
+                                       overflow-auto bg-white dark:bg-slate-800"
+                                >
+                                <!-- Favorites content goes here -->
                                 </div>
-                            </div>
-                            <div id="report-content" class="p-2">
-                                {{template "report_small" .}}
-                            </div>
+            </div>
+
+
+            <!-- 5) Bottom Controls (overlay at bottom) -->
+            <div class="bottom-controls absolute bottom-0 left-0 right-0 grid grid-cols-3 items-end gap-4 m-4 z-10">
+                <!-- Report Container - Left -->
+                <div id="report-container" class="report w-auto max-w-[600px] bg-white/95 dark:bg-gray-800/95 shadow-lg">
+                    <div class="buoy-name border-b border-black dark:bg-slate-800 dark:text-white p-2 flex justify-between items-center">
+                        <div id="report-title" class="report-title text-sm">
+                            Choose buoy
                         </div>
-                        
-                        <!-- Time Slider Container -->
-                        <div class="bg-white/95 dark:bg-gray-800/95 p-2 shadow-lg rounded flex items-center gap-2 min-w-[200px]">
-                            <span class="text-xs font-semibold">Time:</span>
-                            <input 
-                                type="range" 
-                                id="timeSlider" 
-                                min="0" 
-                                max="384" 
-                                value="0" 
-                                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
-                            >
-                            <span id="timeValue" class="text-xs min-w-[2.5em]">+000 hrs</span>
+                        <div>
+                            <button id="forecastBtn" class="forecast border border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400 px-2 py-0.5 text-xs hover:bg-blue-50 dark:hover:bg-blue-900/30">
+                                View Forecast
+                            </button>
                         </div>
                     </div>
+                    <div id="report-content" class="p-2 dark:bg-slate-800">
+                        {{template "report_small" .}}
+                    </div>
+                </div>
+
+                <!-- Metadata Container - Center -->
+                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 min-w-[200px] mb-2 justify-self-center">
+                    <span class="text-xs font-semibold dark:text-white">Last Updated:</span>
+                    <span id="metadataTimestamp" class="text-xs dark:text-white"></span>
+                </div>
+
+                <!-- Time Slider Container - Right -->
+                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 min-w-[200px] dark:text-white justify-self-end">
+                    <span class="text-xs font-semibold">Time:</span>
+                    <input type="range" id="timeSlider" min="0" max="384" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700">
+                    <span id="timeValue" class="text-xs min-w-[2.5em]">+000 hrs</span>
                 </div>
             </div>
 
-            <!-- Favorites View (hidden by default) -->
-            <div id="favoritesView" class="w-full hidden">
-                <div id="buoy-containers" class="favorites h-[80vh] overflow-auto"></div>
-            </div>
-        </div>
+            
+
+
+            <script>
+                function toggleView(view) {
+                    const mapView = document.getElementById('mapView');
+                    const favoritesView = document.getElementById('favoritesView');
+                    const mapBtn = document.getElementById('showMapBtn');
+                    const favBtn = document.getElementById('showFavoritesBtn');
+
+                    // The single bottom-controls container
+                    const bottomControls = document.querySelector('.bottom-controls');
+
+                    if (view === 'map') {
+                        // Show map
+                        mapView.classList.remove('hidden');
+                        favoritesView.classList.add('hidden');
+
+                        // Show bottom controls
+                        bottomControls.classList.remove('hidden');
+
+                        // Update button states
+                        mapBtn.classList.add('font-bold','border-2');
+                        favBtn.classList.remove('font-bold', 'border-2');
+                    } else {
+                        // Show favorites
+                        mapView.classList.add('hidden');
+                        favoritesView.classList.remove('hidden');
+
+                        // Hide bottom controls
+                        bottomControls.classList.add('hidden');
+
+                        // Update button states
+                        favBtn.classList.add('font-bold', 'border-2');
+                        mapBtn.classList.remove('font-bold', 'border-2');
+                    }
+                }
+
+            </script> 
+
     </body>
 
-        <script>
-            function toggleView(view) {
-                const mapView = document.getElementById('mapView');
-                const favoritesView = document.getElementById('favoritesView');
-                const mapBtn = document.getElementById('showMapBtn');
-                const favBtn = document.getElementById('showFavoritesBtn');
-
-                if (view === 'map') {
-                    mapView.classList.remove('hidden');
-                    favoritesView.classList.add('hidden');
-                    mapBtn.classList.add('bg-gray-200');
-                    favBtn.classList.remove('bg-gray-200');
-                } else {
-                    mapView.classList.add('hidden');
-                    favoritesView.classList.remove('hidden');
-                    favBtn.classList.add('bg-gray-200');
-                    mapBtn.classList.remove('bg-gray-200');
-                }
-            }
-        </script> 
 
         <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
         <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
@@ -427,44 +514,50 @@
             // Initialize MapLibre map
             var map = new maplibregl.Map({
                 container: 'map',
-                style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
                 center: [-121.157227, 33.800832], // Note: MapLibre uses [lng, lat] order
+                style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
                 zoom: 5
             });
 
-            map.on('load', () => {
-                // Notice the URL includes "/static/" because we did r.Static("/static", "./static")
+            // A helper function to add the contours source/layer
+            function addContoursLayer() {
+                if (map.getLayer('contour-fills')) {
+                    map.removeLayer('contour-fills');
+                }
+                if (map.getSource('contours')) {
+                    map.removeSource('contours');
+                }
                 map.addSource('contours', {
                     type: 'geojson',
-                    data: '/static/contours_001.geojson'
+                    data: '/static/contours_000.geojson'
                 });
 
-                map.addLayer({
+                // Add layer
+                map.addLayer(
+                    {
                     id: 'contour-fills',
                     type: 'fill',
                     source: 'contours',
                     paint: {
                         'fill-color': [
-                            'case',
-                            ['==', ['get', 'contour_level'], 2.0],  '#4575B4',
-                            ['==', ['get', 'contour_level'], 4.0],  '#74ADD1',
-                            ['==', ['get', 'contour_level'], 6.0],  '#F46D43',
-                            ['==', ['get', 'contour_level'], 8.0],  '#D73027',
-                            ['==', ['get', 'contour_level'], 10.0], '#A50026',
-                            '#ADD8E6'
-                        ],
-                        'fill-opacity': 0.8
+                        'case',
+                        ['==', ['get', 'contour_level'], 2.0],  '#4575B4',
+                        ['==', ['get', 'contour_level'], 4.0],  '#74ADD1',
+                        ['==', ['get', 'contour_level'], 6.0],  '#F46D43',
+                        ['==', ['get', 'contour_level'], 8.0],  '#D73027',
+                        ['==', ['get', 'contour_level'], 10.0], '#A50026', '#ADD8E6' ], 'fill-opacity': 0.8
+                        }
                     }
-                });
+                );
+            }
 
-                // Example: Add navigation
-                map.addControl(new maplibregl.NavigationControl());
+            map.on('style.load', () => {
+                addContoursLayer();
+                console.log("layers:" , map.getStyle().layers)
+                map.moveLayer('contour-fills');
             });
 
-            // Example slider logic:
-            // Just update the data source to a different GeoJSON file in /static/ 
-            // (e.g., /static/contours_002.geojson, /static/contours_003.geojson, etc.)
-            const timeSlider = document.getElementById('timeSlider');
+            // Also handle the timeSlider changes:
             timeSlider.addEventListener('input', (event) => {
                 const val = parseInt(event.target.value);
                 const padded = String(val).padStart(3, '0');
@@ -844,7 +937,7 @@
 
                 matches.forEach(match => {
                     const div = document.createElement('div');
-                    div.classList.add('search-result');
+                    div.classList.add('search-result', 'dark:bg-slate-800');
                     div.textContent = match.name;
                     div.onclick = function () {
                         getBuoyReport(match.stationId, match.name);
@@ -893,32 +986,56 @@
             window.location.href = `/forecast/${currentBuoy.stationId}`;
             });
 
+
             function toggleDarkMode() {
-                // Check if the dark class exists on the body
-                if (document.body.classList.contains('dark')) {
-                // If dark mode is enabled, turn it off
-                document.body.classList.remove('dark');
-                // Save the preference in localStorage
-                localStorage.setItem('darkMode', 'false');
+                const isDark = document.documentElement.classList.contains('dark');
+                if (isDark) {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('darkMode', 'false');
+                    // map.setStyle('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json');
                 } else {
-                // If dark mode is not enabled, turn it on
-                document.body.classList.add('dark');
-                // Save the preference in localStorage
-                localStorage.setItem('darkMode', 'true');
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('darkMode', 'true');
+                    // map.setStyle('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json');
                 }
             }
 
+            // Set initial dark mode state
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.documentElement.classList.add('dark');
+                // map.setStyle('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json');
+            } else { 
+                // map.setStyle('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json');
+            } 
 
             document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
-
-
-
 
             //center the map
             map.setCenter([-119.069824, 33.101608]);
             map.setZoom(3);
 
             plotBuoys();
+        
+            // Fetch and display metadata
+            async function fetchMetadata() {
+                try {
+                    const response = await fetch('/static/metadata.json');
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch metadata');
+                    }
+                    const metadata = await response.json();
+                    const timestamp = new Date(metadata.timestamp);
+                    document.getElementById('metadataTimestamp').textContent = 
+                        timestamp.toLocaleString();
+                } catch (error) {
+                    console.error('Error fetching metadata:', error);
+                    document.getElementById('metadataTimestamp').textContent = 
+                        'Unable to load timestamp';
+                }
+            }
+
+            // Fetch metadata when page loads
+            fetchMetadata();
         </script>
 
 

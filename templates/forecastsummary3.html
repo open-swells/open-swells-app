@@ -14,17 +14,10 @@
                 --scrollbar-thumb-color: #888;
                 --scrollbar-track-color: #f1f1f1;
             }
-            body.dark {
-                --bg-color: #1a1a1a;
-                --text-color: #ffffff;
-                --card-bg-color: #333;
-                --border-color: #555;
-                --scrollbar-thumb-color: #555;
-                --scrollbar-track-color: #333;
-            }
-            body {
-                background-color: var(--bg-color);
-                color: var(--text-color);
+            
+            .dark {
+                --scrollbar-thumb-color: #4b5563;
+                --scrollbar-track-color: #1e293b;
             }
             .buoy {
                 margin-bottom: 30px;
@@ -50,6 +43,12 @@
             }
             .forecast-summary::-webkit-scrollbar-track {
                 background-color: var(--scrollbar-track-color);
+            }
+            
+            /* Firefox scrollbar styles */
+            .forecast-summary {
+                scrollbar-width: thin;
+                scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
             }
             .forecast-day {
                 width: 100px;
@@ -86,17 +85,17 @@
 </head>
 <body>
     {{range .Buoys}}
-    <div class="buoy">
-               <div class="buoy-name flex justify-between items-center">
+    <div class="buoy dark:bg-slate-800">
+               <div class="buoy-name flex justify-between items-center dark:bg-slate-800 dark:text-white">
                     <span>{{.Name}}</span>
                     <div>
-                        <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite border border-red-900 text-red-900 px-1 py-0.5 text-xs">Remove from Favorites</button>
-                        <button onclick="window.location.href='/forecast/{{.ID}}'" class="border border-blue-900 text-blue-900 px-1 py-0.5 text-xs">View Forecast</button>
+                        <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite border border-red-900 text-red-900 px-1 py-0.5 text-xs dark:text-pink-500">Remove from Favorites</button>
+                        <button onclick="window.location.href='/forecast/{{.ID}}'" class="border border-blue-900 text-blue-900 px-1 py-0.5 text-xs dark:text-teal-500">View Forecast</button>
                     </div>
                 </div>
-        <div class="forecast-summary">
+        <div class="forecast-summary dark:bg-slate-800 dark:text-white">
             {{range .Summary}}
-            <div class="forecast-day bg-white border border-2 py-4 px-2 flex flex-col items-center justify-center">
+            <div class="forecast-day bg-white border border-2 py-4 px-2 flex flex-col items-center justify-center dark:bg-slate-800">
                 <div class="flex items-center space-x-1 mb-1"> 
                     <div class="font-medium">{{slice .DateAbv 0 3}}</div>
                     <div class="text-sm font-semibold">{{slice .DateAbv 3}}</div>
