@@ -19,13 +19,6 @@
                 --scrollbar-thumb-color: #4b5563;
                 --scrollbar-track-color: #1e293b;
             }
-            .buoy {
-                margin-bottom: 30px;
-            }
-            .buoy-name {
-                font-size: 1.2em;
-                font-weight: bold;
-            }
             .forecast-summary {
                 display: flex;
                 overflow-x: auto;
@@ -49,13 +42,6 @@
             .forecast-summary {
                 scrollbar-width: thin;
                 scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
-            }
-            .forecast-day {
-                width: 100px;
-                min-width: 100px;
-                text-align: center;
-                background-color: var(--card-bg-color);
-                border-color: var(--border-color);
             }
             .date-abv {
                 white-space: nowrap;
@@ -87,21 +73,21 @@
     {{range .Buoys}}
     <div class="buoy dark:bg-slate-800">
                <div class="buoy-name flex justify-between items-center dark:bg-slate-800 dark:text-white">
-                    <span>{{.Name}}</span>
-                    <div>
-                        <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite border border-red-900 text-red-900 px-1 py-0.5 text-xs dark:text-pink-500">Remove from Favorites</button>
-                        <button onclick="window.location.href='/forecast/{{.ID}}'" class="border border-blue-900 text-blue-900 px-1 py-0.5 text-xs dark:text-teal-500">View Forecast</button>
+                    <span class="text-sm md:text-base">{{.Name}}</span>
+                    <div class="flex justify-end gap-2">
+                        <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite md:w-32 w-24 border border-red-900 text-red-900 px-1 py-0.5 text-[10px] md:text-xs dark:text-pink-500">Remove</button>
+                        <button onclick="window.location.href='/forecast/{{.ID}}'" class="md:w-32 w-24 border border-blue-900 text-blue-900 px-1 py-0.5 text-[10px] md:text-xs dark:text-teal-500">Forecast</button>
                     </div>
                 </div>
         <div class="forecast-summary dark:bg-slate-800 dark:text-white">
             {{range .Summary}}
-            <div class="forecast-day bg-white border border-2 py-4 px-2 flex flex-col items-center justify-center dark:bg-slate-800">
+            <div class="forecast-day bg-white border border-2 py-2 md:min-w-[100px] min-w-[70px] md:py-4 px-1 md:px-2 flex flex-col items-center justify-center dark:bg-slate-800">
                 <div class="flex items-center space-x-1 mb-1"> 
-                    <div class="font-medium">{{slice .DateAbv 0 3}}</div>
-                    <div class="text-sm font-semibold">{{slice .DateAbv 3}}</div>
+                    <div class="text-xs md:text-base font-medium">{{slice .DateAbv 0 3}}</div>
+                    <div class="text-xs md:text-sm font-semibold">{{slice .DateAbv 3}}</div>
                 </div> 
-                <div class="wave-height text-sm font-semibold">{{.WaveHeight}}</div>
-                <div class="condition font-semibold" style="color: {{if eq .Condition "good"}}green{{else if eq .Condition "fair"}}orange{{else if eq .Condition "poor"}}red{{end}};">{{.Condition}}</div>
+                <div class="wave-height text-xs md:text-sm font-semibold">{{.WaveHeight}}</div>
+                <div class="condition text-xs md:text-sm font-semibold" style="color: {{if eq .Condition "good"}}green{{else if eq .Condition "fair"}}orange{{else if eq .Condition "poor"}}red{{end}};">{{.Condition}}</div>
             </div>
             {{end}}
         </div>

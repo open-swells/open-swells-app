@@ -15,127 +15,12 @@
             }
         </script>
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap&display=swap');
         
-        /* Mobile styles - placed at top for higher specificity */
-        @media (max-width: 768px) {
-            body .header {
-                display: grid;
-                grid-template-areas:
-                    "logo icons"
-                "search search";
-            grid-template-columns: 1fr auto;
-            grid-gap: 2px;
-            padding: 5px;
-            width: 100%;
-            }
-
-
-            body .header .title {
-                grid-area: logo;
-                justify-self: start;
-                min-width: fit-content;
-            }
-
-
-            body .header .search {
-                grid-area: search;
-                width: 100%;
-            }
-
-            body .header .icons {
-                grid-area: icons;
-                justify-self: end;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                min-width: fit-content;
-            }
-        }
-
-
-        #map { 
-            /* height: 500px; width: 100%; */ 
-            margin: 0 auto;
-            padding: 10px;
-            align-items: center;
-        }
-
-        #searchResults {
-            position: absolute;
-            z-index: 1000;
-            width: calc(50% - 1rem);
-            background: white;
-            border-top: none;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .search-result {
-            padding: 0.5rem;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-        }
-        .search-result:hover { 
-            background-color: #f0f0f0;
-        } 
-        .search-result:last-child {
-            border-bottom: none;
-        }
-        .leaflet-popup-content-wrapper { 
-            border-radius: 0px !important;
-        } 
-        .buoy-name { 
-            background-color: #ffffff;
-        } 
-
-
-        /* Dark mode styles */
-        body.dark .leaflet-popup-content-wrapper { 
-            background-color: #333;
-            color: #ffffff;
-            border-radius: 0px !important;
-        } 
-        body.dark {
-            background-color: #1a1a1a;
-            color: #ffffff;
-        }
-        body.dark #searchResults {
-            background: #333;
-            border-color: #555;
-        }
-        body.dark .search-result {
-            border-bottom-color: #555;
-        }
-        body.dark input {
-            background-color: #333;
-            color: #ffffff;
-            border-color: #555;
-        }
-        body.dark .simple-button {
-            border-color: #fff;
-        }
-        body.dark button { 
-            background-color: #333;
-            color: #ffffff;
-            border-color: #555;
-            border-width: 1px;
-            border-style: solid;
-        } 
-        body.dark .buoy-name { 
-            color: #ffffff;
-            background-color: #1a1a1a;
-            border-color: #555;
-        }
-        body.dark .signinmodal{ 
-            color: #ffffff;
-            background-color: #333;
-            border-color: #555;
-        }
         body {
             font-family: 'JetBrains Mono', monospace !important;
+            font-display: swap;
         }
-
-
         </style>
     </head>
 
@@ -155,33 +40,34 @@
             </div>
         </div>
 
-        <!-- 2) Header “island” at the top -->
-        <div class="header flex flex-row justify-evenly items-center p-2 absolute top-0 left-0 right-0 z-10" >
+        <!-- 2) Header "island" at the top -->
+        <div class="header md:flex md:flex-row md:justify-evenly items-center p-2 absolute top-0 left-0 right-0 z-10 grid grid-cols-[1fr_auto] md:grid-cols-none gap-0.5 md:gap-0" >
 
           <!-- Logo -->
-            <div class="title">
-                <h1 class="text-xl font-bold dark:text-white">
+          <div class="title justify-self-start min-w-fit">
+                <h1 class="md:text-xl text-l font-bold dark:text-white">
                     <a href="/" class="bg-white/95 dark:bg-slate-800/95 px-3 py-1">OpenSwells;</a>
                 </h1>
             </div>
 
             <!-- Search -->
-            <div class="search w-1/2 dark:text-white">
+            <div id="search" class="search w-full md:w-1/2 dark:text-white col-span-2 md:col-span-1 row-start-2 md:row-start-1">
                 <input 
                  type="text" 
                  id="search" 
-                 class="w-full border p-2 dark:bg-slate-800 dark:text-white" 
+                 class="w-full border p-1 md:p-2 text-sm md:text-base dark:bg-slate-800 dark:text-white" 
                  placeholder="Search for a buoy"
                  >
-                 <div id="searchResults" class="mt-2"></div>
+                 <div id="searchResults" class="absolute z-50 w-full md:w-[calc(50%-1rem)] md:text-sm text-xs bg-white dark:bg-slate-800 max-h-[200px] overflow-y-auto mt-1 md:mt-2">
+                 </div>
             </div>
 
             <!-- Icons -->
-            <div class="icons flex items-center bg-white/95 dark:bg-slate-800/95">
-                <a href="/about" class="w-10 h-10 flex items-center justify-center dark:text-white">
+            <div class="icons flex items-center gap-2.5 min-w-fit justify-self-end bg-white/95 dark:bg-slate-800/95">
+                <a href="/about" class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center dark:text-white">
                     <svg xmlns="http://www.w3.org/2000/svg" 
                          viewBox="0 0 24 24" fill="none" stroke="currentColor" 
-                                                         width="24" height="24">
+                                                         width="20" height="20" class="md:w-6 md:h-6">
                         <path stroke-linecap="round" 
                               stroke-linejoin="round" 
                               stroke-width="2" 
@@ -190,10 +76,10 @@
                     </svg>
                 </a>
                 <a href="https://github.com/evancoons22/go-mb-surf" 
-                   class="w-10 h-10 flex items-center justify-center dark:text-white">
+                   class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center dark:text-white">
                     <svg xmlns="http://www.w3.org/2000/svg" 
                          viewBox="0 0 24 24" fill="currentColor"
-                                             width="24" height="24">
+                                             width="20" height="20" class="md:w-6 md:h-6">
                         <path d="M12 0C5.374 0 0 5.373 0 12c0
                                  5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577
                                  v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756
@@ -208,10 +94,10 @@
                     </svg>
                 </a>
                 <a id="darkModeToggle" 
-                   class="w-10 h-10 flex items-center justify-center cursor-pointer dark:text-white">
+                   class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center cursor-pointer dark:text-white">
                     <svg xmlns="http://www.w3.org/2000/svg" 
                          viewBox="0 0 24 24" fill="none" stroke="currentColor" 
-                                                         width="24" height="24">
+                                                         width="20" height="20" class="md:w-6 md:h-6">
                         <path stroke-linecap="round" stroke-linejoin="round" 
                                                      stroke-width="2" 
                                                      d="M12 3v1m0 16v1m9-9h-1
@@ -221,7 +107,7 @@
                                                         11-8 0 4 4 0 018 0z" />
                     </svg>
                 </a>
-                <a href="#" id="signInBtn" class="login-link py-1 px-2 dark:text-white">
+                <a href="#" id="signInBtn" class="login-link py-1 px-2 text-sm md:text-base dark:text-white">
                     Sign In
                 </a>
 
@@ -270,14 +156,14 @@
 
 
         <!-- 3) Toggle Buttons -->
-        <div class="absolute top-[4rem] left-4 z-10 flex gap-2" >
+        <div class="absolute md:top-[4rem] top-[4.6rem] md:left-4 left-2 flex gap-2" >
             <button id="showMapBtn" 
-                    class="w-24 py-1 px-3 text-sm border font-bold border-2 border-black dark:border-white text-black bg-white dark:bg-slate-800 dark:text-white rounded"
+                    class="md:w-24 w-20 md:py-1 py-0.5 px-3 text-xs md:text-sm border font-bold border-2 border-black dark:border-white text-black bg-white dark:bg-slate-800 dark:text-white rounded flex items-center justify-center"
                     onclick="toggleView('map')" >
                     Map
             </button>
             <button id="showFavoritesBtn" 
-                    class="w-24 py-1 px-3 text-sm border text-black border-black dark:border-white bg-white dark:bg-slate-800 dark:text-white rounded"
+                    class="md:w-24 w-20 md:py-1 py-0.5 px-3 text-xs md:text-sm border text-black border-black dark:border-white bg-white dark:bg-slate-800 dark:text-white rounded flex items-center justify-center"
                     onclick="toggleView('favorites')" >
                     Favorites
             </button>
@@ -300,7 +186,7 @@
 
 
             <!-- Legend -->
-            <div class="legend absolute bottom-60 left-4 z-10 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg">
+            <div class="legend absolute md:bottom-52 bottom-80 left-4 z-10 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg">
                 <div class="text-xs font-semibold mb-2 dark:text-white">Wave Height (m)</div>
                 <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-2">
@@ -331,11 +217,11 @@
             </div>
 
             <!-- 5) Bottom Controls (overlay at bottom) -->
-            <div class="bottom-controls absolute bottom-0 left-0 right-0 grid grid-cols-3 items-end gap-4 m-4 z-10">
+            <div class="bottom-controls absolute bottom-0 left-0 right-0 grid md:grid-cols-3 grid-cols-1 items-end md:gap-4 gap-1 m-4 z-10">
                 <!-- Report Container - Left -->
-                <div id="report-container" class="report w-auto max-w-[600px] bg-white/95 dark:bg-gray-800/95 shadow-lg">
-                    <div class="buoy-name border-b border-black dark:bg-slate-800 dark:text-white p-2 flex justify-between items-center">
-                        <div id="report-title" class="report-title text-sm">
+                <div id="report-container" class="report w-auto max-w-[600px] bg-white/95 dark:bg-gray-800/95 shadow-lg md:col-start-1 ">
+                    <div class="buoy-name border-b border-black dark:border-white dark:bg-slate-800 dark:text-white p-2 flex justify-between items-center">
+                        <div id="report-title" class="report-title text-sm min-w-[90px] min-h-[20px]">
                             Choose buoy
                         </div>
                         <div>
@@ -350,13 +236,13 @@
                 </div>
 
                 <!-- Metadata Container - Center -->
-                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 min-w-[200px] mb-2 justify-self-center">
+                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2  min-w-[100px] md:mb-2 justify-self-center w-full md:w-auto">
                     <span class="text-xs font-semibold dark:text-white">Last Updated:</span>
                     <span id="metadataTimestamp" class="text-xs dark:text-white"></span>
                 </div>
 
                 <!-- Time Slider Container - Right -->
-                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 min-w-[300px] dark:text-white justify-self-end">
+                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 dark:text-white md:w-auto md:justify-self-end">
                     <button id="playButton" class="w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-slate-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 11.5V8.5l3.5 1.5-3.5 1.5z"/>
@@ -386,6 +272,7 @@
                     const favoritesView = document.getElementById('favoritesView');
                     const mapBtn = document.getElementById('showMapBtn');
                     const favBtn = document.getElementById('showFavoritesBtn');
+                    const search = document.getElementById('search');
 
                     // The single bottom-controls container
                     const bottomControls = document.querySelector('.bottom-controls');
@@ -395,6 +282,9 @@
                         // Show map
                         mapView.classList.remove('hidden');
                         favoritesView.classList.add('hidden');
+
+                        // search
+                        search.classList.remove('hidden');
 
                         // Show bottom controls
                         bottomControls.classList.remove('hidden');
@@ -407,6 +297,9 @@
                         // Show favorites
                         mapView.classList.add('hidden');
                         favoritesView.classList.remove('hidden');
+
+                        //search
+                        search.classList.add('hidden');
 
                         // Hide bottom controls
                         bottomControls.classList.add('hidden');
@@ -503,7 +396,7 @@
                     } else {
                         console.log('User not signed in.');
                         document.getElementById('buoy-containers').innerHTML =
-                            '<p>Please sign in to view your favorite buoys.</p>';
+                            '<p class="dark:text-white">Please sign in to view your favorite buoys.</p>';
                     }
                 });
             });
@@ -521,7 +414,7 @@
                 const signInBtn = document.getElementById('signInBtn');
                 if (user) {
                     // User is signed in
-                    signInBtn.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="w-8 h-8 rounded-full">`;
+                    signInBtn.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="md:w-8 md:h-8 w-6 h-6 rounded-full">`;
                     // signInBtn.onclick = () => firebase.auth().signOut().then(() => updateUIForSignedInUser(null));
                     signInBtn.onclick = () => document.getElementById('userPopup').classList.remove('hidden');
                     document.getElementById('userName').textContent = user.displayName;
@@ -773,8 +666,8 @@
 
             function createPopupContent(buoy) {
                 return `
-                <div class="w-[400px]">
-                <div class="text-md mb-2 break-words w-[400px]" style="word-wrap: break-word; overflow-wrap: break-word;">
+                <div class="w-[220px]">
+                <div class="text-md mb-2 break-words w-[220px]" style="word-wrap: break-word; overflow-wrap: break-word;">
                 <span class="inline-block break-words">${buoy.name}</span>
                 </div>
                 <div class="flex gap-1">
@@ -1074,7 +967,7 @@
 
                 matches.forEach(match => {
                     const div = document.createElement('div');
-                    div.classList.add('search-result', 'dark:bg-slate-800');
+                    div.classList.add('p-1', 'border-b', 'border-gray-200', 'dark:border-gray-700', 'cursor-pointer', 'hover:bg-gray-100', 'dark:hover:bg-slate-700', 'dark:bg-slate-800');
                     div.textContent = match.name;
                     div.onclick = function () {
                         getBuoyReport(match.stationId, match.name);
