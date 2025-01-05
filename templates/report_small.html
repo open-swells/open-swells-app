@@ -37,20 +37,19 @@
     <!-- <h2 class="text-5x1 text-lg font-bold mb-4">Report</h2>-->
 
     <!-- <div class="report flex justify-center"> -->
-    <div class="text-[10px] text-right dark:text-white mb-2">{{if .swellreport.Date}}{{.swellreport.Date}}{{else}}yyyy/mm/dd hh:mm{{end}}</div>
     <div class="grid grid-cols-3 h-[70px] w-full">
         <div class="swell px-2 border-r dark:border-gray-600">
-            <div class="text-[10px] font-semibold">Swell</div>
-            <div class="grid grid-rows-2 mt-1">
+            <div class="text-[12px] font-semibold">Swell</div>
+            <div class="grid grid-rows-2 ">
                 <div class="flex items-center space-x-2">
                     <div class="swellsymbol text-lg" style="transform: rotate({{if .swellreport.PrimaryDegrees}}{{.swellreport.PrimaryDegrees}}{{else}}0{{end}}deg);">&#8595;</div>
-                    <div class="text-[10px]">
+                    <div class="text-[12px]">
                         {{if .swellreport.PrimaryWaveHeight}}{{.swellreport.PrimaryWaveHeight}}{{else}}--{{end}}ft@{{if .swellreport.PrimaryPeriod}}{{.swellreport.PrimaryPeriod}}{{else}}--{{end}}s
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
                     <div class="windswellsymbol text-lg" style="transform: rotate({{if .swellreport.SecondaryDegrees}}{{.swellreport.SecondaryDegrees}}{{else}}0{{end}}deg);">&#8595;</div>
-                    <div class="text-[10px]">
+                    <div class="text-[12px]">
                         {{if .swellreport.SecondaryWaveHeight}}{{.swellreport.SecondaryWaveHeight}}{{else}}--{{end}}ft@{{if .swellreport.SecondaryPeriod}}{{.swellreport.SecondaryPeriod}}{{else}}--{{end}}s
                     </div>
                 </div>
@@ -58,10 +57,10 @@
         </div>
 
         <div class="wind px-2 border-r dark:border-gray-600">
-            <div class="text-[10px] font-semibold">Wind</div>
-            <div class="flex items-center space-x-2 mt-2">
+            <div class="text-[12px] font-semibold">Wind</div>
+            <div class="flex items-center space-x-2 ">
                 <div class="windsymbol text-lg" style="transform: rotate({{if .windreport.WindDir}}{{.windreport.WindDir}}{{else}}0{{end}}deg);">&#8595;</div>
-                <div class="text-[10px] leading-tight">
+                <div class="text-[12px] leading-tight">
                     {{if .windreport.WindSpeed}}{{.windreport.WindSpeed}}{{else}}--{{end}}mph<br>
                     gust {{if .windreport.WindGust}}{{.windreport.WindGust}}{{else}}--{{end}}
                 </div>
@@ -69,12 +68,13 @@
         </div>
 
         <div class="temp px-2">
-            <div class="text-[10px] font-semibold">Temp</div>
-            <div class="text-[10px] leading-tight mt-2">
+            <div class="text-[12px] font-semibold">Temp</div>
+            <div class="text-[12px] leading-tight ">
                 Air: {{if .windreport.AirTemp}}{{.windreport.AirTemp}}{{else}}--{{end}}ºF<br>
                 Water: {{if .windreport.WaterTemp}}{{.windreport.WaterTemp}}{{else}}--{{end}}ºF
             </div>
         </div>
+        <!-- <div class="text-[10px] text-right dark:text-white mb-2">{{if .swellreport.Date}}{{.swellreport.Date}}{{else}}yyyy/mm/dd hh:mm{{end}}</div> -->
     </div>
     <!-- </div> -->
 
