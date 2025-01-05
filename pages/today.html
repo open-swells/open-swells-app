@@ -15,11 +15,11 @@
             }
         </script>
         <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
         
+
         body {
             font-family: 'JetBrains Mono', monospace !important;
-            font-display: swap;
         }
         </style>
     </head>
@@ -114,11 +114,11 @@
                 <!-- Sign-in Modal -->
                 <div id="signInModal" 
                      class="fixed z-50 inset-0 bg-gray-600 bg-opacity-50 
-                            flex items-center justify-center hidden">
+                            flex items-start justify-center pt-[20vh] hidden">
                     <div class="signinmodal bg-white p-8 shadow-lg relative">
                         <button id="closeModal" 
-                                class="absolute top-3 left-4 text-gray-500
-                                       hover:text-gray-700 text-xl font-bold">
+                                class="absolute top-1 left-2 text-gray-500
+                                       hover:text-gray-700 text-2xl font-bold">
                             &times;
                         </button>
                         <button onclick="googleSignIn()" 
@@ -186,8 +186,8 @@
 
 
             <!-- Legend -->
-            <div class="legend absolute md:bottom-52 bottom-80 left-4 z-10 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg">
-                <div class="text-xs font-semibold mb-2 dark:text-white">Wave Height (m)</div>
+            <div class="legend absolute md:bottom-44 bottom-80 left-4 z-10 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg">
+                <div class="text-xs font-semibold mb-2 dark:text-white">(m)</div>
                 <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-2">
                         <div class="w-6 h-4" style="background-color: #A50026;"></div>
@@ -217,11 +217,11 @@
             </div>
 
             <!-- 5) Bottom Controls (overlay at bottom) -->
-            <div class="bottom-controls absolute bottom-0 left-0 right-0 grid md:grid-cols-3 grid-cols-1 items-end md:gap-4 gap-1 m-4 z-10">
+            <div class="bottom-controls absolute bottom-0 left-0 right-0 grid md:grid-cols-3 grid-cols-1 items-end md:gap-4 gap-1 m-4 z-10 md:mb-4 mb-14">
                 <!-- Report Container - Left -->
                 <div id="report-container" class="report w-auto max-w-[600px] bg-white/95 dark:bg-gray-800/95 shadow-lg md:col-start-1 ">
                     <div class="buoy-name border-b border-black dark:border-white dark:bg-slate-800 dark:text-white p-2 flex justify-between items-center">
-                        <div id="report-title" class="report-title text-sm min-w-[90px] min-h-[20px]">
+                        <div id="report-title" class="report-title text-sm">
                             Choose buoy
                         </div>
                         <div>
@@ -230,13 +230,13 @@
                             </button>
                         </div>
                     </div>
-                    <div id="report-content" class="p-2 dark:bg-slate-800">
+                    <div id="report-content" class="p-2 dark:bg-slate-800 dark:text-white">
                         {{template "report_small" .}}
                     </div>
                 </div>
 
                 <!-- Metadata Container - Center -->
-                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2  min-w-[100px] md:mb-2 justify-self-center w-full md:w-auto">
+                <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2  min-w-[100px] justify-self-center w-full md:w-auto">
                     <span class="text-xs font-semibold dark:text-white">Last Updated:</span>
                     <span id="metadataTimestamp" class="text-xs dark:text-white"></span>
                 </div>
@@ -1022,21 +1022,17 @@
                 if (isDark) {
                     document.documentElement.classList.remove('dark');
                     localStorage.setItem('darkMode', 'false');
-                    // map.setStyle('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json');
                 } else {
                     document.documentElement.classList.add('dark');
                     localStorage.setItem('darkMode', 'true');
-                    // map.setStyle('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json');
                 }
             }
 
             // Set initial dark mode state
             if (localStorage.getItem('darkMode') === 'true') {
                 document.documentElement.classList.add('dark');
-                // map.setStyle('https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json');
-            } else { 
-                // map.setStyle('https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json');
-            } 
+            }  
+            
 
             document.getElementById('darkModeToggle').addEventListener('click', toggleDarkMode);
 

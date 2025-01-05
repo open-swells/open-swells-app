@@ -11,11 +11,11 @@
             font-family: 'JetBrains Mono', monospace;
             background: linear-gradient(135deg, rgba(0,0,255,0.1), rgba(255,0,0,0.1)); /* Washed out heatmap effect */
         }
-        .dark-mode {
+        .dark {
             background: linear-gradient(135deg, rgba(30,30,30,1), rgba(10,10,10,1)); /* Dark mode gradient */
             color: white;
         }
-        .dark-mode .header {
+        .dark .header {
             background-color: #333;
         }
         .features-card {
@@ -39,7 +39,7 @@
             font-size: 0.875rem;
             color: #555;
         }
-        .dark-mode .features-card p {
+        .dark .features-card p {
             color: #ddd;
         }
         button.start-mapping {
@@ -58,26 +58,32 @@
             background-color: #002f66;
             color: white;
         }
-        .dark-mode button.start-mapping {
+        .dark button.start-mapping {
             background-color: #4c8ed9;
             border: 1px solid #4c8ed9;
             color: white;
         }
-        .dark-mode button.start-mapping:hover {
+        .dark button.start-mapping:hover {
             background-color: #397bb3;
         }
     </style>
     <script>
         function toggleDarkMode() {
-            document.body.classList.toggle('dark-mode');
-            const isDarkMode = document.body.classList.contains('dark-mode');
-            localStorage.setItem('darkMode', isDarkMode);
+            const isDark = document.documentElement.classList.contains('dark');
+            if (isDark) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('darkMode', 'false');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('darkMode', 'true');
+            }
         }
-        
+
         // Set initial dark mode state
         if (localStorage.getItem('darkMode') === 'true') {
-            document.body.classList.add('dark-mode');
-        }     
+            document.documentElement.classList.add('dark');
+        }  
+
     </script>
 </head>
 <body class="flex flex-col items-center justify-between min-h-screen">
