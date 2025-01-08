@@ -32,6 +32,11 @@
                 <a href="/map" class="text-sm md:text-lg font-bold px-3 py-1">&#8592 Return To Map</a>
             </div>
 
+            <!-- Buoy Name -->
+            <h1 class="text-sm md:text-lg font-bold text-center px-3 py-1 w-full col-span-2 md:col-span-1 row-start-2 md:row-start-1">
+                {{.buoyName}} - (buoy {{.swellreport.StationId}})
+            </h1>
+
             <!-- Icons -->
             <div class="icons flex items-center gap-2 min-w-fit justify-self-end  px-2">
                 <a href="/about" class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
@@ -51,10 +56,6 @@
                 </a>
             </div>
 
-            <!-- Buoy Name -->
-            <h1 class="text-sm md:text-lg font-bold text-center col-span-2 md:col-span-1  px-3 py-1 w-full">
-                {{.buoyName}} - (buoy {{.swellreport.StationId}})
-            </h1>
         </div>
 
 
