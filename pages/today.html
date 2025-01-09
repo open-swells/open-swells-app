@@ -243,9 +243,9 @@
 
                 <!-- Time Slider Container - Right -->
                 <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 dark:text-white lg:w-auto lg:justify-self-end">
-                    <button id="playButton" class="w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-slate-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 11.5V8.5l3.5 1.5-3.5 1.5z"/>
+                    <button id="playButton" class="w-12 h-12 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                            <path d="M8 5v14l11-7z"/>
                         </svg>
                     </button>
                     <div class="flex flex-col w-full">
@@ -565,8 +565,8 @@
             playButton.addEventListener('click', () => {
                 isPlaying = !isPlaying;
                 playButton.innerHTML = isPlaying ? 
-                    '<svg xmlns="http://www.w3.org/2000/svg" class="" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 8.5h2.5v3h-2.5v-3z"/></svg>' :
-                    '<svg xmlns="http://www.w3.org/2000/svg" class="" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 11.5V8.5l3.5 1.5-3.5 1.5z"/></svg>';
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>' :
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M8 5v14l11-7z"/></svg>';
 
                 if (isPlaying) {
                     animationInterval = setInterval(() => {
@@ -591,7 +591,7 @@
                 if (isPlaying) {
                     clearInterval(animationInterval);
                     isPlaying = false;
-                    playButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3.75a6.25 6.25 0 100 12.5 6.25 6.25 0 000-12.5zM8.75 11.5V8.5l3.5 1.5-3.5 1.5z"/></svg>';
+                    playButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M8 5v14l11-7z"/></svg>';
                 }
             });
 
