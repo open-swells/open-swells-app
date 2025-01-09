@@ -2,3 +2,4 @@
 firebase-config.json
 *.geojson
 metadata.json
+.DS_Store
