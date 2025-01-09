@@ -51,19 +51,21 @@
             </div>
 
             <!-- Search -->
-            <div id="search" class="search w-full md:w-1/2 dark:text-white col-span-2 md:col-span-1 row-start-2 md:row-start-1">
-                <input 
-                 type="text" 
-                 id="search" 
-                 class="w-full border p-1 md:p-2 text-sm md:text-base dark:bg-slate-800 dark:text-white" 
-                 placeholder="Search for a buoy"
-                 >
-                 <div id="searchResults" class="absolute z-50 w-full md:w-[calc(50%-1rem)] md:text-sm text-xs bg-white dark:bg-slate-800 max-h-[200px] overflow-y-auto mt-1 md:mt-2">
-                 </div>
+            <div class="searchbox md:w-1/2 col-start-1 col-span-2">
+                <div id="search" class="search w-full dark:text-white col-span-2 md:col-span-1 row-start-2 md:row-start-1">
+                    <input 
+                     type="text" 
+                     id="search" 
+                     class="w-full border p-1 md:p-2 text-sm md:text-base dark:bg-slate-800 dark:text-white" 
+                     placeholder="Search for a buoy"
+                     >
+                     <div id="searchResults" class="absolute z-50 w-full md:w-[calc(50%-1rem)] md:text-sm text-xs bg-white dark:bg-slate-800 max-h-[200px] overflow-y-auto mt-1 md:mt-2">
+                     </div>
+                </div>
             </div>
 
             <!-- Icons -->
-            <div class="icons flex items-center gap-2.5 min-w-fit justify-self-end bg-white/95 dark:bg-slate-800/95">
+            <div class="icons flex items-center row-start-1 col-start-2 gap-2.5 min-w-fit justify-self-end bg-white/95 dark:bg-slate-800/95">
                 <a href="/about" class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center dark:text-white">
                     <svg xmlns="http://www.w3.org/2000/svg" 
                          viewBox="0 0 24 24" fill="none" stroke="currentColor" 
