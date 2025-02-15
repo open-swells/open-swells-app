@@ -1,280 +1,99 @@
-{{ define "forecastsummary" }}
-<div>
-    <script>
-        function createSwellHTML(direction, height, period) {
-            const arrowHTML = `<span class="swell-arrow text-3xl" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
-
-            // Swell height and period information
-            const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
-
-            // Combine the arrow with the swell info
-            return `<div class="flex flex-center items-center">${arrowHTML} ${swellInfoHTML}</div>`;
-        }
-
-        function convertToDate(data, date) {
-            hour = parseInt(data[0].Date.split(' ')[1]);
-            firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour); // this sets the time as UTC time, but listed as local time
-            firstdate.setHours(firstdate.getHours() - firstdate.getTimezoneOffset() / 60); // this converts the time VALUE to match the time zone
-            for (i = 0; i < data.length; i++) {
-                // this date needs to be in UTC!!
-                data[i].dateObj = new Date(firstdate);
-                data[i].dateObj.setHours(data[i].dateObj.getHours() + i);
-                data[i].hour = data[i].dateObj.getHours();
-            }
-            return data;
-        }
-
-        function groupDataByDay(data) {
-            // order by date first
-            // log first date
-            data.sort((a, b) => a.dateObj - b.dateObj);
-            const groupedData = {};
-            data.forEach(item => {
-                const dateKey = item.dateObj.toLocaleDateString();
-                if (!groupedData[dateKey]) {
-                    groupedData[dateKey] = [];
-                }
-                groupedData[dateKey].push(item);
-            });
-            return groupedData;
-        }
-
-        function buildSummary(data) { 
-            const summary = [];
-
-            Object.entries(data).forEach(([date, item]) => {
-                // get the day of the week
-                let tempdate = new Date(date);
-                // tempdate.setHours(tempdate.getHours() - tempdate.getTimezoneOffset() / 60);
-                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                const dayOfWeek = days[tempdate.getDay()];
-
-
-                const datefull = date.split('T')[0];
-                let abbreviatedDate = datefull.slice(0, 4);
-                abbreviatedDate = abbreviatedDate.replace(/^0+/, '').replace('-', '/');
-
-
-                // keep track of total primary swell
-                let totalPrimarySwell = 0;
-                item.forEach((item) => {
-                    totalPrimarySwell += parseFloat(item.PrimaryWaveHeight);
-                });
-                const primarySwellAverage = totalPrimarySwell / item.length;
-
-                // get the condition
-                let condition = 'good';
-                if (primarySwellAverage < 0.5) {
-                    condition = 'poor';
-                } else if (primarySwellAverage < 1.5) {
-                    condition = 'fair';
-                }
-
-                // get the height of the wave in feet
-                const waveHeightFeet = (primarySwellAverage * 3.28084).toFixed(1); // Convert meters to feet and round to 1 decimal place
-
-                summary.push({
-                    date: date,
-                    dateabv: `${dayOfWeek} ${abbreviatedDate}`,
-                    condition: condition,
-                    waveHeight: `${waveHeightFeet}ft`
-                });
-            });
-
-            return summary;
-        } 
-
-
-        let currentDay = []; 
-        //let swellChart = null;
-        console.log({{.forecastdata.forecast}}, {{.forecastdata.date}});
-        const data = convertToDate({{.forecastdata.forecast}}, {{.forecastdata.date}});
-        let dataGroupedByDay = groupDataByDay(data);
-        let forecastsummary = buildSummary(dataGroupedByDay);
-
-
-        // Modify the DOMContentLoaded event listener to handle multiple buoys
-        document.addEventListener('DOMContentLoaded', () => {
-            const buoys = [
-                { id: '46253', name: 'Buoy 46253' },
-                { id: '46221', name: 'Buoy 46221' },
-                { id: '46232', name: 'Buoy 46232' }
-            ];
-
-            buoys.forEach(buoy => {
-                // const buoyData = convertToDate({{.forecastdata.forecast}}, {{.forecastdata.date}});
-                // const buoyDataGroupedByDay = groupDataByDay(buoyData);
-                const buoyForecastSummary = forecastsummary;
-
-                const buoyContainer = document.getElementById(`buoy-${buoy.id}-container`);
-                const forecastContainer = buoyContainer.querySelector('.forecast-container');
-
-                buoyForecastSummary.forEach(forecast => {
-                    const card = document.createElement('div');
-                    card.className = 'forecastcard bg-white border border-2 py-4 px-2 flex flex-col items-center';
-                    card.setAttribute('data-date', forecast.date);
-
-                    const dayDateContainer = document.createElement('div');
-                    dayDateContainer.className = 'flex items-center space-x-1 mb-1';
-
-                    const dayOfWeek = document.createElement('div');
-                    dayOfWeek.className = 'font-medium';
-                    dayOfWeek.textContent = forecast.dateabv.split(' ')[0];
-
-                    const dateEl = document.createElement('div');
-                    dateEl.className = 'text-sm';
-                    dateEl.textContent = forecast.dateabv.split(' ')[1];
-
-                    dayDateContainer.appendChild(dayOfWeek);
-                    dayDateContainer.appendChild(dateEl);
-
-                    const waveHeightEl = document.createElement('div');
-                    waveHeightEl.className = 'text-sm font-semibold';
-                    waveHeightEl.textContent = forecast.waveHeight;
-
-                    const conditionEl = document.createElement('div');
-                    conditionEl.textContent = forecast.condition;
-                    conditionEl.className = `font-bold ${forecast.condition.toLowerCase() === 'good' ? 'text-green-500' : forecast.condition.toLowerCase() === 'fair' ? 'text-orange-500' : 'text-red-500'}`;
-
-                    card.appendChild(dayDateContainer);
-                    card.appendChild(waveHeightEl);
-                    card.appendChild(conditionEl);
-
-                    forecastContainer.appendChild(card);
-                });
-            });
-        });
-    </script>
-
+{{ define "forecastsummary3" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast Summary</title>
     <style>
-        .buoy-container {
-            margin-bottom: 1rem;
-        }
-        .forecast-container {
-            display: flex;
-            overflow-x: auto;
-            padding: 1rem 0;
-            gap: 1rem;
-        }
-
-        /* Light mode scrollbar styles */
-        .forecast-container::-webkit-scrollbar {
-            height: 8px;
-        }
-
-        .forecast-container::-webkit-scrollbar-track {
-            background: #f1f1f1;
-        }
-
-        .forecast-container::-webkit-scrollbar-thumb {
-            background-color: #888;
-            border-radius: 4px;
-        }
-
-        .forecast-container::-webkit-scrollbar-thumb:hover {
-            background-color: #555;
-        }
-
-        body.dark .forecast-container { 
-            background-color: #1a1a1a;
-            color: #ffffff;
-            border-color: #555;
-        } 
-
-        .forecast-container::-webkit-scrollbar {
-            height: 8px;
-        }
-
-        .forecast-container::-webkit-scrollbar-thumb {
-            background-color: #555;
-            border-radius: 4px;
-        }
-
-        .forecast-container::-webkit-scrollbar-thumb:hover {
-            background-color: #777;
-        }
-
-        body.dark .container {
-            background-color: #1a1a1a;
-            color: #ffffff;
-            border-color: #555;
-        }
-
-        body.dark h2 {
-            background-color: #1a1a1a;
-            color: #ffffff;
-            border-color: #555;
-        }
-        body.dark .forecastcard { 
-            background-color: #1a1a1a;
-            color: #ffffff;
-            border-color: #555;
-        } 
-
-        body.dark #forecast-table {
-            color: #ffffff;
-        }
-
-        /* Dark mode scrollbar styles */
-        body.dark .forecast-container::-webkit-scrollbar {
-            height: 8px;
-        }
-
-        body.dark .forecast-container::-webkit-scrollbar-track {
-            background: #2a2a2a;
-        }
-
-        body.dark .forecast-container::-webkit-scrollbar-thumb {
-            background-color: #555;
-            border-radius: 4px;
-        }
-
-        body.dark .forecast-container::-webkit-scrollbar-thumb:hover {
-            background-color: #777;
-        }
-
-        #add-buoy-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        #add-buoy-btn {
-            background-color: transparent;
-            transition: background-color 0.3s ease;
-        }
-
-        #add-buoy-btn:hover {
-            background-color: rgba(0, 0, 0, 0.1);
-        }
-
-        body.dark #add-buoy-btn:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-        }
-    </style>
-
-    <div id="buoy-containers">
-        <div id="buoy-46253-container" class="buoy-container">
-            <h3 class="text-md font-semibold ">Buoy 46253</h3>
-            <div class="forecast-container"></div>
-        </div>
-
-        <div id="buoy-46221-container" class="buoy-container">
-            <h3 class="text-md font-semibold">Buoy 46221</h3>
-            <div class="forecast-container"></div>
-        </div>
-
-        <div id="buoy-46232-container" class="buoy-container">
-            <h3 class="text-md font-semibold">Buoy 46232</h3>
-            <div class="forecast-container"></div>
+            :root {
+                --bg-color: #ffffff;
+                --text-color: #000000;
+                --card-bg-color: #ffffff;
+                --border-color: #000000;
+                --scrollbar-thumb-color: #888;
+                --scrollbar-track-color: #f1f1f1;
+            }
+            
+            .dark {
+                --scrollbar-thumb-color: #4b5563;
+                --scrollbar-track-color: #1e293b;
+            }
+            .forecast-summary {
+                display: flex;
+                overflow-x: auto;
+                padding: 1rem 0;
+                gap: 1rem;
+                min-height: 150px;
+                position: relative;
+            }
+            .forecast-summary::-webkit-scrollbar {
+                height: 8px;
+            }
+            .forecast-summary::-webkit-scrollbar-thumb {
+                background-color: var(--scrollbar-thumb-color);
+                border-radius: 4px;
+            }
+            .forecast-summary::-webkit-scrollbar-track {
+                background-color: var(--scrollbar-track-color);
+            }
+            
+            /* Firefox scrollbar styles */
+            .forecast-summary {
+                scrollbar-width: thin;
+                scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
+            }
+            .date-abv {
+                white-space: nowrap;
+            }
+            .condition {
+                margin: 5px 0;
+            }
+            .wave-height {
+                font-size: 0.9em;
+            }
+            .scroll-indicator {
+                position: absolute;
+                bottom: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 50px;
+                height: 20px;
+                background-color: rgba(128, 128, 128, 0.1);
+                border-radius: 10px 10px 0 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-size: 12px;
+                color: var(--text-color);
+            }
+        </style>
+</head>
+<body>
+    {{range .Buoys}}
+    <div class="buoy dark:bg-slate-800">
+               <div class="buoy-name flex justify-between items-center dark:bg-slate-800 dark:text-white">
+                    <span class="text-sm md:text-base">{{.Name}}</span>
+                    <div class="flex justify-end gap-2">
+                        <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite md:w-32 w-24 border border-red-900 text-red-900 px-1 py-0.5 text-[10px] md:text-xs dark:text-pink-500">Remove</button>
+                        <button onclick="window.location.href='/forecast/{{.ID}}'" class="md:w-32 w-24 border border-blue-900 text-blue-900 px-1 py-0.5 text-[10px] md:text-xs dark:text-teal-500">Forecast</button>
+                    </div>
+                </div>
+        <div class="forecast-summary dark:bg-slate-800 dark:text-white">
+            {{range .Summary}}
+            <div class="forecast-day bg-white border border-2 py-2 md:min-w-[100px] min-w-[70px] md:py-4 px-1 md:px-2 flex flex-col items-center justify-center dark:bg-slate-800">
+                <div class="flex items-center space-x-1 mb-1"> 
+                    <div class="text-xs md:text-base font-medium">{{slice .DateAbv 0 3}}</div>
+                    <div class="text-xs md:text-sm font-semibold">{{slice .DateAbv 3}}</div>
+                </div> 
+                <div class="wave-height text-xs md:text-sm font-semibold">{{.WaveHeight}}</div>
+                <div class="condition text-xs md:text-sm font-semibold" style="color: {{if eq .Condition "good"}}green{{else if eq .Condition "fair"}}orange{{else if eq .Condition "poor"}}red{{end}};">{{.Condition}}</div>
+            </div>
+            {{end}}
         </div>
     </div>
-    <div class="flex justify-center">  
-        <button id="add-buoy-btn" class="mt-4 font-bold py-2 px-4 border border-black text-black dark:border-white dark:text-white">
-            <span class="text-2xl">+</span> Add New Buoy
-        </button>
-    </div> 
-    
-</div>
+    {{end}}
+</body>
+</html>
+
 {{ end }}

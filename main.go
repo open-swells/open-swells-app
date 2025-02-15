@@ -676,8 +676,8 @@ func renderForecastSummary(w http.ResponseWriter, cache *Cache,  uid string, db 
 		})
 	}
 
-	tmpl := template.Must(template.ParseFiles("templates/forecastsummary3.html"))
-	err = tmpl.ExecuteTemplate(w, "forecastsummary3", struct {
+	tmpl := template.Must(template.ParseFiles("templates/forecastsummary.html"))
+	err = tmpl.ExecuteTemplate(w, "forecastsummary", struct {
 		Buoys []struct {
 			Buoy
 			Summary []ForecastSummary
@@ -802,7 +802,7 @@ func main() {
         returndata = map[string]interface{}{"forecastdata": forecastdata, "windreport": windreport, "swellreport": swellreport}
 
 
-        tmpl, err := template.ParseFiles("pages/today.html", "templates/report_small.html", "templates/forecastsummary3.html")
+        tmpl, err := template.ParseFiles("pages/today.html", "templates/report_small.html", "templates/forecastsummary.html")
         htmlBuffer := new(bytes.Buffer)
         err = tmpl.ExecuteTemplate(htmlBuffer, "today.html", returndata)
 
