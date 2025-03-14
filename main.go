@@ -916,9 +916,11 @@ func main() {
 
     router.GET("/forecast/:stationId", func(c *gin.Context) {
         stationId := c.Param("stationId")
-        forecastdata, err := getForecast(c, cache, stationId)
+
         swellreport, err := getSwellReport(stationId)
         windreport, err := getWindReport(stationId)
+
+        forecastdata, err := getForecast(c, cache, stationId)
 
         // Get buoy name from BuoyLocations map
         buoyName := fmt.Sprintf("Buoy %s", stationId) // default name if not found
