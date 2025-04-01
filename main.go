@@ -601,12 +601,13 @@ func sortForecastSummary(summary []ForecastSummary) {
 }
 
 func renderForecastSummary(w http.ResponseWriter, cache *Cache, uid string, db *sql.DB) {
-    var buoys []struct {
+	type BuoyWithSummary struct {
 		Buoy
-		Summary []ForecastSummary
+		Summary   []ForecastSummary
 		HasError  bool
 		ErrorMsg  string
 	}
+	var buoys []BuoyWithSummary
 
 	if uid == "" {
 		http.Error(w, "UID is required", http.StatusBadRequest)
