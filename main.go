@@ -433,6 +433,14 @@ func getSwellReport(stationId string) (SwellReport, error) {
     if err != nil {
         return SwellReport{}, err
     }
+    if resp.StatusCode() != http.StatusOK {
+        return SwellReport{}, fmt.Errorf("failed to fetch data: HTTP status %d", resp.StatusCode())
+    }
+    
+    // Check if response body is empty or too short
+    if len(resp.String()) < 3 {
+        return SwellReport{}, fmt.Errorf("insufficient data in response")
+    }
     // skip the first 2 lines, then we only need the first line of data
     lines := strings.Split(resp.String(), "\n")
     line := lines[2]
@@ -592,10 +600,12 @@ func sortForecastSummary(summary []ForecastSummary) {
 	})
 }
 
-func renderForecastSummary(w http.ResponseWriter, cache *Cache,  uid string, db *sql.DB) {
-	var buoys []struct {
+func renderForecastSummary(w http.ResponseWriter, cache *Cache, uid string, db *sql.DB) {
+    var buoys []struct {
 		Buoy
 		Summary []ForecastSummary
+		HasError  bool
+		ErrorMsg  string
 	}
 
 	if uid == "" {
@@ -603,38 +613,77 @@ func renderForecastSummary(w http.ResponseWriter, cache *Cache,  uid string, db 
 		return
 	}
 
-	//buoyIDs := []string{"46221", "46232"}
 	buoyIDs, err := getBuoysForUser(db, uid)
 	if err != nil {
-	    http.Error(w, "no favorites", http.StatusBadRequest)
-	    return
+		http.Error(w, "no favorites", http.StatusBadRequest)
+		return
+	}
+
+	// If no buoys are found, return an empty list but not an error
+	if len(buoyIDs) == 0 {
+		tmpl := template.Must(template.ParseFiles("templates/forecastsummary.html"))
+		err = tmpl.ExecuteTemplate(w, "forecastsummary", struct {
+			Buoys []BuoyWithSummary
+		}{Buoys: buoys})
+		
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		return
 	}
 
 	for _, buoyID := range buoyIDs {
+		buoyName := fmt.Sprintf("Buoy %s", buoyID)
+		if location, ok := BuoyLocations[buoyID]; ok {
+			buoyName = location.Name
+		}
+
+		// Create a buoy entry even if there's an error
+		buoyEntry := BuoyWithSummary{
+			Buoy: Buoy{
+				ID:   buoyID,
+				Name: buoyName,
+			},
+		}
+
+		// Try to get forecast data
 		forecastData, err := getForecast(nil, cache, buoyID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error fetching data for buoy %s: %v", buoyID, err), http.StatusInternalServerError)
-			return
+			log.Printf("Error fetching data for buoy %s: %v", buoyID, err)
+			buoyEntry.HasError = true
+			buoyEntry.ErrorMsg = "Data unavailable"
+			buoys = append(buoys, buoyEntry)
+			continue
 		}
 
 		forecast, ok := forecastData["forecast"].([]ForecastRow)
 		if !ok {
-			http.Error(w, fmt.Sprintf("Invalid forecast data for buoy %s", buoyID), http.StatusInternalServerError)
-			return
+			log.Printf("Invalid forecast data for buoy %s", buoyID)
+			buoyEntry.HasError = true
+			buoyEntry.ErrorMsg = "Invalid forecast data"
+			buoys = append(buoys, buoyEntry)
+			continue
 		}
 
 		initialDate, ok := forecastData["date"].(string)
 		if !ok {
-			http.Error(w, fmt.Sprintf("Invalid initial date for buoy %s", buoyID), http.StatusInternalServerError)
-			return
+			log.Printf("Invalid initial date for buoy %s", buoyID)
+			buoyEntry.HasError = true
+			buoyEntry.ErrorMsg = "Invalid date data"
+			buoys = append(buoys, buoyEntry)
+			continue
 		}
 
 		baseTime, err := time.Parse("2006010215", initialDate)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error parsing initial date for buoy %s: %v", buoyID, err), http.StatusInternalServerError)
-			return
+			log.Printf("Error parsing initial date for buoy %s: %v", buoyID, err)
+			buoyEntry.HasError = true
+			buoyEntry.ErrorMsg = "Date parsing error"
+			buoys = append(buoys, buoyEntry)
+			continue
 		}
 
+		// Process the forecast data
 		groupedForecast := make(map[string][]ForecastRow)
 		for i, row := range forecast {
 			forecastTime := baseTime.Add(time.Duration(i) * time.Hour)
@@ -659,36 +708,20 @@ func renderForecastSummary(w http.ResponseWriter, cache *Cache,  uid string, db 
 		// Sort the summary slice by date
 		sortForecastSummary(summary)
 
-		buoyName := fmt.Sprintf("Buoy %s", buoyID)
-		if location, ok := BuoyLocations[buoyID]; ok {
-			buoyName = location.Name
-		}
-		buoys = append(buoys, struct {
-			Buoy
-			Summary []ForecastSummary
-		}{
-			Buoy: Buoy{
-				ID:       buoyID,
-				Name:     buoyName,
-				Forecast: forecastData,
-			},
-			Summary: summary,
-		})
+		buoyEntry.Summary = summary
+		buoyEntry.Buoy.Forecast = forecastData
+		buoys = append(buoys, buoyEntry)
 	}
 
 	tmpl := template.Must(template.ParseFiles("templates/forecastsummary.html"))
 	err = tmpl.ExecuteTemplate(w, "forecastsummary", struct {
-		Buoys []struct {
-			Buoy
-			Summary []ForecastSummary
-		}
+		Buoys []BuoyWithSummary
 	}{Buoys: buoys})
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
-
 
 var (
 	authClient *auth.Client
@@ -917,10 +950,29 @@ func main() {
     router.GET("/forecast/:stationId", func(c *gin.Context) {
         stationId := c.Param("stationId")
 
-        swellreport, err := getSwellReport(stationId)
-        windreport, err := getWindReport(stationId)
+        // Get swell report, handle errors gracefully
+        swellreport, swellErr := getSwellReport(stationId)
+        if swellErr != nil {
+            log.Printf("Warning: Failed to get swell report for buoy %s: %v", stationId, swellErr)
+            // Use empty swell report instead of failing
+            swellreport = SwellReport{StationId: stationId}
+        }
 
-        forecastdata, err := getForecast(c, cache, stationId)
+        // Get wind report, handle errors gracefully
+        windreport, windErr := getWindReport(stationId)
+        if windErr != nil {
+            log.Printf("Warning: Failed to get wind report for buoy %s: %v", stationId, windErr)
+            // Use empty wind report instead of failing
+            windreport = WindReport{StationId: stationId}
+        }
+
+        // Get forecast data
+        forecastdata, forecastErr := getForecast(c, cache, stationId)
+        if forecastErr != nil {
+            log.Printf("Error: Failed to get forecast data for buoy %s: %v", stationId, forecastErr)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get forecast data"})
+            return
+        }
 
         // Get buoy name from BuoyLocations map
         buoyName := fmt.Sprintf("Buoy %s", stationId) // default name if not found
@@ -929,16 +981,12 @@ func main() {
         }
 
         returndata := map[string]interface{}{
-            "forecastdata":    forecastdata,
-            "swellreport": swellreport,
-            "windreport":  windreport,
-            "buoyName":    buoyName,
-        }
-
-        if err != nil {
-            log.Println(err)
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get forecast data"})
-            return
+            "forecastdata": forecastdata,
+            "swellreport":  swellreport,
+            "windreport":   windreport,
+            "buoyName":     buoyName,
+            "hasSwellError": swellErr != nil,
+            "hasWindError":  windErr != nil,
         }
 
         tmpl, err := template.ParseFiles("pages/buoy.html", "templates/forecast.html", "templates/report.html")

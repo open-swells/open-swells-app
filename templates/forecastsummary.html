@@ -1,4 +1,4 @@
-{{ define "forecastsummary3" }}
+{{ define "forecastsummary" }}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,31 +67,60 @@
                 font-size: 12px;
                 color: var(--text-color);
             }
+            .error-message {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100px;
+                color: #e53e3e;
+                font-size: 0.9em;
+                text-align: center;
+                padding: 1rem;
+            }
         </style>
 </head>
 <body>
-    {{range .Buoys}}
-    <div class="buoy dark:bg-slate-800">
-               <div class="buoy-name flex justify-between items-center dark:bg-slate-800 dark:text-white">
-                    <span class="text-sm md:text-base">{{.Name}}</span>
-                    <div class="flex justify-end gap-2">
-                        <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite md:w-32 w-24 border border-red-900 text-red-900 px-1 py-0.5 text-[10px] md:text-xs dark:text-pink-500">Remove</button>
-                        <button onclick="window.location.href='/forecast/{{.ID}}'" class="md:w-32 w-24 border border-blue-900 text-blue-900 px-1 py-0.5 text-[10px] md:text-xs dark:text-teal-500">Forecast</button>
-                    </div>
+    {{if eq (len .Buoys) 0}}
+    <div class="text-center p-4 dark:text-white">
+        <p>No favorite buoys found. Add buoys to see their forecast summaries.</p>
+    </div>
+    {{else}}
+        {{range .Buoys}}
+        <div class="buoy dark:bg-slate-800">
+            <div class="buoy-name flex justify-between items-center dark:bg-slate-800 dark:text-white">
+                <span class="text-sm md:text-base">{{.Name}}</span>
+                <div class="flex justify-end gap-2">
+                    <button onclick="toggleFavorite('{{.ID}}')" class="remove-favorite md:w-32 w-24 border border-red-900 text-red-900 px-1 py-0.5 text-[10px] md:text-xs dark:text-pink-500">Remove</button>
+                    <button onclick="window.location.href='/forecast/{{.ID}}'" class="md:w-32 w-24 border border-blue-900 text-blue-900 px-1 py-0.5 text-[10px] md:text-xs dark:text-teal-500">Forecast</button>
                 </div>
-        <div class="forecast-summary dark:bg-slate-800 dark:text-white">
-            {{range .Summary}}
-            <div class="forecast-day bg-white border border-2 py-2 md:min-w-[100px] min-w-[70px] md:py-4 px-1 md:px-2 flex flex-col items-center justify-center dark:bg-slate-800">
-                <div class="flex items-center space-x-1 mb-1"> 
-                    <div class="text-xs md:text-base font-medium">{{slice .DateAbv 0 3}}</div>
-                    <div class="text-xs md:text-sm font-semibold">{{slice .DateAbv 3}}</div>
-                </div> 
-                <div class="wave-height text-xs md:text-sm font-semibold">{{.WaveHeight}}</div>
-                <div class="condition text-xs md:text-sm font-semibold" style="color: {{if eq .Condition "good"}}green{{else if eq .Condition "fair"}}orange{{else if eq .Condition "poor"}}red{{end}};">{{.Condition}}</div>
             </div>
+            
+            {{if .HasError}}
+            <div class="error-message dark:bg-slate-800 dark:text-red-400">
+                <p>Unable to load forecast data for this buoy. {{.ErrorMsg}}</p>
+            </div>
+            {{else}}
+                {{if eq (len .Summary) 0}}
+                <div class="error-message dark:bg-slate-800 dark:text-yellow-400">
+                    <p>No forecast data available for this buoy.</p>
+                </div>
+                {{else}}
+                <div class="forecast-summary dark:bg-slate-800 dark:text-white">
+                    {{range .Summary}}
+                    <div class="forecast-day bg-white border border-2 py-2 md:min-w-[100px] min-w-[70px] md:py-4 px-1 md:px-2 flex flex-col items-center justify-center dark:bg-slate-800">
+                        <div class="flex items-center space-x-1 mb-1"> 
+                            <div class="text-xs md:text-base font-medium">{{slice .DateAbv 0 3}}</div>
+                            <div class="text-xs md:text-sm font-semibold">{{slice .DateAbv 3}}</div>
+                        </div> 
+                        <div class="wave-height text-xs md:text-sm font-semibold">{{.WaveHeight}}</div>
+                        <div class="condition text-xs md:text-sm font-semibold" style="color: {{if eq .Condition "good"}}green{{else if eq .Condition "fair"}}orange{{else if eq .Condition "poor"}}red{{end}};">{{.Condition}}</div>
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
             {{end}}
         </div>
-    </div>
+        {{end}}
     {{end}}
 </body>
 </html>
