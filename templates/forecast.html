@@ -298,8 +298,12 @@
                 .call(yAxis);
 
             function updateChart(data, svg) { 
+                // Remove previous vertical line if it exists
+                svg.selectAll(".vertical-line").remove();
+                svg.selectAll(".overlay").remove();
+                
                 rescale();
-                y.domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight))]);
+                y.domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight)) * 3.28084]);
 
                 // Line generator for primary swell height
                 const linePrimary = d3.line()
@@ -391,30 +395,70 @@
                     .attr("fill", "purple");
 
                 const tooltip = d3.select("#tooltip");
+                
+                // Create a vertical line indicator that follows the mouse
+                const verticalLine = svg.append("line")
+                    .attr("class", "vertical-line")
+                    .attr("y1", 0)
+                    .attr("y2", height)
+                    .attr("stroke", "gray")
+                    .attr("stroke-width", 1)
+                    .attr("stroke-dasharray", "5,5")
+                    .style("opacity", 0);
+                
+                // Create a transparent overlay to capture mouse events across the entire chart area
+                svg.append("rect")
+                    .attr("class", "overlay")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .style("fill", "none")
+                    .style("pointer-events", "all");
 
                 // Mouse move handler to update tooltip content and position
                 svg.on("mousemove", (event) => {
-                    // show a popup anywhere on hover, not just over the line
-
                     const mousePos = d3.pointer(event);
                     const mouseX = mousePos[0];
-                    const hoverDate = x.invert(mouseX);
-                    const closestData = data.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
+                    
+                    // Ensure mouseX is within the chart bounds
+                    const boundedMouseX = Math.max(0, Math.min(width, mouseX));
+                    
+                    // Update vertical line position
+                    verticalLine
+                        .attr("x1", boundedMouseX)
+                        .attr("x2", boundedMouseX)
+                        .style("opacity", 1);
+                    
+                    const hoverDate = x.invert(boundedMouseX);
+                    const closestData = data.reduce((prev, curr) => 
+                        (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
 
+                    const hour = closestData.hour;
+                    const formattedHour = hour === 0 ? '12:00am' : 
+                                         hour === 12 ? '12:00pm' : 
+                                         hour < 12 ? `${hour}:00am` : 
+                                         `${hour-12}:00pm`;
 
-
+                    // Create directional arrows for the tooltip
+                    const createArrowHTML = (direction, color) => {
+                        return `<span style="display: inline-block; color: ${color}; transform: rotate(${direction - 180}deg); margin-right: 5px;">&#8595;</span>`;
+                    };
+                    
+                    // Format tooltip content with directional arrows matching the swell directions
                     tooltip.style("visibility", "visible")
                         .style("top", (event.pageY + 15) + "px")
                         .style("left", (event.pageX + 15) + "px")
-                        .html(`Hour: ${closestData.hour}<br>${(closestData.PrimaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.PrimaryPeriod}s
-                            <br>${(closestData.SecondaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.SecondaryPeriod}s
-                            <br>${(closestData.TertiaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.TertiaryPeriod}s
-                            <br>${(closestData.QuaternaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.QuaternaryPeriod}s`);
+                        .html(`<strong>${formattedHour}</strong><br>
+                            <span style="color: steelblue;">${createArrowHTML(closestData.PrimaryDegrees, "steelblue")} ${(closestData.PrimaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.PrimaryPeriod}s</span><br>
+                            <span style="color: orange;">${createArrowHTML(closestData.SecondaryDegrees, "orange")} ${(closestData.SecondaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.SecondaryPeriod}s</span><br>
+                            <span style="color: green;">${createArrowHTML(closestData.TertiaryDegrees, "green")} ${(closestData.TertiaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.TertiaryPeriod}s</span><br>
+                            <span style="color: purple;">${createArrowHTML(closestData.QuaternaryDegrees, "purple")} ${(closestData.QuaternaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.QuaternaryPeriod}s</span>
+                        `);
                 });
 
-                // Mouse leave handler to hide tooltip
+                // Mouse leave handler to hide tooltip and vertical line
                 svg.on("mouseleave", () => {
                     tooltip.style("visibility", "hidden");
+                    verticalLine.style("opacity", 0);
                 });
             }
 
@@ -446,7 +490,7 @@
         </div>
 
     </div>
-    <div id="tooltip" class="absolute invisible p-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 rounded pointer-events-none dark:text-white"></div>
+    <div id="tooltip" class="absolute invisible p-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 rounded pointer-events-none dark:text-white shadow-lg"></div>
     <div id="forecast-table" class="mt-8 mb-16"></div>
 
 
