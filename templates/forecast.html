@@ -433,10 +433,7 @@
                         (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
 
                     const hour = closestData.hour;
-                    const formattedHour = hour === 0 ? '12:00am' : 
-                                         hour === 12 ? '12:00pm' : 
-                                         hour < 12 ? `${hour}:00am` : 
-                                         `${hour-12}:00pm`;
+                    const formattedHour = `${hour.toString().padStart(2, '0')}:00`;
 
                     // Create directional arrows for the tooltip
                     const createArrowHTML = (direction, color) => {
