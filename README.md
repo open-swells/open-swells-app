@@ -4,7 +4,6 @@
 -->
 ## OpenSwells;
 
-### [openswells.com](https://openswells.com)
 ### Overview
 
 **[OpenSwells](https://go-surf-app-438594f906bc.herokuapp.com/)** is a free, open-source **surf report** and **16 day swell forecast from 170+ locations**. Reports and forecasts are from the [The Environmental Modeling Center Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php).
@@ -30,12 +29,3 @@ You can run this app locally.
 - [leafletjs](https://leafletjs.com/) (maps)
 - [d3js](https://d3js.org/) (charts)
 - [EMC Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php)
-
-### to do
-- [X] fix dark mode
-- [X] button redesign top right
-- [X] new flex layout map and report. 
-- [X] remove auto dark mode
-    - [] Map should become a template and returned from go
-- [] map in forecast and 
-- [] eventually, use htmx to replace the report on request (see "show fast report" commented out in button)
