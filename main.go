@@ -559,13 +559,7 @@ func getForecast(c *gin.Context, cache *Cache, stationId string) (map[string]int
     return returndata, nil
 }
 
-func formatDate(date string) string {
-	parsedDate, err := time.Parse("2006-01-02", date)
-	if err != nil {
-		return date
-	}
-	return parsedDate.Format("Mon 1/2")
-}
+
 
 func calculateAverageWaveHeight(forecast []ForecastRow) float64 {
 	total := 0.0
@@ -593,6 +587,57 @@ func determineCondition(avgWaveHeight float64) string {
 	return "good"
 }
 
+
+func formatDate(date string) string {
+	parsedDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return date
+	}
+	return parsedDate.Format("Mon 1/2")
+}
+
+func generateForecastSummary(forecastData map[string]interface{}) ([]ForecastSummary, error) {
+	forecast, ok := forecastData["forecast"].([]ForecastRow)
+	if !ok {
+		return nil, fmt.Errorf("invalid forecast data")
+	}
+
+	initialDate, ok := forecastData["date"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid initial date")
+	}
+
+	baseTime, err := time.Parse("2006010215", initialDate)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing initial date: %w", err)
+	}
+
+	// Process the forecast data
+	groupedForecast := make(map[string][]ForecastRow)
+	for i, row := range forecast {
+		forecastTime := baseTime.Add(time.Duration(i) * time.Hour)
+		day := forecastTime.Format("2006-01-02")
+		groupedForecast[day] = append(groupedForecast[day], row)
+	}
+
+	var summary []ForecastSummary
+	for day, rows := range groupedForecast {
+		avgWaveHeight := calculateAverageWaveHeight(rows)
+		condition := determineCondition(avgWaveHeight)
+		waveHeightFeet := fmt.Sprintf("%.1fft", avgWaveHeight*3.28084)
+
+		summary = append(summary, ForecastSummary{
+			Date:       day,
+			DateAbv:    formatDate(day),
+			Condition:  condition,
+			WaveHeight: waveHeightFeet,
+		})
+	}
+
+	// Sort the summary slice by date
+	sortForecastSummary(summary)
+	return summary, nil
+}
 
 func sortForecastSummary(summary []ForecastSummary) {
 	sort.Slice(summary, func(i, j int) bool {
@@ -786,7 +831,8 @@ func verifyUserID(uid string) error {
 
 func main() {
     // start firebase auth
-    opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
+    // opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
+	opt := option.WithCredentialsFile("/Users/evancoons/Downloads/open-swells-89714-firebase-adminsdk-ghfog-cab6d41e1d.json")
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
        panic(fmt.Sprintf("error initializing app: %v", err))
@@ -975,6 +1021,13 @@ func main() {
             return
         }
 
+        forecastsummary, err := generateForecastSummary(forecastdata)
+        if err != nil {
+            log.Printf("Error: Failed to generate forecast summary for buoy %s: %v", stationId, err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate forecast summary"})
+            return
+        }
+
         // Get buoy name from BuoyLocations map
         buoyName := fmt.Sprintf("Buoy %s", stationId) // default name if not found
         if location, ok := BuoyLocations[stationId]; ok {
@@ -988,6 +1041,7 @@ func main() {
             "buoyName":     buoyName,
             "hasSwellError": swellErr != nil,
             "hasWindError":  windErr != nil,
+            "forecastsummary": forecastsummary,
         }
 
         tmpl, err := template.ParseFiles("pages/buoy.html", "templates/forecast.html", "templates/report.html")

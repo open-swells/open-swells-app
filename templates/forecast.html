@@ -1,37 +1,25 @@
 {{ define "forecast" }}
 <div>
     <script>
-        function displayClicked(date) { 
+        function displayClicked(date) {
             const dayData = dataGroupedByDay[date];
+            if (!dayData) return;
             currentDay = dayData;
 
             const dataTable = document.getElementById('forecast-table');
             dataTable.innerHTML = '';
 
-           // const dateHeader = document.createElement('h3');
-           // dateHeader.className = 'date-header';
-           // dateHeader.className = 'text-2x1 text-lg font-bold mb-4';
-
-            // change date by getting the div instead
             const dateHeader = document.getElementById('date-header');
-
             const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            
+            const parts = date.split('-');
+            const tempdate = new Date(parts[0], parts[1] - 1, parts[2]);
 
-            let tempdate = new Date(date);
-            const datefull = date.split('T')[0];
+            dateHeader.textContent = days[tempdate.getDay()] + ' ' + date;
 
-            dateHeader.textContent = days[tempdate.getDay()] + ' ' + datefull
-
-            let abbreviatedDate = datefull.slice(5, 10);
-            abbreviatedDate = abbreviatedDate.replace(/^0+/, '').replace('-', '/');
-
-            // Create a table for each day
             const table = document.createElement('table');
             table.className = 'min-w-full text-xs md:text-sm text-left border-collapse dark:text-white table-fixed';
 
-            // table.setAttribute('border', '1');
-
-            // Create a header for the table
             const header = table.createTHead();
             const headerRow = header.insertRow();
             headerRow.className = 'text-xs uppercase';
@@ -43,7 +31,6 @@
                 headerRow.appendChild(headerCell);
             });
 
-            // Create the body of the table
             const tbody = document.createElement('tbody');
             table.appendChild(tbody);
 
@@ -51,25 +38,18 @@
                 const row = tbody.insertRow();
                 row.className = 'border-b border-gray-200 dark:border-gray-600';
 
-
-                // Hour column
                 const hourCell = row.insertCell();
-                // split the date item and take the second part
                 hourCell.textContent = dataItem.hour;
-                // hourCell.textContent = dataItem.date;
                 hourCell.className = 'py-2 px-6';
 
-                // Primary swell column
                 const primaryCell = row.insertCell();
                 primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
                 primaryCell.className = 'py-2 px-6';
 
-                // Secondary swell column
                 const secondaryCell = row.insertCell();
                 secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
                 secondaryCell.className = 'py-2 px-6';
 
-                // Tertiary swell column
                 const tertiaryCell = row.insertCell();
                 if (dataItem.TertiaryWaveHeight === '') {
                     tertiaryCell.innerHTML = '';
@@ -78,7 +58,6 @@
                     tertiaryCell.className = 'py-2 px-6';
                 }
 
-                // Quaternary swell column
                 const quaternaryCell = row.insertCell();
                 if (dataItem.QuaternaryWaveHeight === '') {
                     quaternaryCell.innerHTML = '';
@@ -86,28 +65,21 @@
                     quaternaryCell.innerHTML = createSwellHTML(dataItem.QuaternaryDegrees, dataItem.QuaternaryWaveHeight, dataItem.QuaternaryPeriod);
                     quaternaryCell.className = 'py-2 px-6';
                 }
-
-                // Append the table to the container
-                dataTable.appendChild(table);
+            });
+            dataTable.appendChild(table);
         }
-        )}
 
         function createSwellHTML(direction, height, period) {
             const arrowHTML = `<span class="swell-arrow text-3xl" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
-
-            // Swell height and period information
             const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
-
-            // Combine the arrow with the swell info
             return `<div class="flex flex-center items-center">${arrowHTML} ${swellInfoHTML}</div>`;
         }
 
         function convertToDate(data, date) {
             hour = parseInt(data[0].Date.split(' ')[1]);
-            firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour); // this sets the time as UTC time, but listed as local time
-            firstdate.setHours(firstdate.getHours() - firstdate.getTimezoneOffset() / 60); // this converts the time VALUE to match the time zone
+            firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour);
+            firstdate.setHours(firstdate.getHours() - firstdate.getTimezoneOffset() / 60);
             for (i = 0; i < data.length; i++) {
-                // this date needs to be in UTC!!
                 data[i].dateObj = new Date(firstdate);
                 data[i].dateObj.setHours(data[i].dateObj.getHours() + i);
                 data[i].hour = data[i].dateObj.getHours();
@@ -116,12 +88,13 @@
         }
 
         function groupDataByDay(data) {
-            // order by date first
-            // log first date
             data.sort((a, b) => a.dateObj - b.dateObj);
             const groupedData = {};
             data.forEach(item => {
-                const dateKey = item.dateObj.toLocaleDateString();
+                const year = item.dateObj.getFullYear();
+                const month = (item.dateObj.getMonth() + 1).toString().padStart(2, '0');
+                const day = item.dateObj.getDate().toString().padStart(2, '0');
+                const dateKey = `${year}-${month}-${day}`;
                 if (!groupedData[dateKey]) {
                     groupedData[dateKey] = [];
                 }
@@ -130,142 +103,18 @@
             return groupedData;
         }
 
-        function buildSummary(data) { 
-            const summary = [];
-
-            Object.entries(data).forEach(([date, item]) => {
-                // get the day of the week
-                let tempdate = new Date(date);
-                // tempdate.setHours(tempdate.getHours() - tempdate.getTimezoneOffset() / 60);
-                const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                const dayOfWeek = days[tempdate.getDay()];
-
-
-                const month = tempdate.getMonth() + 1; // getMonth() returns 0-11
-                const day = tempdate.getDate();
-                const abbreviatedDate = `${month}/${day}`;
-
-
-                // keep track of total primary swell
-                let totalPrimarySwell = 0;
-                item.forEach((item) => {
-                    totalPrimarySwell += parseFloat(item.PrimaryWaveHeight);
-                });
-                const primarySwellAverage = totalPrimarySwell / item.length;
-
-                // get the condition
-                let condition = 'good';
-                if (primarySwellAverage < 0.5) {
-                    condition = 'poor';
-                } else if (primarySwellAverage < 1.5) {
-                    condition = 'fair';
-                }
-
-                // get the height of the wave in feet
-                const waveHeightFeet = (primarySwellAverage * 3.28084).toFixed(1); // Convert meters to feet and round to 1 decimal place
-
-                summary.push({
-                    date: date,
-                    dateabv: `${dayOfWeek} ${abbreviatedDate}`,
-                    condition: condition,
-                    waveHeight: `${waveHeightFeet}ft`
-                });
-            });
-
-            return summary;
-        } 
-
-
-        let currentDay = []; 
-        let swellChart = null;
+        let currentDay = [];
         let data = convertToDate({{.forecastdata.forecast}}, {{.forecastdata.date}});
         let dataGroupedByDay = groupDataByDay(data);
-        let forecastsummary = buildSummary(dataGroupedByDay);
 
-
-        // this dom listener adds the forecast cards
         document.addEventListener('DOMContentLoaded', () => {
-            currentDay = dataGroupedByDay[Object.keys(dataGroupedByDay)[0]];
-
-
-            const forecastContainer = document.getElementById('forecastContainer');
-
-            forecastsummary.forEach(forecast => {
-                const card = document.createElement('div');
-                card.className = 'forecastcard border border-1 py-4 px-1 flex flex-col items-center cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-600'; // TailwindCSS classes for styling
-
-                card.setAttribute('data-date', forecast.date); // Store the date in a data attribute
-
-                const dayDateContainer = document.createElement('div');
-                dayDateContainer.className = 'flex items-center space-x-1 mb-1';
-
-                const dayOfWeek = document.createElement('div');
-                dayOfWeek.className = 'font-medium';
-                dayOfWeek.textContent = forecast.dateabv.split(' ')[0]; // Get the day abbreviation
-
-                const dateEl = document.createElement('div');
-                dateEl.className = 'text-sm';
-                dateEl.textContent = forecast.dateabv.split(' ')[1]; // Get the date abbreviation
-
-                dayDateContainer.appendChild(dayOfWeek);
-                dayDateContainer.appendChild(dateEl);
-
-                const waveHeightEl = document.createElement('div');
-                waveHeightEl.className = 'text-sm font-semibold';
-                waveHeightEl.textContent = forecast.waveHeight;
-
-                const conditionEl = document.createElement('div');
-                conditionEl.textContent = forecast.condition;
-                conditionEl.className = `font-bold ${forecast.condition.toLowerCase() === 'good' ? 'text-green-500' : forecast.condition.toLowerCase() === 'fair' ? 'text-orange-500' : 'text-red-500'}`;
-
-                card.appendChild(dayDateContainer);
-                card.appendChild(waveHeightEl);
-                card.appendChild(conditionEl);
-
-                forecastContainer.appendChild(card);
-            });
-            displayClicked(Object.keys(dataGroupedByDay)[0]);
-            
-        });
-
-
-        // this dom listener adds the visualization and forecast chart
-        document.addEventListener('DOMContentLoaded', () => {
-            // const data = convertToDate({{.forecast}}, {{.date}});
-            // const dataGroupedByDay = groupDataByDay(data);
             const cards = document.querySelectorAll('.forecastcard');
-            cards.forEach(card => {
-                card.addEventListener('click', function() {
-                    this.classList.toggle('selectedforecast'); // This toggles the selectedforecast class on click
-                    cards.forEach(otherCard => {
-                        if (otherCard !== this) {
-                            otherCard.classList.remove('selectedforecast');
-                        }
-                    });
-                    cards.forEach(otherCard => {
-                        if (otherCard !== this) {
-                            otherCard.classList.remove('font-bold', 'bg-gray-100');
-                        }
-                    });
-                    displayClicked(this.getAttribute('data-date')); // Call the displayClicked function
-                    updateChart(currentDay, svg);
-                });
-            });
+            const firstCard = cards[0];
 
-            firstcard = cards[0];
-            firstcard.classList.toggle('font-bold');
-            //firstcard.classList.toggle('bg-gray-100');
-
-            
-            // Dimensions and margins of the graph
             const margin = {top: 20, right: 30, bottom: 30, left: 50},
-                // width should be max width
-                //width = 860 - margin.left - margin.right,
-                // set the width to 100% of the parent container
                 width = document.getElementById('chart-container').offsetWidth - margin.left - margin.right,
                 height = 400 - margin.top - margin.bottom;
 
-            // Append the svg object to the body of the page
             const svg = d3.select("#chart")
                 .append("svg")
                 .attr("width", width + margin.left + margin.right)
@@ -273,8 +122,6 @@
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
-            // Initialize scales
-            // x should always be the hour, 0 to 23
             const x = d3.scaleLinear()
                 .domain([0, 23])
                 .range([ 0, width ]);
@@ -282,13 +129,10 @@
                 .attr("transform", `translate(0,${height})`)
                 .call(d3.axisBottom(x));
 
-            // y should not start at 0, but  just below the minimum swell height
             var y = d3.scaleLinear()
-                .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight)) * 3.28084])
                 .range([ height, 0 ]);
 
             var yScale = d3.scaleLinear()
-                .domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight)) * 3.28084])
                 .range([ height, 0 ]);
 
             var yAxis = d3.axisLeft(yScale);
@@ -297,188 +141,91 @@
                 .attr("class", "yaxis")
                 .call(yAxis);
 
-            function updateChart(data, svg) { 
-                // Remove previous vertical line if it exists
+            function updateChart(data, svg) {
+                if (!data || data.length === 0) return;
+                
                 svg.selectAll(".vertical-line").remove();
                 svg.selectAll(".overlay").remove();
                 
-                rescale();
-                y.domain([0, d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight)) * 3.28084]);
+                const maxWaveHeight = d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight, d.TertiaryWaveHeight, d.QuaternaryWaveHeight)) * 3.28084;
+                y.domain([0, maxWaveHeight]);
+                yScale.domain([0, maxWaveHeight]);
+                svg.select(".yaxis").transition().duration(200).call(yAxis);
 
-                // Line generator for primary swell height
-                const linePrimary = d3.line()
-                    .x(d => x(d.hour))
-                    .y(d => y(d.PrimaryWaveHeight * 3.28084));
+                const linePrimary = d3.line().x(d => x(d.hour)).y(d => y(d.PrimaryWaveHeight * 3.28084));
+                const lineSecondary = d3.line().x(d => x(d.hour)).y(d => y(d.SecondaryWaveHeight * 3.28084));
+                const lineTertiary = d3.line().x(d => x(d.hour)).y(d => y(d.TertiaryWaveHeight * 3.28084));
+                const lineQuaternary = d3.line().x(d => x(d.hour)).y(d => y(d.QuaternaryWaveHeight * 3.28084));
 
-                // Line generator for secondary swell height
-                const lineSecondary = d3.line()
-                    .x(d => x(d.hour))
-                    .y(d => y(d.SecondaryWaveHeight * 3.28084));
+                svg.selectAll(".linePrimary").data([data]).join("path").attr("class", "linePrimary").attr("d", linePrimary).attr("fill", "none").attr("stroke", "steelblue");
+                svg.selectAll(".lineSecondary").data([data]).join("path").attr("class", "lineSecondary").attr("d", lineSecondary).attr("fill", "none").attr("stroke", "orange");
+                svg.selectAll(".lineTertiary").data([data]).join("path").attr("class", "lineTertiary").attr("d", lineTertiary).attr("fill", "none").attr("stroke", "green");
+                svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke", "purple");
 
-                //Draw tertiary swell line
-                const lineTertiary = d3.line()
-                    .x(d => x(d.hour))
-                    .y(d => y(d.TertiaryWaveHeight * 3.28084));
-
-                const lineQuaternary = d3.line()
-                    .x(d => x(d.hour))
-                    .y(d => y(d.QuaternaryWaveHeight * 3.28084));
-
-                // Draw or update primary swell line
-                svg.selectAll(".linePrimary").data([data], d => d.hour)
-                    .join("path")
-                    .attr("class", "linePrimary")
-                    .attr("d", linePrimary)
-                    .attr("fill", "none")
-                    .attr("stroke", "steelblue");
-
-                // Draw or update secondary swell line
-                svg.selectAll(".lineSecondary").data([data], d => d.hour)
-                    .join("path")
-                    .attr("class", "lineSecondary")
-                    .attr("d", lineSecondary)
-                    .attr("fill", "none")
-                    .attr("stroke", "orange");
-
-                svg.selectAll(".lineTertiary").data([data], d => d.hour)
-                    .join("path")
-                    .attr("class", "lineTertiary")
-                    .attr("d", lineTertiary)
-                    .attr("fill", "none")
-                    .attr("stroke", "green");
-
-                svg.selectAll(".lineQuaternary").data([data], d => d.hour)
-                    .join("path")
-                    .attr("class", "lineQuaternary")
-                    .attr("d", lineQuaternary)
-                    .attr("fill", "none")
-                    .attr("stroke", "purple");
-
-                // Add arrows for primary swell points
-                svg.selectAll(".primaryPoint").data(data)
-                    .join("path")
-                    .attr("class", "primaryPoint")
-                    .attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${d.PrimaryDegrees - 135}) skewY(25)`)
-                    .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
-                    .attr("fill", "steelblue");
-
-                // Add arrows for secondary swell points, with different rotation
-                svg.selectAll(".secondaryPoint").data(data)
-                    .join("path")
-                    .attr("class", "secondaryPoint")
-                    .attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${d.SecondaryDegrees - 135}) skewY(25)`)
-                    .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
-                    .attr("stroke", "orange")
-                    .attr("fill", "orange");
-
-                // if all the tertiary data is 0, don't draw the line
-                svg.selectAll(".tertiaryPoint").data(data)
-                    .join("path")
-                    .attr("class", "tertiaryPoint")
-                    .attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${d.TertiaryDegrees - 135}) skewY(25)`)
-                    .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
-                    .attr("stroke", "green")
-                    .attr("fill", "green");
-
-                // if every tertiary point is empty, don't draw the line
-                if (data.every(d => d.TertiaryWaveHeight === 0)) {
-                    svg.selectAll(".lineTertiary").remove();
-                }
-
-                // add arrows for quaternary swell points, with different rotation
-                svg.selectAll(".quaternaryPoint").data(data)
-                    .join("path")
-                    .attr("class", "quaternaryPoint")
-                    .attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight * 3.28084)}) rotate(${d.QuaternaryDegrees - 135}) skewY(25)`)
-                    .attr("d", d3.symbol().type(d3.symbolTriangle).size(50))
-                    .attr("stroke", "purple")
-                    .attr("fill", "purple");
+                svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${d.PrimaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("fill", "steelblue");
+                svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${d.SecondaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", "orange").attr("fill", "orange");
+                svg.selectAll(".tertiaryPoint").data(data).join("path").attr("class", "tertiaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${d.TertiaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", "green").attr("fill", "green");
+                svg.selectAll(".quaternaryPoint").data(data).join("path").attr("class", "quaternaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight * 3.28084)}) rotate(${d.QuaternaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", "purple").attr("fill", "purple");
 
                 const tooltip = d3.select("#tooltip");
-                
-                // Create a vertical line indicator that follows the mouse
-                const verticalLine = svg.append("line")
-                    .attr("class", "vertical-line")
-                    .attr("y1", 0)
-                    .attr("y2", height)
-                    .attr("stroke", "gray")
-                    .attr("stroke-width", 1)
-                    .attr("stroke-dasharray", "5,5")
-                    .style("opacity", 0);
-                
-                // Create a transparent overlay to capture mouse events across the entire chart area
-                svg.append("rect")
-                    .attr("class", "overlay")
-                    .attr("width", width)
-                    .attr("height", height)
-                    .style("fill", "none")
-                    .style("pointer-events", "all");
+                const verticalLine = svg.append("line").attr("class", "vertical-line").attr("y1", 0).attr("y2", height).attr("stroke", "gray").attr("stroke-width", 1).attr("stroke-dasharray", "5,5").style("opacity", 0);
+                svg.append("rect").attr("class", "overlay").attr("width", width).attr("height", height).style("fill", "none").style("pointer-events", "all");
 
-                // Mouse move handler to update tooltip content and position
                 svg.on("mousemove", (event) => {
                     const mousePos = d3.pointer(event);
-                    const mouseX = mousePos[0];
-                    
-                    // Ensure mouseX is within the chart bounds
-                    const boundedMouseX = Math.max(0, Math.min(width, mouseX));
-                    
-                    // Update vertical line position
-                    verticalLine
-                        .attr("x1", boundedMouseX)
-                        .attr("x2", boundedMouseX)
-                        .style("opacity", 1);
-                    
-                    const hoverDate = x.invert(boundedMouseX);
-                    const closestData = data.reduce((prev, curr) => 
-                        (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
-
-                    const hour = closestData.hour;
-                    const formattedHour = `${hour.toString().padStart(2, '0')}:00`;
-
-                    // Create directional arrows for the tooltip
-                    const createArrowHTML = (direction, color) => {
-                        return `<span style="display: inline-block; color: ${color}; transform: rotate(${direction - 180}deg); margin-right: 5px;">&#8595;</span>`;
-                    };
-                    
-                    // Format tooltip content with directional arrows matching the swell directions
-                    tooltip.style("visibility", "visible")
-                        .style("top", (event.pageY + 15) + "px")
-                        .style("left", (event.pageX + 15) + "px")
+                    const mouseX = Math.max(0, Math.min(width, mousePos[0]));
+                    verticalLine.attr("x1", mouseX).attr("x2", mouseX).style("opacity", 1);
+                    const hoverDate = x.invert(mouseX);
+                    const closestData = data.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
+                    const formattedHour = `${closestData.hour.toString().padStart(2, '0')}:00`;
+                    const createArrowHTML = (direction, color) => `<span style="display: inline-block; color: ${color}; transform: rotate(${direction - 180}deg); margin-right: 5px;">&#8595;</span>`;
+                    tooltip.style("visibility", "visible").style("top", (event.pageY + 15) + "px").style("left", (event.pageX + 15) + "px")
                         .html(`<strong>${formattedHour}</strong><br>
                             <span style="color: steelblue;">${createArrowHTML(closestData.PrimaryDegrees, "steelblue")} ${(closestData.PrimaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.PrimaryPeriod}s</span><br>
                             <span style="color: orange;">${createArrowHTML(closestData.SecondaryDegrees, "orange")} ${(closestData.SecondaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.SecondaryPeriod}s</span><br>
                             <span style="color: green;">${createArrowHTML(closestData.TertiaryDegrees, "green")} ${(closestData.TertiaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.TertiaryPeriod}s</span><br>
-                            <span style="color: purple;">${createArrowHTML(closestData.QuaternaryDegrees, "purple")} ${(closestData.QuaternaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.QuaternaryPeriod}s</span>
-                        `);
+                            <span style="color: purple;">${createArrowHTML(closestData.QuaternaryDegrees, "purple")} ${(closestData.QuaternaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.QuaternaryPeriod}s</span>`);
                 });
 
-                // Mouse leave handler to hide tooltip and vertical line
                 svg.on("mouseleave", () => {
                     tooltip.style("visibility", "hidden");
                     verticalLine.style("opacity", 0);
                 });
             }
 
-            function rescale() {
-                yScale.domain([0, d3.max(currentDay, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight)) * 3.28084])  // change scale to 0, to between 10 and 100
-                svg.select(".yaxis")
-                        .transition().duration(200)  // https://github.com/mbostock/d3/wiki/Transitions#wiki-d3_ease
-                        .call(yAxis);  
+            cards.forEach(card => {
+                card.addEventListener('click', function() {
+                    cards.forEach(c => c.classList.remove('selectedforecast', 'font-bold', 'bg-gray-100'));
+                    this.classList.add('selectedforecast', 'font-bold');
+                    const date = this.getAttribute('data-date');
+                    displayClicked(date);
+                    updateChart(currentDay, svg);
+                });
+            });
 
-                svg.select(".yaxis_label")
-                    .text("Rescaled Axis");
+            if (firstCard) {
+                firstCard.classList.add('selectedforecast', 'font-bold');
+                const date = firstCard.getAttribute('data-date');
+                displayClicked(date);
+                updateChart(currentDay, svg);
             }
-
-            updateChart(currentDay, svg);
-
         });
-
-
     </script>
 
     <h2 class="text-2x1 text-lg font-bold mt-8">16 Day Forecast</h2>
     <div class = "container mx-auto ">
-        <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer"> </div>
+        <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer">
+            {{range .forecastsummary}}
+                <div class="forecastcard bg-white border border-2 py-2 md:min-w-[100px] min-w-[70px] md:py-4 px-1 md:px-2 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-gray-600" data-date="{{.Date}}">
+                    <div class="flex items-center space-x-1 mb-1"> 
+                        <div class="text-xs md:text-base font-medium">{{slice .DateAbv 0 3}}</div>
+                        <div class="text-xs md:text-sm font-semibold">{{slice .DateAbv 3}}</div>
+                    </div> 
+                    <div class="wave-height text-xs md:text-sm font-semibold">{{.WaveHeight}}</div>
+                    <div class="condition text-xs md:text-sm font-semibold" style="color: {{if eq .Condition "good"}}green{{else if eq .Condition "fair"}}orange{{else if eq .Condition "poor"}}red{{end}};">{{.Condition}}</div>
+                </div>
+            {{end}}
+        </div>
     </div>
     <div id="date-header" class= 'text-2x1 text-lg font-bold my-4'> </div>
 
