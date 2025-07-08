@@ -18,7 +18,7 @@
             dateHeader.textContent = days[tempdate.getDay()] + ' ' + date;
 
             const table = document.createElement('table');
-            table.className = 'min-w-full text-xs md:text-sm text-left border-collapse dark:text-white table-fixed';
+            table.className = 'min-w-full text-xs md:text-sm text-left border-collapse text-black dark:text-white table-fixed';
 
             const header = table.createTHead();
             const headerRow = header.insertRow();
@@ -195,8 +195,8 @@
 
             cards.forEach(card => {
                 card.addEventListener('click', function() {
-                    cards.forEach(c => c.classList.remove('selectedforecast', 'font-bold', 'bg-gray-100'));
-                    this.classList.add('selectedforecast', 'font-bold');
+                    cards.forEach(c => c.classList.remove('selectedforecast', 'font-bold', 'bg-gray-100', 'dark:bg-gray-700'));
+                    this.classList.add('selectedforecast', 'font-bold', 'bg-gray-100', 'dark:bg-gray-700');
                     const date = this.getAttribute('data-date');
                     displayClicked(date);
                     updateChart(currentDay, svg);
@@ -204,7 +204,7 @@
             });
 
             if (firstCard) {
-                firstCard.classList.add('selectedforecast', 'font-bold');
+                firstCard.classList.add('selectedforecast', 'font-bold', 'bg-gray-100', 'dark:bg-gray-700');
                 const date = firstCard.getAttribute('data-date');
                 displayClicked(date);
                 updateChart(currentDay, svg);
@@ -216,7 +216,7 @@
     <div class = "container mx-auto ">
         <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer">
             {{range .forecastsummary}}
-                <div class="forecastcard bg-white border border-2 py-2 md:min-w-[100px] min-w-[70px] md:py-4 px-1 md:px-2 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-gray-600" data-date="{{.Date}}">
+                <div class="forecastcard bg-white border border-2 py-2 md:min-w-[100px] min-w-[70px] md:py-4 px-1 md:px-2 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-gray-600 dark:text-white text-black" data-date="{{.Date}}">
                     <div class="flex items-center space-x-1 mb-1"> 
                         <div class="text-xs md:text-base font-medium">{{slice .DateAbv 0 3}}</div>
                         <div class="text-xs md:text-sm font-semibold">{{slice .DateAbv 3}}</div>
@@ -234,7 +234,7 @@
         </div>
 
     </div>
-    <div id="tooltip" class="absolute invisible p-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 rounded pointer-events-none dark:text-white shadow-lg"></div>
+    <div id="tooltip" class="absolute invisible p-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 rounded pointer-events-none text-black dark:text-white shadow-lg"></div>
     <div id="forecast-table" class="mt-8 mb-16"></div>
 
 
