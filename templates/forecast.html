@@ -1,113 +1,127 @@
 {{ define "forecast" }}
 <div>
     <script>
-        function displayClicked(date) {
-            const dayData = dataGroupedByDay[date];
-            if (!dayData) return;
-            currentDay = dayData;
-
-            const dataTable = document.getElementById('forecast-table');
-            dataTable.innerHTML = '';
-
-            const dateHeader = document.getElementById('date-header');
-            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-            
-            const parts = date.split('-');
-            const tempdate = new Date(parts[0], parts[1] - 1, parts[2]);
-
-            dateHeader.textContent = days[tempdate.getDay()] + ' ' + date;
-
-            const table = document.createElement('table');
-            table.className = 'min-w-full text-xs md:text-sm text-left border-collapse text-black dark:text-white table-fixed';
-
-            const header = table.createTHead();
-            const headerRow = header.insertRow();
-            headerRow.className = 'text-xs uppercase';
-            const headers = ['Hour', 'Primary Swell', 'Secondary Swell'];
-            headers.forEach(headerText => {
-                const headerCell = document.createElement('th');
-                headerCell.textContent = headerText;
-                headerCell.className = 'py-3 px-6';
-                headerRow.appendChild(headerCell);
-            });
-
-            const tbody = document.createElement('tbody');
-            table.appendChild(tbody);
-
-            dayData.forEach(dataItem => {
-                const row = tbody.insertRow();
-                row.className = 'border-b border-gray-200 dark:border-gray-600';
-
-                const hourCell = row.insertCell();
-                hourCell.textContent = dataItem.hour;
-                hourCell.className = 'py-2 px-6';
-
-                const primaryCell = row.insertCell();
-                primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
-                primaryCell.className = 'py-2 px-6';
-
-                const secondaryCell = row.insertCell();
-                secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
-                secondaryCell.className = 'py-2 px-6';
-
-                const tertiaryCell = row.insertCell();
-                if (dataItem.TertiaryWaveHeight === '') {
-                    tertiaryCell.innerHTML = '';
-                } else {
-                    tertiaryCell.innerHTML = createSwellHTML(dataItem.TertiaryDegrees, dataItem.TertiaryWaveHeight, dataItem.TertiaryPeriod);
-                    tertiaryCell.className = 'py-2 px-6';
-                }
-
-                const quaternaryCell = row.insertCell();
-                if (dataItem.QuaternaryWaveHeight === '') {
-                    quaternaryCell.innerHTML = '';
-                } else {
-                    quaternaryCell.innerHTML = createSwellHTML(dataItem.QuaternaryDegrees, dataItem.QuaternaryWaveHeight, dataItem.QuaternaryPeriod);
-                    quaternaryCell.className = 'py-2 px-6';
-                }
-            });
-            dataTable.appendChild(table);
-        }
-
-        function createSwellHTML(direction, height, period) {
-            const arrowHTML = `<span class="swell-arrow text-3xl" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
-            const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
-            return `<div class="flex flex-center items-center">${arrowHTML} ${swellInfoHTML}</div>`;
-        }
-
-        function convertToDate(data, date) {
-            hour = parseInt(data[0].Date.split(' ')[1]);
-            firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour);
-            firstdate.setHours(firstdate.getHours() - firstdate.getTimezoneOffset() / 60);
-            for (i = 0; i < data.length; i++) {
-                data[i].dateObj = new Date(firstdate);
-                data[i].dateObj.setHours(data[i].dateObj.getHours() + i);
-                data[i].hour = data[i].dateObj.getHours();
-            }
-            return data;
-        }
-
-        function groupDataByDay(data) {
-            data.sort((a, b) => a.dateObj - b.dateObj);
-            const groupedData = {};
-            data.forEach(item => {
-                const year = item.dateObj.getFullYear();
-                const month = (item.dateObj.getMonth() + 1).toString().padStart(2, '0');
-                const day = item.dateObj.getDate().toString().padStart(2, '0');
-                const dateKey = `${year}-${month}-${day}`;
-                if (!groupedData[dateKey]) {
-                    groupedData[dateKey] = [];
-                }
-                groupedData[dateKey].push(item);
-            });
-            return groupedData;
-        }
-
-        let currentDay = [];
-        let data = convertToDate({{.forecastdata.forecast}}, {{.forecastdata.date}});
-        let dataGroupedByDay = groupDataByDay(data);
-
         document.addEventListener('DOMContentLoaded', () => {
+            const isDarkMode = () => document.documentElement.classList.contains('dark');
+
+            const getChartColors = () => {
+                const darkMode = isDarkMode();
+                return {
+                    linePrimary: darkMode ? '#60a5fa' : 'steelblue',
+                    lineSecondary: 'orange',
+                    lineTertiary: darkMode ? '#4ade80' : 'green',
+                    lineQuaternary: darkMode ? '#a78bfa' : 'purple',
+                    axis: darkMode ? 'white' : 'black',
+                    verticalLine: darkMode ? '#6b7280' : 'gray'
+                };
+            };
+
+            function displayClicked(date) {
+                const dayData = dataGroupedByDay[date];
+                if (!dayData) return;
+                currentDay = dayData;
+
+                const dataTable = document.getElementById('forecast-table');
+                dataTable.innerHTML = '';
+
+                const dateHeader = document.getElementById('date-header');
+                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                
+                const parts = date.split('-');
+                const tempdate = new Date(parts[0], parts[1] - 1, parts[2]);
+
+                dateHeader.textContent = days[tempdate.getDay()] + ' ' + date;
+
+                const table = document.createElement('table');
+                table.className = 'min-w-full text-xs md:text-sm text-left border-collapse text-black dark:text-white table-fixed';
+
+                const header = table.createTHead();
+                const headerRow = header.insertRow();
+                headerRow.className = 'text-xs uppercase';
+                const headers = ['Hour', 'Primary Swell', 'Secondary Swell'];
+                headers.forEach(headerText => {
+                    const headerCell = document.createElement('th');
+                    headerCell.textContent = headerText;
+                    headerCell.className = 'py-3 px-6';
+                    headerRow.appendChild(headerCell);
+                });
+
+                const tbody = document.createElement('tbody');
+                table.appendChild(tbody);
+
+                dayData.forEach(dataItem => {
+                    const row = tbody.insertRow();
+                    row.className = 'border-b border-gray-200 dark:border-gray-600';
+
+                    const hourCell = row.insertCell();
+                    hourCell.textContent = dataItem.hour;
+                    hourCell.className = 'py-2 px-6';
+
+                    const primaryCell = row.insertCell();
+                    primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
+                    primaryCell.className = 'py-2 px-6';
+
+                    const secondaryCell = row.insertCell();
+                    secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
+                    secondaryCell.className = 'py-2 px-6';
+
+                    const tertiaryCell = row.insertCell();
+                    if (dataItem.TertiaryWaveHeight === '') {
+                        tertiaryCell.innerHTML = '';
+                    } else {
+                        tertiaryCell.innerHTML = createSwellHTML(dataItem.TertiaryDegrees, dataItem.TertiaryWaveHeight, dataItem.TertiaryPeriod);
+                        tertiaryCell.className = 'py-2 px-6';
+                    }
+
+                    const quaternaryCell = row.insertCell();
+                    if (dataItem.QuaternaryWaveHeight === '') {
+                        quaternaryCell.innerHTML = '';
+                    } else {
+                        quaternaryCell.innerHTML = createSwellHTML(dataItem.QuaternaryDegrees, dataItem.QuaternaryWaveHeight, dataItem.QuaternaryPeriod);
+                        quaternaryCell.className = 'py-2 px-6';
+                    }
+                });
+                dataTable.appendChild(table);
+            }
+
+            function createSwellHTML(direction, height, period) {
+                const arrowHTML = `<span class="swell-arrow text-3xl" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
+                const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
+                return `<div class="flex flex-center items-center">${arrowHTML} ${swellInfoHTML}</div>`;
+            }
+
+            function convertToDate(data, date) {
+                hour = parseInt(data[0].Date.split(' ')[1]);
+                firstdate = new Date(date.slice(0, 4), date.slice(4, 6) - 1, date.slice(6, 8), hour);
+                firstdate.setHours(firstdate.getHours() - firstdate.getTimezoneOffset() / 60);
+                for (i = 0; i < data.length; i++) {
+                    data[i].dateObj = new Date(firstdate);
+                    data[i].dateObj.setHours(data[i].dateObj.getHours() + i);
+                    data[i].hour = data[i].dateObj.getHours();
+                }
+                return data;
+            }
+
+            function groupDataByDay(data) {
+                data.sort((a, b) => a.dateObj - b.dateObj);
+                const groupedData = {};
+                data.forEach(item => {
+                    const year = item.dateObj.getFullYear();
+                    const month = (item.dateObj.getMonth() + 1).toString().padStart(2, '0');
+                    const day = item.dateObj.getDate().toString().padStart(2, '0');
+                    const dateKey = `${year}-${month}-${day}`;
+                    if (!groupedData[dateKey]) {
+                        groupedData[dateKey] = [];
+                    }
+                    groupedData[dateKey].push(item);
+                });
+                return groupedData;
+            }
+
+            let currentDay = [];
+            let data = convertToDate({{.forecastdata.forecast}}, {{.forecastdata.date}});
+            let dataGroupedByDay = groupDataByDay(data);
+
             const cards = document.querySelectorAll('.forecastcard');
             const firstCard = cards[0];
 
@@ -125,7 +139,8 @@
             const x = d3.scaleLinear()
                 .domain([0, 23])
                 .range([ 0, width ]);
-            svg.append("g")
+            const xAxisGroup = svg.append("g")
+                .attr("class", "xaxis")
                 .attr("transform", `translate(0,${height})`)
                 .call(d3.axisBottom(x));
 
@@ -137,13 +152,21 @@
 
             var yAxis = d3.axisLeft(yScale);
 
-            svg.append("g")
+            const yAxisGroup = svg.append("g")
                 .attr("class", "yaxis")
                 .call(yAxis);
+
+            const setAxisColor = () => {
+                const colors = getChartColors();
+                svg.selectAll(".yaxis, .xaxis").selectAll("text").style("fill", colors.axis);
+                svg.selectAll(".yaxis, .xaxis").selectAll("path, line").style("stroke", colors.axis);
+            };
+            setAxisColor();
 
             function updateChart(data, svg) {
                 if (!data || data.length === 0) return;
                 
+                let chartColors = getChartColors();
                 svg.selectAll(".vertical-line").remove();
                 svg.selectAll(".overlay").remove();
                 
@@ -151,24 +174,25 @@
                 y.domain([0, maxWaveHeight]);
                 yScale.domain([0, maxWaveHeight]);
                 svg.select(".yaxis").transition().duration(200).call(yAxis);
+                setAxisColor();
 
                 const linePrimary = d3.line().x(d => x(d.hour)).y(d => y(d.PrimaryWaveHeight * 3.28084));
                 const lineSecondary = d3.line().x(d => x(d.hour)).y(d => y(d.SecondaryWaveHeight * 3.28084));
                 const lineTertiary = d3.line().x(d => x(d.hour)).y(d => y(d.TertiaryWaveHeight * 3.28084));
                 const lineQuaternary = d3.line().x(d => x(d.hour)).y(d => y(d.QuaternaryWaveHeight * 3.28084));
 
-                svg.selectAll(".linePrimary").data([data]).join("path").attr("class", "linePrimary").attr("d", linePrimary).attr("fill", "none").attr("stroke", "steelblue");
-                svg.selectAll(".lineSecondary").data([data]).join("path").attr("class", "lineSecondary").attr("d", lineSecondary).attr("fill", "none").attr("stroke", "orange");
-                svg.selectAll(".lineTertiary").data([data]).join("path").attr("class", "lineTertiary").attr("d", lineTertiary).attr("fill", "none").attr("stroke", "green");
-                svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke", "purple");
+                svg.selectAll(".linePrimary").data([data]).join("path").attr("class", "linePrimary").attr("d", linePrimary).attr("fill", "none").attr("stroke", chartColors.linePrimary);
+                svg.selectAll(".lineSecondary").data([data]).join("path").attr("class", "lineSecondary").attr("d", lineSecondary).attr("fill", "none").attr("stroke", chartColors.lineSecondary);
+                svg.selectAll(".lineTertiary").data([data]).join("path").attr("class", "lineTertiary").attr("d", lineTertiary).attr("fill", "none").attr("stroke", chartColors.lineTertiary);
+                svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke", chartColors.lineQuaternary);
 
-                svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${d.PrimaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("fill", "steelblue");
-                svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${d.SecondaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", "orange").attr("fill", "orange");
-                svg.selectAll(".tertiaryPoint").data(data).join("path").attr("class", "tertiaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${d.TertiaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", "green").attr("fill", "green");
-                svg.selectAll(".quaternaryPoint").data(data).join("path").attr("class", "quaternaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight * 3.28084)}) rotate(${d.QuaternaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", "purple").attr("fill", "purple");
+                svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${d.PrimaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("fill", chartColors.linePrimary);
+                svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${d.SecondaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", chartColors.lineSecondary).attr("fill", chartColors.lineSecondary);
+                svg.selectAll(".tertiaryPoint").data(data).join("path").attr("class", "tertiaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${d.TertiaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", chartColors.lineTertiary).attr("fill", chartColors.lineTertiary);
+                svg.selectAll(".quaternaryPoint").data(data).join("path").attr("class", "quaternaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight * 3.28084)}) rotate(${d.QuaternaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", chartColors.lineQuaternary).attr("fill", chartColors.lineQuaternary);
 
                 const tooltip = d3.select("#tooltip");
-                const verticalLine = svg.append("line").attr("class", "vertical-line").attr("y1", 0).attr("y2", height).attr("stroke", "gray").attr("stroke-width", 1).attr("stroke-dasharray", "5,5").style("opacity", 0);
+                const verticalLine = svg.append("line").attr("class", "vertical-line").attr("y1", 0).attr("y2", height).attr("stroke", chartColors.verticalLine).attr("stroke-width", 1).attr("stroke-dasharray", "5,5").style("opacity", 0);
                 svg.append("rect").attr("class", "overlay").attr("width", width).attr("height", height).style("fill", "none").style("pointer-events", "all");
 
                 svg.on("mousemove", (event) => {
@@ -181,10 +205,10 @@
                     const createArrowHTML = (direction, color) => `<span style="display: inline-block; color: ${color}; transform: rotate(${direction - 180}deg); margin-right: 5px;">&#8595;</span>`;
                     tooltip.style("visibility", "visible").style("top", (event.pageY + 15) + "px").style("left", (event.pageX + 15) + "px")
                         .html(`<strong>${formattedHour}</strong><br>
-                            <span style="color: steelblue;">${createArrowHTML(closestData.PrimaryDegrees, "steelblue")} ${(closestData.PrimaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.PrimaryPeriod}s</span><br>
-                            <span style="color: orange;">${createArrowHTML(closestData.SecondaryDegrees, "orange")} ${(closestData.SecondaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.SecondaryPeriod}s</span><br>
-                            <span style="color: green;">${createArrowHTML(closestData.TertiaryDegrees, "green")} ${(closestData.TertiaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.TertiaryPeriod}s</span><br>
-                            <span style="color: purple;">${createArrowHTML(closestData.QuaternaryDegrees, "purple")} ${(closestData.QuaternaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.QuaternaryPeriod}s</span>`);
+                            <span style="color: ${chartColors.linePrimary};">${createArrowHTML(closestData.PrimaryDegrees, chartColors.linePrimary)} ${(closestData.PrimaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.PrimaryPeriod}s</span><br>
+                            <span style="color: ${chartColors.lineSecondary};">${createArrowHTML(closestData.SecondaryDegrees, chartColors.lineSecondary)} ${(closestData.SecondaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.SecondaryPeriod}s</span><br>
+                            <span style="color: ${chartColors.lineTertiary};">${createArrowHTML(closestData.TertiaryDegrees, chartColors.lineTertiary)} ${(closestData.TertiaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.TertiaryPeriod}s</span><br>
+                            <span style="color: ${chartColors.lineQuaternary};">${createArrowHTML(closestData.QuaternaryDegrees, chartColors.lineQuaternary)} ${(closestData.QuaternaryWaveHeight * 3.28084).toFixed(1)}ft at ${closestData.QuaternaryPeriod}s</span>`);
                 });
 
                 svg.on("mouseleave", () => {
@@ -209,6 +233,11 @@
                 displayClicked(date);
                 updateChart(currentDay, svg);
             }
+
+            const observer = new MutationObserver(() => {
+                updateChart(currentDay, svg);
+            });
+            observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
         });
     </script>
 

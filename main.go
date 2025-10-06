@@ -831,8 +831,8 @@ func verifyUserID(uid string) error {
 
 func main() {
     // start firebase auth
-    // opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
-	opt := option.WithCredentialsFile("/Users/evancoons/Downloads/open-swells-89714-firebase-adminsdk-ghfog-cab6d41e1d.json")
+    opt := option.WithCredentialsFile("/home/evan/Downloads/open-swells-89714-keys.json")
+	// opt := option.WithCredentialsFile("/Users/evancoons/Downloads/open-swells-89714-firebase-adminsdk-ghfog-cab6d41e1d.json")
     app, err := firebase.NewApp(context.Background(), nil, opt)
     if err != nil {
        panic(fmt.Sprintf("error initializing app: %v", err))
