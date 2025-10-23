@@ -4,27 +4,105 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>OpenSwells App Overview</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+            :root {
+                color-scheme: dark;
+                --page-bg: #0f172a;
+                --card-bg: rgba(15, 23, 42, 0.88);
+                --text-color: #e2e8f0;
+                --text-secondary: #94a3b8;
+                --accent: #38bdf8;
+                --accent-hover: #7dd3fc;
+            }
+            body {
+                font-family: 'JetBrains Mono', monospace;
+                background: radial-gradient(circle at top, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.95)), var(--page-bg);
+                color: var(--text-color);
+                line-height: 1.7;
+                margin: 0;
+                min-height: 100vh;
+            }
+            main {
+                max-width: 960px;
+                margin: 0 auto;
+                padding: 4rem 1.5rem 5rem;
+                background: var(--card-bg);
+                backdrop-filter: blur(6px);
+                border-radius: 18px;
+                border: 1px solid rgba(148, 163, 184, 0.12);
+                box-shadow: 0 25px 60px rgba(15, 23, 42, 0.45);
+            }
+            h1, h2, h3 {
+                margin-top: 1.75rem;
+                margin-bottom: 0.75rem;
+                font-weight: 700;
+            }
+            p, ul, ol {
+                margin-top: 1rem;
+                margin-bottom: 1rem;
+            }
+            ul, ol {
+                padding-left: 1.5rem;
+                list-style-position: outside;
+            }
+            a {
+                color: var(--accent);
+                text-decoration: none;
+                transition: color 0.2s ease;
+            }
+            a:hover {
+                color: var(--accent-hover);
+            }
+            code {
+                background-color: rgba(15, 23, 42, 0.6);
+                padding: 0.15rem 0.45rem;
+                border-radius: 6px;
+                border: 1px solid rgba(148, 163, 184, 0.25);
+                color: var(--accent-hover);
+            }
+            header {
+                display: flex;
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+            header h1 {
+                margin-top: 0;
+                font-size: clamp(2rem, 4vw, 2.75rem);
+                letter-spacing: 0.02em;
+            }
+            header h3 {
+                margin-top: 0;
+                font-size: 1rem;
+                color: var(--text-secondary);
+            }
+            @media (max-width: 600px) {
+                main {
+                    margin: 1.5rem;
+                    padding: 2.5rem 1.5rem;
+                }
+            }
+        </style>
     </head>
-    <style> 
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
-        body {
-            font-family: 'JetBrains Mono', monospace;
-        }
-    </style> 
     <body>
-        <div style="padding-left:20%; padding-right:20%" >
-            <!-- <p align="center"> <img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" width="300"/> </p> -->
-            <!-- <h1> GoSurf </h1> -->
-
-            <h1 id="gosurf"><a href="http://openswells.com">OpenSwells;</a></h3>
-            <h3 id="github"><a href="https://github.com/evancoons22/go-mb-surf">Github</a></h3>
+        <main>
+            <header>
+                <h1 id="gosurf"><a href="/">OpenSwells;</a></h1>
+                <h3 id="github"><a href="https://github.com/evancoons22/go-mb-surf">Github</a></h3>
+            </header>
 
             <h3 id="overview">Overview</h3>
-            <!-- <p><strong><a href="https://go-surf-app-438594f906bc.herokuapp.com/">GoSurf</a></strong>  -->
-            A free, open-source <strong>surf report</strong> and <strong>16 day swell forecast from 170+ locations</strong>. Reports and forecasts are from the <a href="https://polar.ncep.noaa.gov/waves/index.php">The Environmental Modeling Center Operational Wave Models</a>.
-            New forecasts are received every 6 hours. </p>
+            <p>
+                A free, open-source <strong>surf report</strong> and <strong>16 day swell forecast from 170+ locations</strong>.
+                Reports and forecasts are from the <a href="https://polar.ncep.noaa.gov/waves/index.php">The Environmental Modeling Center Operational Wave Models</a>.
+                New forecasts are received every 6 hours.
+            </p>
             <h3 id="previously">Previously</h3>
-            <p>This project was previously a 3 day forecast for my local beach using an LSTM network, and later graph neural networks (<a href="https://go-ml-surf-forecast.onrender.com/">site</a>, <a href="https://github.com/evancoons22/nbdc-buoy-data">github</a>). I have since expanded it to include a 16 days forecast for 170+ locations thanks to Environmental Modeling Center and NOAA.</p>
+            <p>
+                This project was previously a 3 day forecast for my local beach using an LSTM network, and later graph neural networks
+                (<a href="https://go-ml-surf-forecast.onrender.com/">site</a>, <a href="https://github.com/evancoons22/nbdc-buoy-data">github</a>).
+                I have since expanded it to include a 16 days forecast for 170+ locations thanks to Environmental Modeling Center and NOAA.
+            </p>
             <h3 id="running-the-app">Running the App</h3>
             <p>You can run this app locally.</p>
             <ol>
@@ -42,8 +120,6 @@
                 <li><a href="https://d3js.org/">d3js</a> (charts)</li>
                 <li><a href="https://polar.ncep.noaa.gov/waves/index.php">EMC Operational Wave Models</a></li>
             </ul>
-        </div>
+        </main>
     </body>
 </html>
-
-
