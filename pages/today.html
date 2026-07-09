@@ -468,6 +468,10 @@
                 return `/static/arrows_${String(hour).padStart(3, '0')}.geojson`;
             }
 
+            function hourToHeatmapFilename(hour) {
+                return `/static/heatmap_${String(hour).padStart(3, '0')}.png`;
+            }
+
             // Height bands — must match FIXED_LEVELS in gfs_to_contours.py.
             // Storm-scale ramp (weather-map convention): calm blues through
             // green/yellow into red and near-black for extreme swell.
@@ -596,6 +600,86 @@
                 }
             }
 
+            // --- Heatmap rendering -------------------------------------------
+            // The pipeline pre-renders each hour's height field as a Mercator
+            // PNG (heatmap_XXX.png); metadata.json carries the corner bounds.
+            // Two image sources ping-pong with an opacity transition so frame
+            // changes crossfade instead of popping. The contour polygons stay
+            // as a fallback when a run has no heatmaps.
+            const HEATMAP_OPACITY = 0.85;
+            const TRANSPARENT_PX =
+                'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNgYGD4DwABBAEAX+XLSgAAAABJRU5ErkJggg==';
+            let heatmapBounds = null; // set from metadata.json
+            let heatmapReady = false;
+            let activeHeatLayer = 'b';
+
+            function maybeAddHeatmapLayers() {
+                // Needs both the style (contour-fills exists) and the bounds.
+                if (heatmapReady || !heatmapBounds || !map.getLayer('contour-fills')) {
+                    return;
+                }
+                const coords = [
+                    [heatmapBounds.west, heatmapBounds.north],
+                    [heatmapBounds.east, heatmapBounds.north],
+                    [heatmapBounds.east, heatmapBounds.south],
+                    [heatmapBounds.west, heatmapBounds.south],
+                ];
+                for (const key of ['a', 'b']) {
+                    map.addSource(`heatmap-${key}`, {
+                        type: 'image',
+                        url: TRANSPARENT_PX,
+                        coordinates: coords,
+                    });
+                    map.addLayer({
+                        id: `heatmap-${key}`,
+                        type: 'raster',
+                        source: `heatmap-${key}`,
+                        paint: {
+                            'raster-opacity': 0,
+                            'raster-opacity-transition': { duration: 250 },
+                            'raster-resampling': 'linear',
+                            'raster-fade-duration': 0,
+                        },
+                    }, 'contour-fills'); // below the (empty) contour fallback
+                }
+                heatmapReady = true;
+                updateMap(currentIndex);
+            }
+
+            // Heatmap frames are fetched as blobs into an LRU of object URLs.
+            const imageCache = new Map(); // url -> Promise<objectURL|null>
+
+            function loadImageFrame(url) {
+                if (imageCache.has(url)) {
+                    const cached = imageCache.get(url);
+                    imageCache.delete(url);
+                    imageCache.set(url, cached);
+                    return cached;
+                }
+                const promise = fetch(url)
+                    .then(r => {
+                        if (!r.ok) throw new Error(`${r.status} for ${url}`);
+                        return r.blob();
+                    })
+                    .then(blob => URL.createObjectURL(blob))
+                    .catch(() => null); // missing hour: fall back to contours
+                imageCache.set(url, promise);
+                if (imageCache.size > FRAME_CACHE_MAX) {
+                    const oldest = imageCache.keys().next().value;
+                    imageCache.get(oldest).then(u => u && URL.revokeObjectURL(u));
+                    imageCache.delete(oldest);
+                }
+                return promise;
+            }
+
+            function showHeatmapFrame(url) {
+                const next = activeHeatLayer === 'a' ? 'b' : 'a';
+                map.getSource(`heatmap-${next}`).updateImage({ url });
+                map.setPaintProperty(`heatmap-${next}`, 'raster-opacity', HEATMAP_OPACITY);
+                map.setPaintProperty(`heatmap-${activeHeatLayer}`, 'raster-opacity', 0);
+                activeHeatLayer = next;
+            }
+
             map.on('style.load', () => {
                 addSwellLayers();
                 // Find the first symbol layer and slot the swell layers beneath
@@ -611,20 +695,46 @@
                 map.moveLayer('swell-arrows', firstSymbolId);
                 map.moveLayer('contour-fills', 'swell-arrows');
                 map.moveLayer('hillshade', 'contour-fills');
+                maybeAddHeatmapLayers(); // if metadata arrived before the style
                 updateMap(currentIndex);
             });
 
-            // Hovering the fills shows the exact band in the legend
+            // Hover readout in the legend. In heatmap mode the value comes
+            // from the nearest arrow grid point (exact height); in contour
+            // fallback mode it comes from the hovered polygon's band.
             const legendReadout = document.getElementById('legendReadout');
+
+            map.on('mousemove', (e) => {
+                if (!legendReadout || !heatmapReady) return;
+                // arrows use the GRIB 0..360 lon convention
+                const lng = ((e.lngLat.lng % 360) + 360) % 360;
+                const lat = e.lngLat.lat;
+                let best = null;
+                let bestDist = 4; // squared degrees; ~2 deg search radius
+                for (const f of currentArrows.features) {
+                    const [flng, flat] = f.geometry.coordinates;
+                    const dlng = Math.min(Math.abs(flng - lng), 360 - Math.abs(flng - lng));
+                    const dist = dlng * dlng + (flat - lat) * (flat - lat);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        best = f;
+                    }
+                }
+                legendReadout.textContent = best
+                    ? `${best.properties.h} m at cursor`
+                    : '';
+            });
+
             map.on('mousemove', 'contour-fills', (e) => {
-                if (!legendReadout || !e.features || !e.features.length) return;
+                if (!legendReadout || heatmapReady) return;
+                if (!e.features || !e.features.length) return;
                 const p = e.features[0].properties;
                 legendReadout.textContent = p.contour_max >= 20
                     ? `≥ ${p.contour_min} m at cursor`
                     : `${p.contour_min} – ${p.contour_max} m at cursor`;
             });
             map.on('mouseleave', 'contour-fills', () => {
-                if (legendReadout) legendReadout.textContent = '';
+                if (legendReadout && !heatmapReady) legendReadout.textContent = '';
             });
 
             // Hovering an arrow shows the full swell reading
@@ -666,6 +776,11 @@
                     const hour = timePart.substring(0, 2);
                     
                     forecastStartTime = new Date(Date.UTC(year, month - 1, day, hour));
+
+                    if (metadata.heatmap_bounds) {
+                        heatmapBounds = metadata.heatmap_bounds;
+                        maybeAddHeatmapLayers();
+                    }
 
                     document.getElementById('metadataTimestamp').textContent = timestamp.toLocaleString();
                     updateTimeDisplay(forecastHours[currentIndex]);
@@ -726,11 +841,16 @@
             function prefetchFrames(index, count = 4) {
                 for (let i = 1; i <= count; i++) {
                     const hour = forecastHours[(index + i) % forecastHours.length];
-                    loadFrame(hourToFilename(hour));
+                    if (heatmapReady) {
+                        loadImageFrame(hourToHeatmapFilename(hour));
+                    } else {
+                        loadFrame(hourToFilename(hour));
+                    }
                     loadFrame(hourToArrowsFilename(hour));
                 }
             }
 
+            let currentArrows = EMPTY_FC; // drives the hover readout
             let updateToken = 0;
             async function updateMap(index) {
                 currentIndex = index;
@@ -738,17 +858,32 @@
                 updateTimeDisplay(hours);
 
                 const token = ++updateToken;
-                const [contours, arrows] = await Promise.all([
-                    loadFrame(hourToFilename(hours)),
+                const wantHeatmap = heatmapReady;
+                let [heatUrl, arrows] = await Promise.all([
+                    wantHeatmap ? loadImageFrame(hourToHeatmapFilename(hours)) : null,
                     loadFrame(hourToArrowsFilename(hours)),
                 ]);
+                // Contours are the fallback when there is no heatmap (older
+                // pipeline runs, or a missing hour in the current one).
+                let contours = null;
+                if (!wantHeatmap || !heatUrl) {
+                    contours = await loadFrame(hourToFilename(hours));
+                }
                 if (token !== updateToken) return; // superseded by a newer frame
 
+                currentArrows = arrows;
                 if (map.style && map.isStyleLoaded()) {
-                    const contourSource = map.getSource('contours');
-                    if (contourSource) contourSource.setData(contours);
                     const arrowSource = map.getSource('arrows');
                     if (arrowSource) arrowSource.setData(arrows);
+                    const contourSource = map.getSource('contours');
+                    if (contourSource) contourSource.setData(contours || EMPTY_FC);
+                    if (wantHeatmap && heatUrl) {
+                        showHeatmapFrame(heatUrl);
+                    } else if (wantHeatmap) {
+                        // missing frame: hide the stale image, contours took over
+                        map.setPaintProperty('heatmap-a', 'raster-opacity', 0);
+                        map.setPaintProperty('heatmap-b', 'raster-opacity', 0);
+                    }
                 }
                 prefetchFrames(index);
             }
