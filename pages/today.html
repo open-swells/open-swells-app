@@ -343,9 +343,22 @@
         <script> 
             let userBuoys = [];
             const popupMap = new Map(); // Use a Map to store popups by their ID
-            async function loadForecastSummary(uid) {
+
+            // All per-user API calls authenticate with the Firebase ID token;
+            // the server derives the uid from the verified token.
+            async function authFetch(url, options = {}) {
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    throw new Error('Not signed in');
+                }
+                const token = await user.getIdToken();
+                options.headers = { ...(options.headers || {}), 'Authorization': `Bearer ${token}` };
+                return fetch(url, options);
+            }
+
+            async function loadForecastSummary() {
                 try {
-                    const summaryResponse = await fetch(`/forecast-summary?uid=${encodeURIComponent(uid)}`);
+                    const summaryResponse = await authFetch('/forecast-summary');
 
                     if (!summaryResponse.ok) {
                         console.log("Error: Could not load forecast summary");
@@ -362,9 +375,9 @@
                 }
             }
 
-            async function loadUserBuoys(uid) {
+            async function loadUserBuoys() {
                 try {
-                    const userBuoysResponse = await fetch(`/get-user-buoys?uid=${encodeURIComponent(uid)}`);
+                    const userBuoysResponse = await authFetch('/api/favorites');
 
                     if (!userBuoysResponse.ok) {
                         console.log("Error: Could not load user buoys");
@@ -384,8 +397,8 @@
             document.addEventListener('DOMContentLoaded', () => {
                 firebase.auth().onAuthStateChanged(async (user) => {
                     if (user) {
-                        await loadForecastSummary(user.uid);
-                        await loadUserBuoys(user.uid);
+                        await loadForecastSummary();
+                        await loadUserBuoys();
                         // Update all popup contents after loading user buoys
                     } else {
                         console.log('User not signed in.');
@@ -654,9 +667,8 @@
                     alert('Please sign in to add favorites');
                     return;
                 }
-                const uid = user.uid;
                 try {
-                    const response = await fetch(`/add?uid=${uid}&buoyid=${stationId}`);
+                    const response = await authFetch(`/api/favorites/${stationId}`, { method: 'POST' });
                     if (!response.ok) {
                         throw new Error('Failed to add buoy to favorites');
                     }
@@ -764,12 +776,10 @@
                     alert('Please sign in to manage favorites');
                     return;
                 }
-                const uid = user.uid;
-
                 if (userBuoys && userBuoys.includes(stationId)) {
                     // Remove from favorites
                     try {
-                        const response = await fetch(`/delete?uid=${uid}&buoyid=${stationId}`);
+                        const response = await authFetch(`/api/favorites/${stationId}`, { method: 'DELETE' });
                         if (!response.ok) {
                             throw new Error('Failed to remove buoy from favorites');
                         }
@@ -782,7 +792,7 @@
                 } else {
                     // Add to favorites
                     try {
-                        const response = await fetch(`/add?uid=${uid}&buoyid=${stationId}`);
+                        const response = await authFetch(`/api/favorites/${stationId}`, { method: 'POST' });
                         if (!response.ok) {
                             throw new Error('Failed to add buoy to favorites');
                         }
@@ -795,7 +805,7 @@
                 }
 
                 // Refresh the favorites display and update popup content
-                await loadForecastSummary(uid);
+                await loadForecastSummary();
             }
 
 

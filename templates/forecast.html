@@ -119,7 +119,7 @@
             }
 
             let currentDay = [];
-            let data = convertToDate({{.forecastdata.forecast}}, {{.forecastdata.date}});
+            let data = convertToDate({{json .ForecastData.Forecast}}, "{{.ForecastData.Date}}");
             let dataGroupedByDay = groupDataByDay(data);
 
             const cards = document.querySelectorAll('.forecastcard');
@@ -244,7 +244,7 @@
     <h2 class="text-2x1 text-lg font-bold mt-8">16 Day Forecast</h2>
     <div class = "container mx-auto ">
         <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer">
-            {{range .forecastsummary}}
+            {{range .ForecastSummary}}
                 <div class="forecastcard bg-white border border-2 py-2 md:min-w-[100px] min-w-[70px] md:py-4 px-1 md:px-2 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-gray-600 dark:text-white text-black" data-date="{{.Date}}">
                     <div class="flex items-center space-x-1 mb-1"> 
                         <div class="text-xs md:text-base font-medium">{{slice .DateAbv 0 3}}</div>

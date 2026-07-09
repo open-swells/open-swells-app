@@ -4,3 +4,8 @@ firebase-config.json
 metadata.json
 .DS_Store
 static/
+gosurf
+*.db
+*.db-wal
+*.db-shm
+main.db

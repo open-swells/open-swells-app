@@ -22,12 +22,12 @@
 
         // Define a global function that can be called after template insertion
         window.initializeSwellDirection = function() {
-            let secondaryswell = {{.swellreport.SecondaryDegrees}};
+            let secondaryswell = "{{.SwellReport.SecondaryDegrees}}";
             let swelldir = document.querySelector('.windswellsymbol');
             console.log("Direction: " + secondaryswell);
             if (swelldir) {
                 console.log("rotating");
-                swelldir.style.transform = `rotate(${directionmap[secondaryswell]}deg)`;
+                swelldir.style.transform = `rotate(${directionmap[secondaryswell] || secondaryswell || 0}deg)`;
             }
         };
 
@@ -42,15 +42,15 @@
             <div class="text-[12px] font-semibold">Swell</div>
             <div class="grid grid-rows-2 ">
                 <div class="flex items-center space-x-2">
-                    <div class="swellsymbol text-lg" style="transform: rotate({{if .swellreport.PrimaryDegrees}}{{.swellreport.PrimaryDegrees}}{{else}}0{{end}}deg);">&#8595;</div>
+                    <div class="swellsymbol text-lg" style="transform: rotate({{if .SwellReport.PrimaryDegrees}}{{.SwellReport.PrimaryDegrees}}{{else}}0{{end}}deg);">&#8595;</div>
                     <div class="text-[12px]">
-                        {{if .swellreport.PrimaryWaveHeight}}{{.swellreport.PrimaryWaveHeight}}{{else}}--{{end}}ft@{{if .swellreport.PrimaryPeriod}}{{.swellreport.PrimaryPeriod}}{{else}}--{{end}}s
+                        {{if .SwellReport.PrimaryWaveHeight}}{{.SwellReport.PrimaryWaveHeight}}{{else}}--{{end}}ft@{{if .SwellReport.PrimaryPeriod}}{{.SwellReport.PrimaryPeriod}}{{else}}--{{end}}s
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <div class="windswellsymbol text-lg" style="transform: rotate({{if .swellreport.SecondaryDegrees}}{{.swellreport.SecondaryDegrees}}{{else}}0{{end}}deg);">&#8595;</div>
+                    <div class="windswellsymbol text-lg" style="transform: rotate({{if .SwellReport.SecondaryDegrees}}{{.SwellReport.SecondaryDegrees}}{{else}}0{{end}}deg);">&#8595;</div>
                     <div class="text-[12px]">
-                        {{if .swellreport.SecondaryWaveHeight}}{{.swellreport.SecondaryWaveHeight}}{{else}}--{{end}}ft@{{if .swellreport.SecondaryPeriod}}{{.swellreport.SecondaryPeriod}}{{else}}--{{end}}s
+                        {{if .SwellReport.SecondaryWaveHeight}}{{.SwellReport.SecondaryWaveHeight}}{{else}}--{{end}}ft@{{if .SwellReport.SecondaryPeriod}}{{.SwellReport.SecondaryPeriod}}{{else}}--{{end}}s
                     </div>
                 </div>
             </div>
@@ -59,10 +59,10 @@
         <div class="wind px-2 border-r dark:border-gray-600">
             <div class="text-[12px] font-semibold">Wind</div>
             <div class="flex items-center space-x-2 ">
-                <div class="windsymbol text-lg" style="transform: rotate({{if .windreport.WindDir}}{{.windreport.WindDir}}{{else}}0{{end}}deg);">&#8595;</div>
+                <div class="windsymbol text-lg" style="transform: rotate({{if .WindReport.WindDir}}{{.WindReport.WindDir}}{{else}}0{{end}}deg);">&#8595;</div>
                 <div class="text-[12px] leading-tight">
-                    {{if .windreport.WindSpeed}}{{.windreport.WindSpeed}}{{else}}--{{end}}mph<br>
-                    gust {{if .windreport.WindGust}}{{.windreport.WindGust}}{{else}}--{{end}}
+                    {{if .WindReport.WindSpeed}}{{.WindReport.WindSpeed}}{{else}}--{{end}}mph<br>
+                    gust {{if .WindReport.WindGust}}{{.WindReport.WindGust}}{{else}}--{{end}}
                 </div>
             </div>
         </div>
@@ -70,15 +70,14 @@
         <div class="temp px-2">
             <div class="text-[12px] font-semibold">Temp</div>
             <div class="text-[12px] leading-tight ">
-                Air: {{if .windreport.AirTemp}}{{.windreport.AirTemp}}{{else}}--{{end}}ºF<br>
-                Water: {{if .windreport.WaterTemp}}{{.windreport.WaterTemp}}{{else}}--{{end}}ºF
+                Air: {{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}{{else}}--{{end}}ºF<br>
+                Water: {{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}{{else}}--{{end}}ºF
             </div>
         </div>
-        <!-- <div class="text-[10px] text-right dark:text-white mb-2">{{if .swellreport.Date}}{{.swellreport.Date}}{{else}}yyyy/mm/dd hh:mm{{end}}</div> -->
+        <!-- <div class="text-[10px] text-right dark:text-white mb-2">{{if .SwellReport.Date}}{{.SwellReport.Date}}{{else}}yyyy/mm/dd hh:mm{{end}}</div> -->
     </div>
     <!-- </div> -->
 
 
 </div>
 {{end}}
-
