@@ -173,39 +173,15 @@
             </div>
 
 
-            <!-- Legend -->
+            <!-- Legend (rows are generated from SWELL_BANDS in the map script) -->
             <div class="legend absolute lg:bottom-40 bottom-72 left-4 z-10 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg hidden lg:block">
-                <div class="text-xs font-semibold mb-2 dark:text-white">Significant wave height (m)</div>
-                <div class="flex flex-col gap-1">
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-4" style="background-color: #A50026;"></div>
-                        <span class="text-xs dark:text-white">≥ 5.5</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-4" style="background-color: #D73027;"></div>
-                        <span class="text-xs dark:text-white">4.0 – 5.5</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-4" style="background-color: #F46D43;"></div>
-                        <span class="text-xs dark:text-white">2.5 – 4.0</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-4" style="background-color: #4575B4;"></div>
-                        <span class="text-xs dark:text-white">1.5 – 2.5</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-4" style="background-color: #74ADD1;"></div>
-                        <span class="text-xs dark:text-white">1.0 – 1.5</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-4" style="background-color: #C7E9FF;"></div>
-                        <span class="text-xs dark:text-white">0.5 – 1.0</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <div class="w-6 h-4" style="background-color: #F7FBFF;"></div>
-                        <span class="text-xs dark:text-white">&lt; 0.5</span>
-                    </div>
-                </div>
+                <div class="text-xs font-semibold mb-2 dark:text-white">Swell height (m)</div>
+                <div id="legendBands" class="flex flex-col gap-1"></div>
+                <div id="legendReadout" class="text-xs mt-2 min-h-[1rem] text-gray-700 dark:text-gray-200"></div>
+                <label class="flex items-center gap-1.5 mt-1 text-xs dark:text-white cursor-pointer">
+                    <input type="checkbox" id="arrowsToggle" checked>
+                    Direction arrows
+                </label>
             </div>
 
             <!-- 5) Bottom Controls (overlay at bottom) -->
@@ -488,47 +464,142 @@
                 return `/static/contours_${String(hour).padStart(3, '0')}.geojson`;
             }
 
-            // A helper function to add the contours source/layer
-            function addContoursLayer() {
-                if (map.getLayer('contour-fills')) {
-                    map.removeLayer('contour-fills');
+            function hourToArrowsFilename(hour) {
+                return `/static/arrows_${String(hour).padStart(3, '0')}.geojson`;
+            }
+
+            // Height bands — must match FIXED_LEVELS in gfs_to_contours.py.
+            // Storm-scale ramp (weather-map convention): calm blues through
+            // green/yellow into red and near-black for extreme swell.
+            const SWELL_BANDS = [
+                { min: 0,   color: '#a5d5f0', label: '< 0.5' },
+                { min: 0.5, color: '#64a8e8', label: '0.5 – 1' },
+                { min: 1,   color: '#3178d2', label: '1 – 1.5' },
+                { min: 1.5, color: '#15a3a3', label: '1.5 – 2' },
+                { min: 2,   color: '#2fb54e', label: '2 – 2.5' },
+                { min: 2.5, color: '#a3c520', label: '2.5 – 3' },
+                { min: 3,   color: '#f2ce08', label: '3 – 4' },
+                { min: 4,   color: '#f59a0b', label: '4 – 5' },
+                { min: 5,   color: '#ea4b28', label: '5 – 6' },
+                { min: 6,   color: '#b31212', label: '6 – 8' },
+                { min: 8,   color: '#4a0a1e', label: '8+' },
+            ];
+
+            const fillColorExpression = ['step', ['get', 'contour_mean'], SWELL_BANDS[0].color];
+            for (const band of SWELL_BANDS.slice(1)) {
+                fillColorExpression.push(band.min, band.color);
+            }
+
+            // Legend rows, highest band on top
+            const legendBands = document.getElementById('legendBands');
+            [...SWELL_BANDS].reverse().forEach(band => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-2';
+                row.innerHTML =
+                    `<div class="w-6 h-4" style="background-color: ${band.color};"></div>` +
+                    `<span class="text-xs dark:text-white">${band.label}</span>`;
+                legendBands.appendChild(row);
+            });
+
+            const EMPTY_FC = { type: 'FeatureCollection', features: [] };
+
+            function makeArrowImage(size = 44) {
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = size;
+                const ctx = canvas.getContext('2d');
+                ctx.translate(size / 2, size / 2);
+                // Arrow points up (north); icon-rotate spins it per feature.
+                const s = size / 2;
+                ctx.beginPath();
+                ctx.moveTo(0, -s * 0.8);
+                ctx.lineTo(s * 0.38, -s * 0.15);
+                ctx.lineTo(s * 0.12, -s * 0.15);
+                ctx.lineTo(s * 0.12, s * 0.8);
+                ctx.lineTo(-s * 0.12, s * 0.8);
+                ctx.lineTo(-s * 0.12, -s * 0.15);
+                ctx.lineTo(-s * 0.38, -s * 0.15);
+                ctx.closePath();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(11, 11, 11, 0.8)';
+                ctx.fill();
+                return ctx.getImageData(0, 0, size, size);
+            }
+
+            function addSwellLayers() {
+                for (const layer of ['hillshade', 'contour-fills', 'swell-arrows']) {
+                    if (map.getLayer(layer)) map.removeLayer(layer);
                 }
-                if (map.getSource('contours')) {
-                    map.removeSource('contours');
+                for (const source of ['terrain-dem', 'contours', 'arrows']) {
+                    if (map.getSource(source)) map.removeSource(source);
                 }
-                map.addSource('contours', {
-                    type: 'geojson',
-                    data: hourToFilename(forecastHours[currentIndex])
+
+                // Terrain relief under the swell layers (free AWS open data).
+                // The contours no longer cover land, so this gives the land
+                // its geography back.
+                map.addSource('terrain-dem', {
+                    type: 'raster-dem',
+                    tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+                    encoding: 'terrarium',
+                    tileSize: 256,
+                    maxzoom: 12,
+                    attribution: 'Terrain tiles: Mapzen / AWS Open Data'
+                });
+                map.addLayer({
+                    id: 'hillshade',
+                    type: 'hillshade',
+                    source: 'terrain-dem',
+                    paint: {
+                        'hillshade-exaggeration': 0.35,
+                        'hillshade-shadow-color': 'rgba(0, 0, 0, 0.35)',
+                        'hillshade-highlight-color': 'rgba(255, 255, 255, 0.25)'
+                    }
                 });
 
-                // Add layer
-                map.addLayer(
-                    {
+                map.addSource('contours', { type: 'geojson', data: EMPTY_FC });
+                map.addSource('arrows', { type: 'geojson', data: EMPTY_FC });
+
+                map.addLayer({
                     id: 'contour-fills',
                     type: 'fill',
                     source: 'contours',
                     paint: {
-                        'fill-color': [
-                            'step',
-                            ['get', 'contour_mean'],
-                            '#F7FBFF', 0.5,
-                            '#C7E9FF', 1.0,
-                            '#74ADD1', 1.5,
-                            '#4575B4', 2.5,
-                            '#F46D43', 4.0,
-                            '#D73027', 5.5,
-                            '#A50026'
-                        ],
-                        'fill-opacity': 0.72,
-                        'fill-outline-color': 'rgba(0, 0, 0, 0.15)'
-                        }
+                        'fill-color': fillColorExpression,
+                        'fill-opacity': 0.75,
+                        'fill-outline-color': 'rgba(0, 0, 0, 0.12)'
                     }
-                );
+                });
+
+                if (!map.hasImage('swell-arrow')) {
+                    map.addImage('swell-arrow', makeArrowImage(), { pixelRatio: 2 });
+                }
+                map.addLayer({
+                    id: 'swell-arrows',
+                    type: 'symbol',
+                    source: 'arrows',
+                    layout: {
+                        'icon-image': 'swell-arrow',
+                        // d = direction the swell comes FROM; point where it's going
+                        'icon-rotate': ['+', ['get', 'd'], 180],
+                        'icon-rotation-alignment': 'map',
+                        // collision detection thins arrows out at low zoom
+                        'icon-allow-overlap': false,
+                        'icon-padding': 4,
+                        'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.45, 5, 0.7, 8, 1.0],
+                    },
+                    paint: { 'icon-opacity': 0.85 },
+                });
+                const arrowsToggle = document.getElementById('arrowsToggle');
+                if (arrowsToggle && !arrowsToggle.checked) {
+                    map.setLayoutProperty('swell-arrows', 'visibility', 'none');
+                }
             }
 
             map.on('style.load', () => {
-                addContoursLayer();
-                // Find the first symbol layer to insert the contour layer beneath
+                addSwellLayers();
+                // Find the first symbol layer and slot the swell layers beneath
+                // it so place labels stay readable. Fills sit under arrows.
                 let firstSymbolId;
                 for (const layer of map.getStyle().layers) {
                     if (layer.type === 'symbol') {
@@ -536,8 +607,46 @@
                         break;
                     }
                 }
-                map.moveLayer('contour-fills', firstSymbolId);
+                // Bottom-to-top: hillshade, swell fills, arrows, then labels.
+                map.moveLayer('swell-arrows', firstSymbolId);
+                map.moveLayer('contour-fills', 'swell-arrows');
+                map.moveLayer('hillshade', 'contour-fills');
                 updateMap(currentIndex);
+            });
+
+            // Hovering the fills shows the exact band in the legend
+            const legendReadout = document.getElementById('legendReadout');
+            map.on('mousemove', 'contour-fills', (e) => {
+                if (!legendReadout || !e.features || !e.features.length) return;
+                const p = e.features[0].properties;
+                legendReadout.textContent = p.contour_max >= 20
+                    ? `≥ ${p.contour_min} m at cursor`
+                    : `${p.contour_min} – ${p.contour_max} m at cursor`;
+            });
+            map.on('mouseleave', 'contour-fills', () => {
+                if (legendReadout) legendReadout.textContent = '';
+            });
+
+            // Hovering an arrow shows the full swell reading
+            const arrowPopup = new maplibregl.Popup({
+                closeButton: false,
+                closeOnClick: false,
+                offset: 12,
+            });
+            map.on('mouseenter', 'swell-arrows', (e) => {
+                const p = e.features[0].properties;
+                arrowPopup
+                    .setLngLat(e.lngLat)
+                    .setHTML(`<div class="text-xs">${p.h} m @ ${p.p} s from ${p.d}&deg;</div>`)
+                    .addTo(map);
+            });
+            map.on('mouseleave', 'swell-arrows', () => arrowPopup.remove());
+
+            document.getElementById('arrowsToggle').addEventListener('change', (e) => {
+                if (map.getLayer('swell-arrows')) {
+                    map.setLayoutProperty('swell-arrows', 'visibility',
+                        e.target.checked ? 'visible' : 'none');
+                }
             });
 
             // Fetch metadata and initialize time display
@@ -588,17 +697,60 @@
                 timeValue.textContent = timeStr;
             }
 
-            function updateMap(index) {
+            // Parsed frames are cached (LRU) and the next few hours prefetched,
+            // so scrubbing and playback don't wait on the network per frame.
+            const frameCache = new Map(); // url -> Promise<geojson>
+            const FRAME_CACHE_MAX = 48;
+
+            function loadFrame(url) {
+                if (frameCache.has(url)) {
+                    const cached = frameCache.get(url);
+                    frameCache.delete(url);
+                    frameCache.set(url, cached); // refresh LRU position
+                    return cached;
+                }
+                const promise = fetch(url)
+                    .then(r => {
+                        if (!r.ok) throw new Error(`${r.status} for ${url}`);
+                        return r.json();
+                    })
+                    // A missing hour clears the layer instead of breaking playback
+                    .catch(() => EMPTY_FC);
+                frameCache.set(url, promise);
+                if (frameCache.size > FRAME_CACHE_MAX) {
+                    frameCache.delete(frameCache.keys().next().value);
+                }
+                return promise;
+            }
+
+            function prefetchFrames(index, count = 4) {
+                for (let i = 1; i <= count; i++) {
+                    const hour = forecastHours[(index + i) % forecastHours.length];
+                    loadFrame(hourToFilename(hour));
+                    loadFrame(hourToArrowsFilename(hour));
+                }
+            }
+
+            let updateToken = 0;
+            async function updateMap(index) {
                 currentIndex = index;
                 const hours = forecastHours[index];
+                updateTimeDisplay(hours);
+
+                const token = ++updateToken;
+                const [contours, arrows] = await Promise.all([
+                    loadFrame(hourToFilename(hours)),
+                    loadFrame(hourToArrowsFilename(hours)),
+                ]);
+                if (token !== updateToken) return; // superseded by a newer frame
 
                 if (map.style && map.isStyleLoaded()) {
-                    const source = map.getSource('contours');
-                    if (source) {
-                        source.setData(hourToFilename(hours));
-                    }
+                    const contourSource = map.getSource('contours');
+                    if (contourSource) contourSource.setData(contours);
+                    const arrowSource = map.getSource('arrows');
+                    if (arrowSource) arrowSource.setData(arrows);
                 }
-                updateTimeDisplay(hours);
+                prefetchFrames(index);
             }
 
             function stepForward() {
