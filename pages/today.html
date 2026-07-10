@@ -182,6 +182,10 @@
                     <input type="checkbox" id="arrowsToggle" checked>
                     Direction arrows
                 </label>
+                <label class="flex items-center gap-1.5 mt-1 text-xs dark:text-white cursor-pointer">
+                    <input type="checkbox" id="heatmapToggle" checked>
+                    Smooth PNG layer
+                </label>
             </div>
 
             <!-- 5) Bottom Controls (overlay at bottom) -->
@@ -507,6 +511,33 @@
 
             const EMPTY_FC = { type: 'FeatureCollection', features: [] };
 
+            function normalizeLongitude(lng) {
+                return lng > 180 ? lng - 360 : lng;
+            }
+
+            function normalizeCoordinates(coords) {
+                if (typeof coords[0] === 'number') {
+                    return [normalizeLongitude(coords[0]), coords[1], ...coords.slice(2)];
+                }
+                return coords.map(normalizeCoordinates);
+            }
+
+            function normalizeGeoJSONLongitudes(collection) {
+                if (!collection || !Array.isArray(collection.features)) {
+                    return EMPTY_FC;
+                }
+                return {
+                    ...collection,
+                    features: collection.features.map(feature => ({
+                        ...feature,
+                        geometry: {
+                            ...feature.geometry,
+                            coordinates: normalizeCoordinates(feature.geometry.coordinates),
+                        },
+                    })),
+                };
+            }
+
             function makeArrowImage(size = 44) {
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = size;
@@ -607,22 +638,99 @@
             // changes crossfade instead of popping. The contour polygons stay
             // as a fallback when a run has no heatmaps.
             const HEATMAP_OPACITY = 0.85;
+            const HEATMAP_FADE_MS = 550;
+            const HEATMAP_OVERLAP_MS = 180;
             const TRANSPARENT_PX =
                 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNgYGD4DwABBAEAX+XLSgAAAABJRU5ErkJggg==';
             let heatmapBounds = null; // set from metadata.json
             let heatmapReady = false;
+            let swellLayersReady = false;
             let activeHeatLayer = 'b';
+            let firstHeatmapFrameShown = false;
+            let heatmapTransitionToken = 0;
+            let swellRenderMode = 'heatmap';
+
+            function wantsHeatmap() {
+                return swellRenderMode === 'heatmap' && heatmapReady;
+            }
+
+            function isGlobalZeroTo360(bounds) {
+                return bounds && bounds.west >= 0 && bounds.east > 180 && (bounds.east - bounds.west) > 300;
+            }
+
+            function displayHeatmapBounds(bounds) {
+                if (!isGlobalZeroTo360(bounds)) {
+                    return bounds;
+                }
+                return {
+                    west: -180,
+                    east: 180,
+                    north: bounds.north,
+                    south: bounds.south,
+                };
+            }
+
+            async function rollHeatmapBlob(blob) {
+                if (!isGlobalZeroTo360(heatmapBounds)) {
+                    return URL.createObjectURL(blob);
+                }
+
+                try {
+                    const bitmap = await createImageBitmap(blob);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = bitmap.width;
+                    canvas.height = bitmap.height;
+                    const ctx = canvas.getContext('2d');
+                    const halfWidth = Math.floor(bitmap.width / 2);
+                    const rightWidth = bitmap.width - halfWidth;
+
+                    // Source PNGs are 0..360 longitude. Roll 180..360 to the left
+                    // so the image aligns with the map's -180..180 initial world.
+                    ctx.drawImage(bitmap, halfWidth, 0, rightWidth, bitmap.height, 0, 0, rightWidth, bitmap.height);
+                    ctx.drawImage(bitmap, 0, 0, halfWidth, bitmap.height, rightWidth, 0, halfWidth, bitmap.height);
+
+                    if (bitmap.close) bitmap.close();
+                    const shiftedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    return URL.createObjectURL(shiftedBlob || blob);
+                } catch (error) {
+                    console.warn('Unable to normalize heatmap longitude; using original PNG.', error);
+                    return URL.createObjectURL(blob);
+                }
+            }
+
+            function decodeImageUrl(url) {
+                return new Promise(resolve => {
+                    const img = new Image();
+                    img.onload = () => resolve(url);
+                    img.onerror = () => resolve(url);
+                    img.src = url;
+                    if (img.decode) {
+                        img.decode().then(() => resolve(url)).catch(() => resolve(url));
+                    }
+                });
+            }
+
+            function hideHeatmapLayers() {
+                heatmapTransitionToken++;
+                firstHeatmapFrameShown = false;
+                for (const layer of ['heatmap-a', 'heatmap-b']) {
+                    if (map.getLayer(layer)) {
+                        map.setPaintProperty(layer, 'raster-opacity', 0);
+                    }
+                }
+            }
 
             function maybeAddHeatmapLayers() {
                 // Needs both the style (contour-fills exists) and the bounds.
                 if (heatmapReady || !heatmapBounds || !map.getLayer('contour-fills')) {
                     return;
                 }
+                const bounds = displayHeatmapBounds(heatmapBounds);
                 const coords = [
-                    [heatmapBounds.west, heatmapBounds.north],
-                    [heatmapBounds.east, heatmapBounds.north],
-                    [heatmapBounds.east, heatmapBounds.south],
-                    [heatmapBounds.west, heatmapBounds.south],
+                    [bounds.west, bounds.north],
+                    [bounds.east, bounds.north],
+                    [bounds.east, bounds.south],
+                    [bounds.west, bounds.south],
                 ];
                 for (const key of ['a', 'b']) {
                     map.addSource(`heatmap-${key}`, {
@@ -636,15 +744,21 @@
                         source: `heatmap-${key}`,
                         paint: {
                             'raster-opacity': 0,
-                            'raster-opacity-transition': { duration: 250 },
+                            'raster-opacity-transition': { duration: HEATMAP_FADE_MS },
                             'raster-resampling': 'linear',
                             'raster-fade-duration': 0,
                         },
                     }, 'contour-fills'); // below the (empty) contour fallback
                 }
                 heatmapReady = true;
+                if (wantsHeatmap()) {
+                    const contourSource = map.getSource('contours');
+                    if (contourSource) contourSource.setData(EMPTY_FC);
+                }
                 updateMap(currentIndex);
             }
+
+            const FRAME_CACHE_MAX = 48;
 
             // Heatmap frames are fetched as blobs into an LRU of object URLs.
             const imageCache = new Map(); // url -> Promise<objectURL|null>
@@ -661,7 +775,8 @@
                         if (!r.ok) throw new Error(`${r.status} for ${url}`);
                         return r.blob();
                     })
-                    .then(blob => URL.createObjectURL(blob))
+                    .then(blob => rollHeatmapBlob(blob))
+                    .then(url => decodeImageUrl(url))
                     .catch(() => null); // missing hour: fall back to contours
                 imageCache.set(url, promise);
                 if (imageCache.size > FRAME_CACHE_MAX) {
@@ -674,14 +789,37 @@
 
             function showHeatmapFrame(url) {
                 const next = activeHeatLayer === 'a' ? 'b' : 'a';
+                const previous = activeHeatLayer;
+                const token = ++heatmapTransitionToken;
+
                 map.getSource(`heatmap-${next}`).updateImage({ url });
-                map.setPaintProperty(`heatmap-${next}`, 'raster-opacity', HEATMAP_OPACITY);
-                map.setPaintProperty(`heatmap-${activeHeatLayer}`, 'raster-opacity', 0);
+
+                if (!firstHeatmapFrameShown) {
+                    map.setPaintProperty(`heatmap-${previous}`, 'raster-opacity', 0);
+                    map.setPaintProperty(`heatmap-${next}`, 'raster-opacity', HEATMAP_OPACITY);
+                    activeHeatLayer = next;
+                    firstHeatmapFrameShown = true;
+                    return;
+                }
+
+                // Keep the current frame visible briefly while the next image
+                // source is uploaded, then overlap the fades to avoid a flash.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        if (token !== heatmapTransitionToken) return;
+                        map.setPaintProperty(`heatmap-${next}`, 'raster-opacity', HEATMAP_OPACITY);
+                        window.setTimeout(() => {
+                            if (token !== heatmapTransitionToken) return;
+                            map.setPaintProperty(`heatmap-${previous}`, 'raster-opacity', 0);
+                        }, HEATMAP_OVERLAP_MS);
+                    });
+                });
                 activeHeatLayer = next;
             }
 
-            map.on('style.load', () => {
+            function initializeSwellMap() {
                 addSwellLayers();
+                swellLayersReady = true;
                 // Find the first symbol layer and slot the swell layers beneath
                 // it so place labels stay readable. Fills sit under arrows.
                 let firstSymbolId;
@@ -697,7 +835,7 @@
                 map.moveLayer('hillshade', 'contour-fills');
                 maybeAddHeatmapLayers(); // if metadata arrived before the style
                 updateMap(currentIndex);
-            });
+            }
 
             // Hover readout in the legend. In heatmap mode the value comes
             // from the nearest arrow grid point (exact height); in contour
@@ -705,9 +843,8 @@
             const legendReadout = document.getElementById('legendReadout');
 
             map.on('mousemove', (e) => {
-                if (!legendReadout || !heatmapReady) return;
-                // arrows use the GRIB 0..360 lon convention
-                const lng = ((e.lngLat.lng % 360) + 360) % 360;
+                if (!legendReadout || !wantsHeatmap()) return;
+                const lng = e.lngLat.lng;
                 const lat = e.lngLat.lat;
                 let best = null;
                 let bestDist = 4; // squared degrees; ~2 deg search radius
@@ -726,7 +863,7 @@
             });
 
             map.on('mousemove', 'contour-fills', (e) => {
-                if (!legendReadout || heatmapReady) return;
+                if (!legendReadout || wantsHeatmap()) return;
                 if (!e.features || !e.features.length) return;
                 const p = e.features[0].properties;
                 legendReadout.textContent = p.contour_max >= 20
@@ -734,7 +871,7 @@
                     : `${p.contour_min} – ${p.contour_max} m at cursor`;
             });
             map.on('mouseleave', 'contour-fills', () => {
-                if (legendReadout && !heatmapReady) legendReadout.textContent = '';
+                if (legendReadout && !wantsHeatmap()) legendReadout.textContent = '';
             });
 
             // Hovering an arrow shows the full swell reading
@@ -757,6 +894,12 @@
                     map.setLayoutProperty('swell-arrows', 'visibility',
                         e.target.checked ? 'visible' : 'none');
                 }
+            });
+
+            document.getElementById('heatmapToggle').addEventListener('change', (e) => {
+                swellRenderMode = e.target.checked ? 'heatmap' : 'contours';
+                legendReadout.textContent = '';
+                updateMap(currentIndex);
             });
 
             // Fetch metadata and initialize time display
@@ -789,6 +932,7 @@
                     document.getElementById('metadataTimestamp').textContent = 'Unable to load timestamp';
                 }
             }
+            const metadataReady = fetchMetadata();
 
             const dateFormatter = new Intl.DateTimeFormat(undefined, {
                 weekday: 'short',
@@ -815,7 +959,6 @@
             // Parsed frames are cached (LRU) and the next few hours prefetched,
             // so scrubbing and playback don't wait on the network per frame.
             const frameCache = new Map(); // url -> Promise<geojson>
-            const FRAME_CACHE_MAX = 48;
 
             function loadFrame(url) {
                 if (frameCache.has(url)) {
@@ -829,6 +972,7 @@
                         if (!r.ok) throw new Error(`${r.status} for ${url}`);
                         return r.json();
                     })
+                    .then(normalizeGeoJSONLongitudes)
                     // A missing hour clears the layer instead of breaking playback
                     .catch(() => EMPTY_FC);
                 frameCache.set(url, promise);
@@ -841,7 +985,7 @@
             function prefetchFrames(index, count = 4) {
                 for (let i = 1; i <= count; i++) {
                     const hour = forecastHours[(index + i) % forecastHours.length];
-                    if (heatmapReady) {
+                    if (wantsHeatmap()) {
                         loadImageFrame(hourToHeatmapFilename(hour));
                     } else {
                         loadFrame(hourToFilename(hour));
@@ -858,7 +1002,7 @@
                 updateTimeDisplay(hours);
 
                 const token = ++updateToken;
-                const wantHeatmap = heatmapReady;
+                const wantHeatmap = wantsHeatmap();
                 let [heatUrl, arrows] = await Promise.all([
                     wantHeatmap ? loadImageFrame(hourToHeatmapFilename(hours)) : null,
                     loadFrame(hourToArrowsFilename(hours)),
@@ -872,7 +1016,11 @@
                 if (token !== updateToken) return; // superseded by a newer frame
 
                 currentArrows = arrows;
-                if (map.style && map.isStyleLoaded()) {
+                // Don't gate this on map.isStyleLoaded(): it reports false
+                // whenever the style has pending work (tiles still streaming
+                // in on first load), which silently dropped the first frame.
+                // setData/updateImage on our own sources are safe regardless.
+                if (swellLayersReady) {
                     const arrowSource = map.getSource('arrows');
                     if (arrowSource) arrowSource.setData(arrows);
                     const contourSource = map.getSource('contours');
@@ -881,8 +1029,9 @@
                         showHeatmapFrame(heatUrl);
                     } else if (wantHeatmap) {
                         // missing frame: hide the stale image, contours took over
-                        map.setPaintProperty('heatmap-a', 'raster-opacity', 0);
-                        map.setPaintProperty('heatmap-b', 'raster-opacity', 0);
+                        hideHeatmapLayers();
+                    } else {
+                        hideHeatmapLayers();
                     }
                 }
                 prefetchFrames(index);
@@ -918,6 +1067,12 @@
                     playButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M8 5v14l11-7z"/></svg>';
                 }
             });
+
+            if (map.isStyleLoaded()) {
+                initializeSwellMap();
+            } else {
+                map.once('load', initializeSwellMap);
+            }
 
             //center the map
             map.setCenter([-119.069824, 33.101608]);
@@ -1346,9 +1501,6 @@
             map.setZoom(3);
 
             plotBuoys();
-        
-            // Fetch metadata when page loads
-            fetchMetadata();
         </script>
 
 
