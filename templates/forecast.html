@@ -241,7 +241,10 @@
         });
     </script>
 
-    <h2 class="text-2x1 text-lg font-bold mt-8">16 Day Forecast</h2>
+    <div class="flex items-center justify-between mt-6 mb-1">
+        <h2 class="text-xs font-semibold uppercase text-[#8b8d93]">16 day outlook</h2>
+        <span class="text-[10px] text-[#6f7177]">Select a day for hourly detail</span>
+    </div>
     <div class = "container mx-auto ">
         <div class="flex overflow-x-auto py-4 space-x-4" id="forecastContainer">
             {{range .ForecastSummary}}
@@ -251,12 +254,12 @@
                         <div class="text-xs md:text-sm font-semibold">{{slice .DateAbv 3}}</div>
                     </div> 
                     <div class="wave-height text-xs md:text-sm font-semibold">{{.WaveHeight}}</div>
-                    <div class="condition text-xs md:text-sm font-semibold" style="color: {{if eq .Condition "good"}}green{{else if eq .Condition "fair"}}orange{{else if eq .Condition "poor"}}red{{end}};">{{.Condition}}</div>
+                    <div class="condition text-xs font-medium" style="color: {{if eq .Condition "good"}}#6fcf97{{else if eq .Condition "fair"}}#e2b86b{{else if eq .Condition "poor"}}#e06c75{{end}};">{{.Condition}}</div>
                 </div>
             {{end}}
         </div>
     </div>
-    <div id="date-header" class= 'text-2x1 text-lg font-bold my-4'> </div>
+    <div id="date-header" class="text-xs font-semibold text-white mt-5 mb-2"></div>
 
     <div id="chart-container" class="flex justify-center">
         <div id="chart">

@@ -4,7 +4,7 @@
     <head>
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
         <script>
             tailwind.config = {
                 darkMode: 'class',
@@ -13,22 +13,56 @@
                 }
             }
         </script>
+        <style>
+            :root { color-scheme: dark; }
+            * { box-sizing: border-box; }
+            body { font-family: Inter, sans-serif !important; background: #18191c !important; color: #e6e6e6; letter-spacing: 0; }
+            .mono { font-family: 'JetBrains Mono', monospace; }
+            .station-shell { max-width: 1120px; margin: 0 auto; padding: 20px 24px 48px; }
+            .station-header { min-height: 48px; border-bottom: 1px solid #34363b; }
+            .station-action { height: 30px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid #3b3d42; background: #202125; color: #c6c7ca; font-size: 11px; }
+            .station-action:hover { background: #2a2c30; color: white; }
+            .current-report .container { gap: 10px !important; max-width: none !important; }
+            .current-report .card { min-height: 124px; padding: 14px !important; border: 1px solid #34363b !important; background: #202125; box-shadow: none !important; }
+            .current-report .card:hover { border-color: #45474d !important; background: #222327; }
+            .current-report h2 { margin: 0 0 10px !important; color: #8b8d93; font-size: 10px !important; font-weight: 600; text-transform: uppercase; }
+            .current-report .text-6xl { font-size: 30px !important; line-height: 1; color: #8f9bff; }
+            .current-report .details, .current-report .content { font-size: 12px !important; }
+            #forecastContainer { gap: 5px !important; padding: 8px 0 12px !important; scrollbar-width: thin; scrollbar-color: #45474d transparent; }
+            .forecastcard { min-width: 82px !important; padding: 9px 6px !important; background: #202125 !important; border: 1px solid #34363b !important; }
+            .forecastcard:hover { background: #292a2f !important; }
+            .forecastcard.selectedforecast { background: #292a35 !important; border-color: #5e6ad2 !important; }
+            #chart-container { border: 1px solid #34363b; background: #202125; overflow-x: auto; padding-top: 8px; }
+            #forecast-table { margin-top: 12px !important; margin-bottom: 24px !important; border: 1px solid #34363b; background: #202125; overflow-x: auto; }
+            #forecast-table th { color: #8b8d93; font-size: 10px; font-weight: 600; padding: 10px 14px !important; }
+            #forecast-table td { padding: 8px 14px !important; white-space: nowrap; }
+            #tooltip { border-radius: 4px !important; background: #18191c !important; border-color: #45474d !important; }
+            body.embedded .standalone-only { display: none !important; }
+            body.embedded .station-shell { padding-top: 14px; }
+            @media (max-width: 767px) {
+                .station-shell { padding: 12px; }
+                .current-report .container { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            }
+        </style>
+        <script>if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));</script>
     </head>
 
-    <body class="w-[95%] mx-auto font-['JetBrains_Mono'] dark:bg-slate-800 dark:text-white dark:border-white">
-        <div class="header grid grid-cols-[1fr_auto] md:flex md:flex-row md:justify-between items-center p-2 gap-2 mt-4">
+    <body>
+      <main class="station-shell">
+        <div class="station-header flex items-start justify-between gap-4 mb-4">
             <!-- Return to Map Link -->
-            <div class="justify-self-start min-w-fit">
-                <a href="/map" class="text-sm md:text-lg font-bold px-3 py-1">&#8592 Return To Map</a>
+            <div class="standalone-only min-w-fit">
+                <a href="/map" class="station-action">&#8592; Map</a>
             </div>
 
             <!-- Buoy Name -->
-            <h1 class="text-sm md:text-lg font-bold text-center px-3 py-1 w-full col-span-2 md:col-span-1 row-start-2 md:row-start-1">
-                {{.BuoyName}} - (buoy {{.SwellReport.StationId}})
-            </h1>
+            <div class="w-full min-w-0">
+                <h1 class="text-base font-semibold text-white truncate">{{.BuoyName}}</h1>
+                <div class="mono text-[10px] text-[#8b8d93] mt-1">BUOY {{.SwellReport.StationId}} &middot; CURRENT CONDITIONS</div>
+            </div>
 
             <!-- Icons -->
-            <div class="icons flex items-center gap-2 min-w-fit justify-self-end  px-2">
+            <div class="standalone-only icons flex items-center gap-2 min-w-fit">
                 <a href="/about" class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20" class="md:w-6 md:h-6">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -40,12 +74,23 @@
                     </svg>
                 </a>
             </div>
-
         </div>
 
-
+        <div class="flex items-center justify-between mb-2">
+            <div class="text-[10px] font-semibold uppercase text-[#8b8d93]">Current report</div>
+            {{if gt (len .ForecastSummary) 0}}
+                {{$current := index .ForecastSummary 0}}
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-[#8b8d93]">Current outlook</span>
+                    <span class="px-2 py-1 text-[10px] font-semibold uppercase border"
+                          style="color: {{if eq $current.Condition "good"}}#6fcf97{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor; background: color-mix(in srgb, currentColor 10%, transparent);">
+                        {{$current.Condition}}
+                    </span>
+                </div>
+            {{end}}
         </div>
-        {{template "report" .}}
+        <div class="current-report">{{template "report" .}}</div>
         {{template "forecast" .}}
+      </main>
     </body>
 </html>

@@ -430,9 +430,11 @@ func generateForecastSummary(forecastData ForecastData) []ForecastSummary {
 
 type BuoyWithSummary struct {
 	Buoy
-	Summary  []ForecastSummary
-	HasError bool
-	ErrorMsg string
+	Summary     []ForecastSummary
+	SwellReport SwellReport
+	WindReport  WindReport
+	HasError    bool
+	ErrorMsg    string
 }
 
 func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache *Cache, uid string, db *sql.DB) {
@@ -456,6 +458,16 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 			}
 			entry := BuoyWithSummary{
 				Buoy: Buoy{ID: buoyID, Name: buoyName},
+			}
+			if swellReport, reportErr := getSwellReport(buoyID); reportErr != nil {
+				log.Printf("Error fetching swell report for buoy %s: %v", buoyID, reportErr)
+			} else {
+				entry.SwellReport = swellReport
+			}
+			if windReport, reportErr := getWindReport(buoyID); reportErr != nil {
+				log.Printf("Error fetching wind report for buoy %s: %v", buoyID, reportErr)
+			} else {
+				entry.WindReport = windReport
 			}
 
 			forecastData, err := getForecast(cache, buoyID)
