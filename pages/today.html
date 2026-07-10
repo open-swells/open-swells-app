@@ -519,33 +519,6 @@
 
             const EMPTY_FC = { type: 'FeatureCollection', features: [] };
 
-            function normalizeLongitude(lng) {
-                return lng > 180 ? lng - 360 : lng;
-            }
-
-            function normalizeCoordinates(coords) {
-                if (typeof coords[0] === 'number') {
-                    return [normalizeLongitude(coords[0]), coords[1], ...coords.slice(2)];
-                }
-                return coords.map(normalizeCoordinates);
-            }
-
-            function normalizeGeoJSONLongitudes(collection) {
-                if (!collection || !Array.isArray(collection.features)) {
-                    return EMPTY_FC;
-                }
-                return {
-                    ...collection,
-                    features: collection.features.map(feature => ({
-                        ...feature,
-                        geometry: {
-                            ...feature.geometry,
-                            coordinates: normalizeCoordinates(feature.geometry.coordinates),
-                        },
-                    })),
-                };
-            }
-
             function makeArrowImage(size = 44) {
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = size;
@@ -980,7 +953,6 @@
                         if (!r.ok) throw new Error(`${r.status} for ${url}`);
                         return r.json();
                     })
-                    .then(normalizeGeoJSONLongitudes)
                     // A missing hour clears the layer instead of breaking playback
                     .catch(() => EMPTY_FC);
                 frameCache.set(url, promise);
