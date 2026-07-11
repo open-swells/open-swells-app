@@ -7,12 +7,12 @@
             const getChartColors = () => {
                 const darkMode = isDarkMode();
                 return {
-                    linePrimary: darkMode ? '#60a5fa' : 'steelblue',
-                    lineSecondary: 'orange',
-                    lineTertiary: darkMode ? '#4ade80' : 'green',
-                    lineQuaternary: darkMode ? '#a78bfa' : 'purple',
-                    axis: darkMode ? 'white' : 'black',
-                    verticalLine: darkMode ? '#6b7280' : 'gray'
+                    linePrimary: '#8f9bff',
+                    lineSecondary: '#e2b86b',
+                    lineTertiary: '#6fcf97',
+                    lineQuaternary: '#b89cff',
+                    axis: darkMode ? '#7f8187' : '#62646a',
+                    verticalLine: '#5e6ad2'
                 };
             };
 
@@ -21,74 +21,14 @@
                 if (!dayData) return;
                 currentDay = dayData;
 
-                const dataTable = document.getElementById('forecast-table');
-                dataTable.innerHTML = '';
-
                 const dateHeader = document.getElementById('date-header');
                 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                 
                 const parts = date.split('-');
                 const tempdate = new Date(parts[0], parts[1] - 1, parts[2]);
 
-                dateHeader.textContent = days[tempdate.getDay()] + ' ' + date;
-
-                const table = document.createElement('table');
-                table.className = 'min-w-full text-xs md:text-sm text-left border-collapse text-black dark:text-white table-fixed';
-
-                const header = table.createTHead();
-                const headerRow = header.insertRow();
-                headerRow.className = 'text-xs uppercase';
-                const headers = ['Hour', 'Primary Swell', 'Secondary Swell'];
-                headers.forEach(headerText => {
-                    const headerCell = document.createElement('th');
-                    headerCell.textContent = headerText;
-                    headerCell.className = 'py-3 px-6';
-                    headerRow.appendChild(headerCell);
-                });
-
-                const tbody = document.createElement('tbody');
-                table.appendChild(tbody);
-
-                dayData.forEach(dataItem => {
-                    const row = tbody.insertRow();
-                    row.className = 'border-b border-gray-200 dark:border-gray-600';
-
-                    const hourCell = row.insertCell();
-                    hourCell.textContent = dataItem.hour;
-                    hourCell.className = 'py-2 px-6';
-
-                    const primaryCell = row.insertCell();
-                    primaryCell.innerHTML = createSwellHTML(dataItem.PrimaryDegrees, dataItem.PrimaryWaveHeight, dataItem.PrimaryPeriod);
-                    primaryCell.className = 'py-2 px-6';
-
-                    const secondaryCell = row.insertCell();
-                    secondaryCell.innerHTML = createSwellHTML(dataItem.SecondaryDegrees, dataItem.SecondaryWaveHeight, dataItem.SecondaryPeriod);
-                    secondaryCell.className = 'py-2 px-6';
-
-                    const tertiaryCell = row.insertCell();
-                    if (dataItem.TertiaryWaveHeight === '') {
-                        tertiaryCell.innerHTML = '';
-                    } else {
-                        tertiaryCell.innerHTML = createSwellHTML(dataItem.TertiaryDegrees, dataItem.TertiaryWaveHeight, dataItem.TertiaryPeriod);
-                        tertiaryCell.className = 'py-2 px-6';
-                    }
-
-                    const quaternaryCell = row.insertCell();
-                    if (dataItem.QuaternaryWaveHeight === '') {
-                        quaternaryCell.innerHTML = '';
-                    } else {
-                        quaternaryCell.innerHTML = createSwellHTML(dataItem.QuaternaryDegrees, dataItem.QuaternaryWaveHeight, dataItem.QuaternaryPeriod);
-                        quaternaryCell.className = 'py-2 px-6';
-                    }
-                });
-                dataTable.appendChild(table);
+                dateHeader.textContent = days[tempdate.getDay()] + ' · ' + date;
                 updateStripSelection(date);
-            }
-
-            function createSwellHTML(direction, height, period) {
-                const arrowHTML = `<span class="swell-arrow text-3xl" style="transform: rotate(${direction - 180}deg); margin-right: 50px;">&#8595;</span>`;
-                const swellInfoHTML = `<span>${height}ft at ${period}s</span>`;
-                return `<div class="flex flex-center items-center">${arrowHTML} ${swellInfoHTML}</div>`;
             }
 
             function convertToDate(data, date) {
@@ -262,14 +202,16 @@
             const cards = document.querySelectorAll('.forecastcard');
             const firstCard = cards[0];
 
-            const margin = {top: 20, right: 30, bottom: 30, left: 50},
+            const margin = {top: 10, right: 12, bottom: 24, left: 34},
                 width = document.getElementById('chart-container').clientWidth - margin.left - margin.right,
-                height = 400 - margin.top - margin.bottom;
+                height = 220 - margin.top - margin.bottom;
 
             const svg = d3.select("#chart")
                 .append("svg")
                 .attr("width", width + margin.left + margin.right)
                 .attr("height", height + margin.top + margin.bottom)
+                .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+                .attr("preserveAspectRatio", "none")
                 .append("g")
                 .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -279,7 +221,7 @@
             const xAxisGroup = svg.append("g")
                 .attr("class", "xaxis")
                 .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x));
+                .call(d3.axisBottom(x).tickValues([0, 6, 12, 18, 23]).tickFormat(d => `${String(d).padStart(2, '0')}:00`).tickSize(4));
 
             var y = d3.scaleLinear()
                 .range([ height, 0 ]);
@@ -287,7 +229,7 @@
             var yScale = d3.scaleLinear()
                 .range([ height, 0 ]);
 
-            var yAxis = d3.axisLeft(yScale);
+            var yAxis = d3.axisLeft(yScale).ticks(3).tickFormat(d => `${d.toFixed(0)}′`).tickSize(-width);
 
             const yAxisGroup = svg.append("g")
                 .attr("class", "yaxis")
@@ -296,7 +238,9 @@
             const setAxisColor = () => {
                 const colors = getChartColors();
                 svg.selectAll(".yaxis, .xaxis").selectAll("text").style("fill", colors.axis);
-                svg.selectAll(".yaxis, .xaxis").selectAll("path, line").style("stroke", colors.axis);
+                svg.selectAll(".xaxis").selectAll("path, line").style("stroke", '#45474d');
+                svg.selectAll(".yaxis").selectAll("path").style("stroke", 'none');
+                svg.selectAll(".yaxis").selectAll("line").style("stroke", '#34363b');
             };
             setAxisColor();
 
@@ -318,15 +262,15 @@
                 const lineTertiary = d3.line().x(d => x(d.hour)).y(d => y(d.TertiaryWaveHeight * 3.28084));
                 const lineQuaternary = d3.line().x(d => x(d.hour)).y(d => y(d.QuaternaryWaveHeight * 3.28084));
 
-                svg.selectAll(".linePrimary").data([data]).join("path").attr("class", "linePrimary").attr("d", linePrimary).attr("fill", "none").attr("stroke", chartColors.linePrimary);
-                svg.selectAll(".lineSecondary").data([data]).join("path").attr("class", "lineSecondary").attr("d", lineSecondary).attr("fill", "none").attr("stroke", chartColors.lineSecondary);
-                svg.selectAll(".lineTertiary").data([data]).join("path").attr("class", "lineTertiary").attr("d", lineTertiary).attr("fill", "none").attr("stroke", chartColors.lineTertiary);
-                svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke", chartColors.lineQuaternary);
+                svg.selectAll(".linePrimary").data([data]).join("path").attr("class", "linePrimary").attr("d", linePrimary).attr("fill", "none").attr("stroke-width", 1.5).attr("stroke", chartColors.linePrimary);
+                svg.selectAll(".lineSecondary").data([data]).join("path").attr("class", "lineSecondary").attr("d", lineSecondary).attr("fill", "none").attr("stroke-width", 1.25).attr("stroke", chartColors.lineSecondary);
+                svg.selectAll(".lineTertiary").data([data]).join("path").attr("class", "lineTertiary").attr("d", lineTertiary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineTertiary);
+                svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineQuaternary);
 
-                svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${d.PrimaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("fill", chartColors.linePrimary);
-                svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${d.SecondaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", chartColors.lineSecondary).attr("fill", chartColors.lineSecondary);
-                svg.selectAll(".tertiaryPoint").data(data).join("path").attr("class", "tertiaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${d.TertiaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", chartColors.lineTertiary).attr("fill", chartColors.lineTertiary);
-                svg.selectAll(".quaternaryPoint").data(data).join("path").attr("class", "quaternaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight * 3.28084)}) rotate(${d.QuaternaryDegrees - 135}) skewY(25)`).attr("d", d3.symbol().type(d3.symbolTriangle).size(50)).attr("stroke", chartColors.lineQuaternary).attr("fill", chartColors.lineQuaternary);
+                svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${d.PrimaryDegrees - 135})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(28)).attr("fill", chartColors.linePrimary);
+                svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${d.SecondaryDegrees - 135})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(24)).attr("fill", chartColors.lineSecondary);
+                svg.selectAll(".tertiaryPoint").data(data).join("path").attr("class", "tertiaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${d.TertiaryDegrees - 135})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(20)).attr("fill", chartColors.lineTertiary);
+                svg.selectAll(".quaternaryPoint").data(data).join("path").attr("class", "quaternaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight * 3.28084)}) rotate(${d.QuaternaryDegrees - 135})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(20)).attr("fill", chartColors.lineQuaternary);
 
                 const tooltip = d3.select("#tooltip");
                 const verticalLine = svg.append("line").attr("class", "vertical-line").attr("y1", 0).attr("y2", height).attr("stroke", chartColors.verticalLine).attr("stroke-width", 1).attr("stroke-dasharray", "5,5").style("opacity", 0);
@@ -419,6 +363,37 @@
             letter-spacing: 0.03em;
             margin-top: 2px;
         }
+        .swell-detail {
+            margin-top: 14px;
+            padding: 10px 10px 6px;
+            background: #202125;
+            border: 1px solid #34363b;
+        }
+        .swell-detail-heading, #date-header, .swell-legend { font-family: 'JetBrains Mono', monospace; }
+        #chart-container { width: 100%; min-width: 0; }
+        #chart, #chart svg { display: block; width: 100%; }
+        #chart svg { max-height: 220px; }
+        #chart text { font-family: 'JetBrains Mono', monospace; font-size: 8px; }
+        .swell-legend { display: flex; flex-wrap: wrap; gap: 5px 12px; margin-top: 6px; color: #8b8d93; font-size: 8px; text-transform: uppercase; }
+        .swell-legend span { display: inline-flex; align-items: center; gap: 4px; }
+        .swell-legend i { width: 7px; height: 7px; display: inline-block; transform: rotate(45deg); }
+        #tooltip {
+            z-index: 20;
+            padding: 7px 9px;
+            background: #18191c;
+            border: 1px solid #45474d;
+            border-radius: 0;
+            color: #e6e6e6;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            line-height: 1.65;
+            box-shadow: 0 8px 24px rgba(0,0,0,.35);
+        }
+        @media (max-width: 520px) {
+            .swell-detail { padding-inline: 6px; }
+            #chart svg { max-height: 190px; }
+            .swell-legend { gap: 4px 8px; }
+        }
     </style>
 
     <!-- 16-day outlook: swell height strip with one day card per column
@@ -439,17 +414,25 @@
             </div>
         {{end}}
     </div>
-    <div id="date-header" class="text-xs font-semibold text-white mt-5 mb-2"></div>
-
-    <div id="chart-container" class="flex justify-center">
-        <div id="chart">
+    <div class="swell-detail">
+        <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-1">
+            <div>
+                <div class="swell-detail-heading text-[9px] font-semibold uppercase tracking-wide text-[#7f8187]">Hourly swell · height & direction</div>
+                <div id="date-header" class="mt-1 text-[10px] font-semibold text-white"></div>
+            </div>
+            <div class="swell-legend" aria-label="Swell component legend">
+                <span><i style="background:#8f9bff"></i>Primary</span>
+                <span><i style="background:#e2b86b"></i>Secondary</span>
+                <span><i style="background:#6fcf97"></i>Tertiary</span>
+                <span><i style="background:#b89cff"></i>Fourth</span>
+            </div>
         </div>
-
+        <div id="chart-container">
+            <div id="chart"></div>
+        </div>
     </div>
-    <div id="tooltip" class="absolute invisible p-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-gray-600 rounded pointer-events-none text-black dark:text-white shadow-lg"></div>
-    <div id="forecast-table" class="mt-8 mb-16"></div>
-
-
+    <div id="tooltip" class="absolute invisible pointer-events-none"></div>
+    <div class="h-8"></div>
 
 </div>
 {{end}}
