@@ -71,7 +71,7 @@ if [[ -z "$GO_BIN" || ! -x "$GO_BIN" ]]; then
 fi
 
 echo "Building with $GO_BIN..."
-"$GO_BIN" build -o "$APP_NAME" .
+"$GO_BIN" build -buildvcs=false -o "$APP_NAME" .
 
 systemctl restart "$APP_NAME"
 systemctl --no-pager --full status "$APP_NAME"
