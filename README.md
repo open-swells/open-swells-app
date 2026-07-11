@@ -42,7 +42,9 @@ derived from the verified token.
 ### Deploying to Linux
 
 `deploy.sh` deploys the app to `/root/open-swells-app` over SSH, builds it on
-the server, and restarts it with systemd.
+the server, and restarts the existing `open-swells-app` systemd service. The
+tracked `open-swells-app.service` file is provided for initial server setup;
+routine deployments do not install or modify the service definition.
 
 Add the server IP to `.env`:
 
@@ -62,9 +64,9 @@ Optional overrides:
 DEPLOY_USER=root DEPLOY_DIR=/root/open-swells-app APP_NAME=open-swells-app ./deploy.sh
 ```
 
-The server must have Go installed. If `FIREBASE_CREDENTIALS` points to an
-absolute local file path, the deploy script also syncs that credentials file to
-the same path on the server.
+The server must have Go installed. The server's `.env`, Firebase credentials,
+and SQLite database files are excluded from deployment syncs and remain
+unchanged.
 
 ### Resources and Tools
 - [htmx](https://htmx.org/)

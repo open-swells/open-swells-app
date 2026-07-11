@@ -1,0 +1,14 @@
+[Unit]
+Description=Open Swells App
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/open-swells-app
+ExecStart=/root/open-swells-app/open-swells-app
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

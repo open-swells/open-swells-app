@@ -5,111 +5,143 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenSwells</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
         body {
-            font-family: 'JetBrains Mono', monospace;
-            background: linear-gradient(135deg, rgba(0,0,255,0.1), rgba(255,0,0,0.1)); /* Washed out heatmap effect */
+            font-family: 'Inter', sans-serif;
+            background: #0f1012;
+            color: #e6e6e6;
+            letter-spacing: 0;
         }
-        .dark {
-            background: linear-gradient(135deg, rgba(30,40,30,1), rgba(1,20,30,1)); /* Dark mode gradient */
-            color: white;
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .hero-glow {
+            background:
+                radial-gradient(ellipse 60% 45% at 50% 0%, rgba(94, 106, 210, 0.16), transparent 70%),
+                #0f1012;
         }
-        .features-card {
-            display: flex;
-            flex-direction: column;
-            padding: 16px;
-            border: 1px solid #ccc;
-            flex: 1;
-            align-items: flex-start;
-            justify-content: space-between;
-            text-align: left;
-            min-height: 150px;
-            transition: all 0.2s;
+        .surface { background: #18191c; border: 1px solid #34363b; }
+        .feature-card {
+            background: #18191c;
+            border: 1px solid #34363b;
+            padding: 20px;
+            transition: border-color 120ms ease, background 120ms ease;
         }
-        .features-card h2 {
-            margin-bottom: 8px;
-            font-size: 1rem;
-            font-weight: bold;
+        .feature-card:hover { border-color: #45474d; background: #1c1d21; }
+        .cta-button {
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 16px;
+            background: #5e6ad2;
+            border: 1px solid #6d78de;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 120ms ease;
         }
-        .features-card p {
-            font-size: 0.875rem;
-            color: #555;
+        .cta-button:hover { background: #6d78de; }
+        .ghost-button {
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 16px;
+            background: #202125;
+            border: 1px solid #3b3d42;
+            color: #d6d7da;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 120ms ease, color 120ms ease;
         }
-        .dark .features-card p {
-            color: #ddd;
+        .ghost-button:hover { background: #2a2c30; color: #fff; }
+        .icon-button {
+            width: 32px; height: 32px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border: 1px solid transparent; color: #a7a9ae;
+            transition: background 120ms ease, color 120ms ease;
         }
-        button.start-mapping {
-            margin-top: 6px;
-            padding: 10px 20px;
-            background-color: #003f88;
-            color: white;
-            font-weight: bold;
-            text-transform: uppercase;
-            border: none;
-            border: 1px solid #003f88;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        button.start-mapping:hover {
-            background-color: #002f66;
-            color: white;
-        }
-        .dark button.start-mapping {
-            background-color: #4c8ed9;
-            border: 1px solid #4c8ed9;
-            color: white;
-        }
-        .dark button.start-mapping:hover {
-            background-color: #397bb3;
-        }
+        .icon-button:hover { color: #fff; background: #2a2c30; border-color: #3b3d42; }
     </style>
 </head>
-<body class="dark flex flex-col items-center justify-between min-h-screen">
+<body class="hero-glow min-h-screen flex flex-col">
     <!-- Header -->
-    <div class="header flex flex-row justify-between items-center p-4 w-full border-b border-gray-400">
-        <!-- Logo -->
-        <div class="title text-center justify-start">
-            <h1 class="md:text-lg text-md font-bold">OpenSwells;</h1>
-        </div>
-        <!-- Icons -->
-        <div class="icons w-1/5 flex items-center justify-end space-x-4">
-            <a href="/about" class="w-8 h-8 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="24" height="24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+    <header class="w-full border-b border-[#26272b]">
+        <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-2 text-sm font-semibold text-white">
+                <span class="text-[#8f9bff]">◒</span> OpenSwells
             </a>
-            <a href="https://github.com/evancoons22/go-mb-surf" class="w-8 h-8 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                    <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-                </svg>
-            </a>
+            <nav class="flex items-center gap-1">
+                <a href="/about" class="icon-button" title="About">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </a>
+                <a href="https://github.com/evancoons22/go-mb-surf" class="icon-button" title="GitHub">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="17" height="17">
+                        <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                </a>
+                <a href="/map" class="ghost-button ml-2 !h-8 text-xs">Open map</a>
+            </nav>
         </div>
-    </div>
+    </header>
 
-    <!-- Main Content -->
-    <div class="flex flex-col items-center justify-center text-center flex-grow px-4 py-8 md:py-0">
-        <h1 class="md:text-4xl text-2xl font-bold mt-4 md:mt-0">OpenSwells;</h1>
-        <p class="text-lg mt-4 mb-2">Free 16 day swell forecast</p>
-        <button class="start-mapping" onclick="window.location.href='/map'">Start Mapping</button>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8 md:mt-16 max-w-4xl w-full">
-            <div class="features-card">
-                <h2>178 Locations</h2>
-                <p>Monitor swell and weather activity across 178 buoy locations.</p>
+    <!-- Hero -->
+    <main class="flex-grow flex flex-col items-center justify-center px-6 py-16">
+        <div class="max-w-2xl w-full text-center">
+            <div class="mono inline-flex items-center gap-2 px-3 py-1 mb-6 text-[11px] text-[#8b8d93] border border-[#34363b] bg-[#18191c]">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#6fcf97]"></span>
+                LIVE &middot; UPDATED EVERY 6 HOURS
             </div>
-            <div class="features-card">
-                <h2>Real-time Reports</h2>
-                <p>All buoy information is available as soon as it is received by <a href="https://www.ndbc.noaa.gov/faq/realtime.shtml" style="text-decoration: underline;">NDBC</a></p>
-            </div>
-            <div class="features-card">
-                <h2>16 Day Global Forecast</h2>
-                <p>Extended 16-day wave predictions, refreshed every 6 hours.</p>
-            </div>
-            <div class="features-card">
-                <h2>Free</h2>
-                <p>No subscription. Sign in with google to save your spots.</p>
+            <h1 class="text-4xl md:text-5xl font-semibold tracking-tight text-white">
+                Free 16-day swell forecasts
+            </h1>
+            <p class="mt-4 text-base text-[#a7a9ae] leading-relaxed max-w-xl mx-auto">
+                Global wave model forecasts and real-time buoy reports from 178 stations.
+                Open source, no subscription.
+            </p>
+            <div class="mt-8 flex items-center justify-center gap-3">
+                <a href="/map" class="cta-button">
+                    Start mapping
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </a>
+                <a href="/about" class="ghost-button">Learn more</a>
             </div>
         </div>
-    </div>
+
+        <!-- Features -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-16 max-w-3xl w-full">
+            <div class="feature-card">
+                <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Coverage</div>
+                <h2 class="text-sm font-semibold text-white mb-1.5">178 stations</h2>
+                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">Monitor swell and weather activity across 178 buoy locations worldwide.</p>
+            </div>
+            <div class="feature-card">
+                <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Reports</div>
+                <h2 class="text-sm font-semibold text-white mb-1.5">Real-time buoy data</h2>
+                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">Readings are available as soon as they are received by <a href="https://www.ndbc.noaa.gov/faq/realtime.shtml" class="text-[#8f9bff] hover:text-white underline underline-offset-2 decoration-[#45474d]">NDBC</a>.</p>
+            </div>
+            <div class="feature-card">
+                <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Forecast</div>
+                <h2 class="text-sm font-semibold text-white mb-1.5">16-day global outlook</h2>
+                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">Extended wave predictions from NOAA wave models, refreshed every 6 hours.</p>
+            </div>
+            <div class="feature-card">
+                <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Pricing</div>
+                <h2 class="text-sm font-semibold text-white mb-1.5">Free, forever</h2>
+                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">No subscription. Sign in with Google to save your favorite spots.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full border-t border-[#26272b]">
+        <div class="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between text-[11px] text-[#6f7177]">
+            <span>OpenSwells &middot; open source</span>
+            <span class="mono">DATA: NOAA / NDBC / EMC</span>
+        </div>
+    </footer>
 </body>
 </html>

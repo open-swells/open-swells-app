@@ -36,18 +36,13 @@ rsync -az --delete \
   --exclude '.git/' \
   --exclude '.agents/' \
   --exclude '.codex/' \
+  --exclude '.env' \
   --exclude '*.db' \
   --exclude '*.db-wal' \
   --exclude '*.db-shm' \
   --exclude "$APP_NAME" \
   --exclude 'gosurf' \
   ./ "$REMOTE:$DEPLOY_DIR/"
-
-if [[ -n "${FIREBASE_CREDENTIALS:-}" && "$FIREBASE_CREDENTIALS" = /* && -f "$FIREBASE_CREDENTIALS" ]]; then
-  echo "Syncing Firebase credentials to $REMOTE:$FIREBASE_CREDENTIALS..."
-  ssh "$REMOTE" "mkdir -p '$(dirname "$FIREBASE_CREDENTIALS")'"
-  rsync -az "$FIREBASE_CREDENTIALS" "$REMOTE:$FIREBASE_CREDENTIALS"
-fi
 
 echo "Building and restarting $APP_NAME on $REMOTE..."
 ssh "$REMOTE" "DEPLOY_DIR='$DEPLOY_DIR' APP_NAME='$APP_NAME' bash -s" <<'REMOTE_SCRIPT'
@@ -62,25 +57,6 @@ fi
 
 go build -o "$APP_NAME" .
 
-cat >/etc/systemd/system/"$APP_NAME".service <<SERVICE
-[Unit]
-Description=Open Swells App
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-WorkingDirectory=$DEPLOY_DIR
-ExecStart=$DEPLOY_DIR/$APP_NAME
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
-
-systemctl daemon-reload
-systemctl enable --now "$APP_NAME"
 systemctl restart "$APP_NAME"
 systemctl --no-pager --full status "$APP_NAME"
 
