@@ -50,12 +50,28 @@ set -euo pipefail
 
 cd "$DEPLOY_DIR"
 
-if ! command -v go >/dev/null 2>&1; then
-  echo "Go is not installed on the server. Install Go, then rerun deploy.sh." >&2
+GO_BIN="${GO_BIN:-}"
+if [[ -z "$GO_BIN" ]]; then
+  GO_BIN="$(command -v go 2>/dev/null || true)"
+fi
+
+if [[ -z "$GO_BIN" ]]; then
+  for candidate in /usr/local/go/bin/go /usr/bin/go /snap/bin/go; do
+    if [[ -x "$candidate" ]]; then
+      GO_BIN="$candidate"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$GO_BIN" || ! -x "$GO_BIN" ]]; then
+  echo "Go was not found in PATH or a standard install location." >&2
+  echo "Set GO_BIN in the remote environment if Go is installed elsewhere." >&2
   exit 1
 fi
 
-go build -o "$APP_NAME" .
+echo "Building with $GO_BIN..."
+"$GO_BIN" build -o "$APP_NAME" .
 
 systemctl restart "$APP_NAME"
 systemctl --no-pager --full status "$APP_NAME"
