@@ -118,7 +118,7 @@
         </header>
         <main>
             <h1>About OpenSwells</h1>
-            <p class="subtitle">Free, open-source surf reports and swell forecasts &middot; <a href="https://github.com/evancoons22/go-mb-surf">GitHub</a></p>
+            <p class="subtitle">Free, open-source surf reports and swell forecasts &middot; <a href="https://github.com/open-swells/open-swells-app">GitHub</a></p>
 
             <div class="eyebrow">Overview</div>
             <p>
@@ -135,12 +135,35 @@
             </p>
 
             <div class="eyebrow">Running the app</div>
+            <p>
+                Two repos work together: <a href="https://github.com/open-swells/grib-parse-collect">grib-parse-collect</a> downloads
+                the wave model GRIB files and renders the forecast layers, and
+                <a href="https://github.com/open-swells/open-swells-app">open-swells-app</a> serves the map.
+                Clone them side by side — the <code>--local</code> flag copies generated layers
+                into the sibling <code>open-swells-app/static/</code> directory.
+            </p>
             <div class="panel">
                 <ol>
-                    <li>Clone the repo</li>
-                    <li><code>$ go run .</code></li>
+                    <li><code>$ git clone https://github.com/open-swells/open-swells-app</code></li>
+                    <li><code>$ git clone https://github.com/open-swells/grib-parse-collect</code></li>
+                    <li><code>$ cd grib-parse-collect && ./run.sh --local --verbose</code></li>
+                    <li><code>$ cd ../open-swells-app && go run .</code></li>
                     <li>Go to <code>localhost:8081</code></li>
                 </ol>
+            </div>
+
+            <div class="eyebrow">Dependencies</div>
+            <div class="panel">
+                <ul>
+                    <li><strong>open-swells-app</strong> — Go 1.21+. Runs without configuration
+                        (<code>PORT</code>, <code>DB_PATH</code>, and <code>STATIC_DIR</code> are configurable).</li>
+                    <li><strong>grib-parse-collect</strong> — Python 3.13+ managed with
+                        <a href="https://docs.astral.sh/uv/">uv</a> (pygrib, numpy, scipy, matplotlib, shapely, geojson),
+                        plus <code>rsync</code> for the <code>--local</code> copy step.</li>
+                    <li><code>--verbose</code> shows a progress bar while the parser runs; the full log is written to
+                        <code>grib-parse-collect/logs/grib-run.log</code>. A full 16-day run processes 129 forecast
+                        hours — use <code>--limit &lt;n&gt;</code> for a quick check.</li>
+                </ul>
             </div>
 
             <div class="eyebrow">Resources and tools</div>
