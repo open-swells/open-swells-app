@@ -37,7 +37,13 @@
     {{range .Buoys}}
     <div class="buoy bg-[#202125] border border-[#34363b] mb-2 p-3">
         <div class="buoy-name flex justify-between items-start gap-2 text-white">
-            <div class="min-w-0"><div class="text-xs font-semibold leading-5 truncate">{{.Name}}</div><div class="font-mono text-[10px] text-[#8b8d93]">BUOY {{.ID}}</div></div>
+            <div class="min-w-0">
+                <div class="text-xs font-semibold leading-5 truncate">{{.Name}}</div>
+                <div class="flex items-center gap-2">
+                    <span class="font-mono text-[10px] text-[#8b8d93]">BUOY {{.ID}}</span>
+                    {{if .Offline}}<span class="font-mono text-[9px] font-semibold uppercase text-[#e2b86b] border border-current px-1 leading-4" title="No report received since {{.OfflineSince}}">Offline since {{.OfflineSince}}</span>{{end}}
+                </div>
+            </div>
             <div class="flex justify-end gap-1 shrink-0">
                 <button onclick="openForecast('{{.ID}}')" class="h-7 px-2 border border-[#45474d] bg-[#292a2f] hover:bg-[#34363b] text-[10px] text-white">Open</button>
                 <button onclick="toggleFavorite('{{.ID}}')" class="h-7 w-7 border border-[#45474d] text-[#9b9da3] hover:text-red-400" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">&times;</button>

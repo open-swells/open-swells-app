@@ -102,7 +102,7 @@ func TestRowTime(t *testing.T) {
 
 func TestLoadTemplates(t *testing.T) {
 	tmpl := loadTemplates()
-	for _, name := range []string{"landing.html", "about.html", "today.html", "buoy.html", "report", "report_small", "forecastsummary"} {
+	for _, name := range []string{"landing.html", "about.html", "today.html", "buoy.html", "report", "forecastsummary"} {
 		if tmpl.Lookup(name) == nil {
 			t.Errorf("template %q not found", name)
 		}

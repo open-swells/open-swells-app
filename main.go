@@ -430,11 +430,13 @@ func generateForecastSummary(forecastData ForecastData) []ForecastSummary {
 
 type BuoyWithSummary struct {
 	Buoy
-	Summary     []ForecastSummary
-	SwellReport SwellReport
-	WindReport  WindReport
-	HasError    bool
-	ErrorMsg    string
+	Summary      []ForecastSummary
+	SwellReport  SwellReport
+	WindReport   WindReport
+	HasError     bool
+	ErrorMsg     string
+	Offline      bool
+	OfflineSince string // e.g. "Jul 3"; only set when Offline
 }
 
 func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache *Cache, uid string, db *sql.DB) {
@@ -452,12 +454,12 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 		go func(i int, buoyID string) {
 			defer wg.Done()
 
-			buoyName := fmt.Sprintf("Buoy %s", buoyID)
-			if location, ok := BuoyLocations[buoyID]; ok {
-				buoyName = location.Name
-			}
 			entry := BuoyWithSummary{
-				Buoy: Buoy{ID: buoyID, Name: buoyName},
+				Buoy: Buoy{ID: buoyID, Name: stationStore.DisplayName(buoyID)},
+			}
+			if since, offline := stationStore.OfflineSince(buoyID); offline {
+				entry.Offline = true
+				entry.OfflineSince = since.Format("Jan 2")
 			}
 			if swellReport, reportErr := getSwellReport(buoyID); reportErr != nil {
 				log.Printf("Error fetching swell report for buoy %s: %v", buoyID, reportErr)
@@ -517,6 +519,18 @@ func openDatabase(path string) *sql.DB {
 			SELECT MIN(id) FROM user_buoys GROUP BY uid, buoy_id
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_buoys_uid_buoy ON user_buoys (uid, buoy_id)`,
+		// Station registry, refreshed daily from NDBC (see stations.go).
+		// Inactive rows are stations that stopped reporting; they are kept
+		// so favorites keep resolving to a name.
+		`CREATE TABLE IF NOT EXISTS buoys (
+			station_id TEXT PRIMARY KEY,
+			name TEXT NOT NULL,
+			latitude REAL NOT NULL,
+			longitude REAL NOT NULL,
+			active INTEGER NOT NULL DEFAULT 1,
+			last_seen TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
 	}
 	for _, m := range migrations {
 		if _, err := db.Exec(m); err != nil {
@@ -579,8 +593,7 @@ func requireAuth() gin.HandlerFunc {
 }
 
 func validBuoyID(id string) bool {
-	_, ok := BuoyLocations[id]
-	return ok
+	return stationStore.Has(id)
 }
 
 func loadTemplates() *template.Template {
@@ -800,6 +813,12 @@ func main() {
 	db := openDatabase(dbPath)
 	defer db.Close()
 
+	stationStore = NewStationStore(db)
+	if err := stationStore.Load(); err != nil {
+		log.Fatalf("failed to load station list: %v", err)
+	}
+	go stationStore.RunRefresher()
+
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -820,6 +839,7 @@ func main() {
 	})
 	router.GET("/static/*filepath", staticHandler(staticDir))
 	router.GET("/healthz", healthHandler(db, staticDir))
+	router.GET("/api/buoys", stationStore.handleList)
 
 	router.GET("/", func(c *gin.Context) {
 		renderTemplate(c, tmpl, "landing.html", nil)
@@ -869,7 +889,7 @@ func main() {
 			ForecastData:    forecastdata,
 			SwellReport:     swellreport,
 			WindReport:      windreport,
-			BuoyName:        BuoyLocations[stationId].Name,
+			BuoyName:        stationStore.DisplayName(stationId),
 			HasSwellError:   swellErr != nil,
 			HasWindError:    windErr != nil,
 			ForecastSummary: generateForecastSummary(forecastdata),
@@ -900,9 +920,6 @@ func main() {
 
 	router.GET("/report/:stationId", func(c *gin.Context) {
 		reportHandler(c, "report")
-	})
-	router.GET("/report_small/:stationId", func(c *gin.Context) {
-		reportHandler(c, "report_small")
 	})
 
 	router.GET("/forecast-summary", requireAuth(), func(c *gin.Context) {

@@ -1,6 +1,6 @@
 {{define "report"}}
 <div>
-    <script> 
+    <script>
         let directionmap = {
             'N': 0,
             'NNE': 22.5,
@@ -9,7 +9,7 @@
             'E': 90,
             'ESE': 112.5,
             'SE': 135,
-            'SSE': 157.5,   
+            'SSE': 157.5,
             'S': 180,
             'SSW': 202.5,
             'SW': 225,
@@ -20,7 +20,8 @@
             'NNW': 337.5
         };
 
-        // Define a global function that can be called after template insertion
+        // NDBC sometimes reports the secondary direction as a compass name
+        // ("WNW") instead of degrees; convert it after template insertion.
         window.initializeSwellDirection = function() {
             let secondaryswell = "{{.SwellReport.SecondaryDegrees}}";
             let swelldir = document.querySelector('.windswellsymbol');
@@ -28,65 +29,131 @@
                 swelldir.style.transform = `rotate(${directionmap[secondaryswell] || secondaryswell || 0}deg)`;
             }
         };
-
-        // Also try to execute immediately in case it's needed
         initializeSwellDirection();
-    </script> 
-    <!-- <h2 class="text-5x1 text-lg font-bold mb-4">Report</h2>-->
+    </script>
+    <style>
+        .report-cards {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+        }
+        @media (max-width: 719px) {
+            .report-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        .report-card {
+            min-width: 0;
+            padding: 12px;
+            background: #202125;
+            border: 1px solid #34363b;
+            transition: border-color 120ms ease;
+        }
+        .report-card:hover { border-color: #45474d; }
+        .report-card h2 {
+            margin: 0 0 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #8b8d93;
+        }
+        .report-row { display: flex; align-items: center; gap: 10px; }
+        .report-value { min-width: 0; }
+        .report-value .main {
+            color: #f0f0f1;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .report-value .sub {
+            margin-top: 3px;
+            color: #8b8d93;
+            font-size: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .compass { width: 40px; height: 40px; flex: none; }
+        .compass .ring { fill: none; stroke: #3b3d42; stroke-width: 1; }
+        .compass .tick { stroke: #45474d; stroke-width: 1; }
+        .compass .needle {
+            fill: #8f9bff;
+            transform-box: view-box;
+            transform-origin: 50% 50%;
+        }
+    </style>
 
-    <!-- <div class="report flex justify-center"> -->
-    <div class="container grid grid-cols-2 md:grid-cols-4 mx-auto max-w-7xl">
-        <div class="card shadow-sm overflow-hidden border border-black dark:border-white p-4">
-            <h2 class="md:text-lg  text-sm mb-2">Primary Swell</h2>
-            <div class="content flex flex-row items-center justify-between gap-3">
-                <div class="direction flex flex-col items-center space-x-2">
-                    <div class="swellsymbol text-6xl" style="transform: rotate({{.SwellReport.PrimaryDegrees}}deg);">&#8595;</div>
-                    <p class="mwd text-center">{{.SwellReport.PrimaryDegrees}}º</p>
-                </div>
-                <div class="details text-base grid content-center text-right">
-                    <p class="swhswp text-sm font-semibold">{{.SwellReport.PrimaryWaveHeight}}ft @ {{.SwellReport.PrimaryPeriod}}s</p>
-                    <p class="steep text-[10px] text-[#8b8d93] mt-1">{{.SwellReport.Steepness}}</p>
+    <div class="report-cards">
+        <div class="report-card">
+            <h2>Primary swell</h2>
+            <div class="report-row">
+                <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle class="ring" cx="20" cy="20" r="16"/>
+                    <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
+                    <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
+                    <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
+                    <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
+                    <path class="needle swellsymbol" style="transform: rotate({{.SwellReport.PrimaryDegrees}}deg);"
+                          d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
+                </svg>
+                <div class="report-value">
+                    <div class="main">{{.SwellReport.PrimaryWaveHeight}}ft @ {{.SwellReport.PrimaryPeriod}}s</div>
+                    <div class="sub">{{.SwellReport.PrimaryDegrees}}&deg;{{if .SwellReport.Steepness}} &middot; {{.SwellReport.Steepness}}{{end}}</div>
                 </div>
             </div>
         </div>
 
-        <div class="card shadow-sm overflow-hidden border border-black dark:border-white p-4">
-            <h2 class="md:text-lg text-sm  mb-2">Secondary Swell</h2>
-            <div class="content flex flex-row items-center justify-between gap-3">
-                <div class="direction flex flex-col items-center space-x-2">
-                    <div class="windswellsymbol text-6xl" style="transform: rotate({{.SwellReport.SecondaryDegrees}}deg);">&#8595;</div>
-                    <p class="wwd text-center">{{.SwellReport.SecondaryDegrees}}º</p>
-                </div>
-                <div class="details space text-base grid content-center text-right">
-                    <p class="wwhwwp text-sm font-semibold">{{.SwellReport.SecondaryWaveHeight}}ft @ {{.SwellReport.SecondaryPeriod}}s</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card shadow-sm overflow-hidden border border-black dark:border-white p-4">
-            <h2 class="md:text-lg text-sm  mb-2">Wind</h2>
-            <div class="content flex flex-row items-center justify-between gap-3">
-                <div class="direction flex flex-col items-center space-x-2">
-                    <div class="windsymbol text-6xl" style="transform: rotate({{.WindReport.WindDir}}deg);">&#8595;</div>
-                    <p class="wddir text-center">{{.WindReport.WindDir}}º</p>
-                </div>
-                <div class="details space text-base grid content-center text-right">
-                    <p class="wdspd text-sm font-semibold">{{.WindReport.WindSpeed}} mph</p>
-                    <p class="gust text-[10px] text-[#8b8d93] mt-1">Gust {{.WindReport.WindGust}} mph</p>
+        <div class="report-card">
+            <h2>Secondary swell</h2>
+            <div class="report-row">
+                <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle class="ring" cx="20" cy="20" r="16"/>
+                    <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
+                    <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
+                    <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
+                    <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
+                    <path class="needle windswellsymbol" style="transform: rotate({{.SwellReport.SecondaryDegrees}}deg);"
+                          d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
+                </svg>
+                <div class="report-value">
+                    <div class="main">{{.SwellReport.SecondaryWaveHeight}}ft @ {{.SwellReport.SecondaryPeriod}}s</div>
+                    <div class="sub">{{.SwellReport.SecondaryDegrees}}&deg;</div>
                 </div>
             </div>
         </div>
 
-        <div class="card shadow-sm overflow-hidden border border-black dark:border-white p-4">
-            <h2 class="md:text-lg text-sm  mb-2">Weather</h2>
-            <div class="content grid grid-cols-2 gap-3 mt-4">
-                <div><p class="text-[10px] text-[#8b8d93] mb-1">AIR</p><p class="airtemp text-lg font-semibold">{{.WindReport.AirTemp}}º</p></div>
-                <div><p class="text-[10px] text-[#8b8d93] mb-1">WATER</p><p class="temp text-lg font-semibold">{{.WindReport.WaterTemp}}º</p></div>
+        <div class="report-card">
+            <h2>Wind</h2>
+            <div class="report-row">
+                <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
+                    <circle class="ring" cx="20" cy="20" r="16"/>
+                    <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
+                    <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
+                    <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
+                    <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
+                    <path class="needle windsymbol" style="transform: rotate({{.WindReport.WindDir}}deg);"
+                          d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
+                </svg>
+                <div class="report-value">
+                    <div class="main">{{.WindReport.WindSpeed}} mph</div>
+                    <div class="sub">Gust {{.WindReport.WindGust}} mph &middot; {{.WindReport.WindDir}}&deg;</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="report-card">
+            <h2>Weather</h2>
+            <div class="report-row" style="gap: 20px;">
+                <div class="report-value">
+                    <div class="sub" style="margin: 0 0 3px;">AIR</div>
+                    <div class="main">{{.WindReport.AirTemp}}&deg;F</div>
+                </div>
+                <div class="report-value">
+                    <div class="sub" style="margin: 0 0 3px;">WATER</div>
+                    <div class="main">{{.WindReport.WaterTemp}}&deg;F</div>
+                </div>
             </div>
         </div>
     </div>
-    <!-- </div> -->
-
-
 </div>
 {{end}}

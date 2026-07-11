@@ -1,12 +1,14 @@
 package main
 
 type BuoyLocation struct {
-	StationID string
-	Name      string
-	Latitude  float64
-	Longitude float64
+	StationID string  `json:"stationId"`
+	Name      string  `json:"name"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
 }
 
+// BuoyLocations is only the first-run seed for the buoys table; the live
+// list is refreshed daily from NDBC (see stations.go).
 var BuoyLocations = map[string]BuoyLocation{
 	"41002": {"41002", "SOUTH HATTERAS - 225 NM South of Cape Hatteras", 31.759, -74.936},
 	"41004": {"41004", "EDISTO - 41 NM Southeast of Charleston, SC", 32.502, -79.099},

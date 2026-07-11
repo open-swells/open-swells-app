@@ -22,16 +22,6 @@
             .station-header { min-height: 48px; border-bottom: 1px solid #34363b; }
             .station-action { height: 30px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid #3b3d42; background: #202125; color: #c6c7ca; font-size: 11px; }
             .station-action:hover { background: #2a2c30; color: white; }
-            .current-report .container { gap: 10px !important; max-width: none !important; }
-            .current-report .card { min-height: 124px; padding: 14px !important; border: 1px solid #34363b !important; background: #202125; box-shadow: none !important; }
-            .current-report .card:hover { border-color: #45474d !important; background: #222327; }
-            .current-report h2 { margin: 0 0 10px !important; color: #8b8d93; font-size: 10px !important; font-weight: 600; text-transform: uppercase; }
-            .current-report .text-6xl { font-size: 30px !important; line-height: 1; color: #8f9bff; }
-            .current-report .details, .current-report .content { font-size: 12px !important; }
-            #forecastContainer { gap: 5px !important; padding: 8px 0 12px !important; scrollbar-width: thin; scrollbar-color: #45474d transparent; }
-            .forecastcard { min-width: 82px !important; padding: 9px 6px !important; background: #202125 !important; border: 1px solid #34363b !important; }
-            .forecastcard:hover { background: #292a2f !important; }
-            .forecastcard.selectedforecast { background: #292a35 !important; border-color: #5e6ad2 !important; }
             #chart-container { border: 1px solid #34363b; background: #202125; overflow-x: auto; padding-top: 8px; }
             #forecast-table { margin-top: 12px !important; margin-bottom: 24px !important; border: 1px solid #34363b; background: #202125; overflow-x: auto; }
             #forecast-table th { color: #8b8d93; font-size: 10px; font-weight: 600; padding: 10px 14px !important; }
@@ -41,7 +31,6 @@
             body.embedded .station-shell { padding-top: 14px; }
             @media (max-width: 767px) {
                 .station-shell { padding: 12px; }
-                .current-report .container { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             }
         </style>
         <script>if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));</script>
