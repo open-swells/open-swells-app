@@ -145,6 +145,13 @@ func (s *StationStore) Has(id string) bool {
 	return ok
 }
 
+func (s *StationStore) Location(id string) (BuoyLocation, bool) {
+	s.mu.RLock()
+	rec, ok := s.byID[id]
+	s.mu.RUnlock()
+	return rec.BuoyLocation, ok
+}
+
 func (s *StationStore) DisplayName(id string) string {
 	s.mu.RLock()
 	rec, ok := s.byID[id]

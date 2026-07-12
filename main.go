@@ -690,11 +690,17 @@ func staticHandler(staticDir string) gin.HandlerFunc {
 			c.Header("Cache-Control", "public, max-age=1800")
 		}
 
-		if strings.HasSuffix(clean, ".geojson") &&
+		// tides.json is ~100KB of hourly series; worth compressing like the
+		// geojson layers.
+		if (strings.HasSuffix(clean, ".geojson") || strings.HasSuffix(clean, "tides.json")) &&
 			strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
 			if gzPath, err := ensureGzipSibling(full); err == nil {
 				c.Header("Content-Encoding", "gzip")
-				c.Header("Content-Type", "application/geo+json")
+				if strings.HasSuffix(clean, ".geojson") {
+					c.Header("Content-Type", "application/geo+json")
+				} else {
+					c.Header("Content-Type", "application/json")
+				}
 				c.Header("Vary", "Accept-Encoding")
 				c.File(gzPath)
 				return
@@ -840,6 +846,7 @@ func main() {
 	router.GET("/static/*filepath", staticHandler(staticDir))
 	router.GET("/healthz", healthHandler(db, staticDir))
 	router.GET("/api/buoys", stationStore.handleList)
+	router.GET("/api/wind/:stationId", windForecastHandler(staticDir))
 
 	router.GET("/", func(c *gin.Context) {
 		renderTemplate(c, tmpl, "landing.html", nil)

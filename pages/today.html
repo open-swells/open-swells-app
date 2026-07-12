@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <html class="dark">
     <head>
 
@@ -21,6 +21,13 @@
         :root { color-scheme: dark; }
         * { box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif !important; background: #0f1012; color: #e6e6e6; overflow: hidden; }
+        /* h-screen is 100vh, which extends under mobile browser chrome and
+           hides the bottom controls; the dynamic viewport unit tracks the
+           real visible height. */
+        body.h-screen { height: 100dvh; }
+        /* MapLibre adds .maplibregl-map (position: relative) to the container,
+           which defeats Tailwind's absolute/inset-0 — size it explicitly. */
+        #map { width: 100%; height: 100%; }
         button, input { letter-spacing: 0; }
         .mono { font-family: 'JetBrains Mono', monospace; }
         .surface { background: rgba(24, 25, 28, .96); border: 1px solid #34363b; box-shadow: 0 12px 30px rgba(0,0,0,.24); }
@@ -28,7 +35,7 @@
         .icon-button:hover { color: #fff; background: #2a2c30; border-color: #3b3d42; }
         .toolbar-button { height: 32px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid #3b3d42; background: #202125; color: #d6d7da; font-size: 12px; font-weight: 500; }
         .toolbar-button:hover, .toolbar-button[aria-expanded="true"] { background: #2a2c30; color: #fff; }
-        #favoritesView { width: min(390px, calc(100vw - 24px)); transform: translateX(calc(100% + 24px)); transition: transform 180ms ease; }
+        #favoritesView { width: min(390px, calc(100vw - 24px)); bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)); transform: translateX(calc(100% + 24px)); transition: transform 180ms ease; }
         #favoritesView.is-open { transform: translateX(0); }
         #drawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
         #drawerBackdrop.is-open { opacity: 1; pointer-events: auto; }
@@ -74,6 +81,26 @@
         .buoy-marker:hover .buoy-marker-dot {
             transform: scale(1.35);
             background: #6d78de;
+        }
+        /* Tide stations: teal diamonds, distinct from the indigo buoy dots.
+           Same outer/inner split as .buoy-marker (MapLibre owns the outer
+           element's transform). */
+        .tide-marker {
+            width: 16px; height: 16px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        .tide-marker-dot {
+            width: 9px; height: 9px;
+            background: #15a3a3;
+            border: 2px solid rgba(255, 255, 255, 0.95);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+            transform: rotate(45deg);
+            transition: transform 120ms ease, background 120ms ease;
+        }
+        .tide-marker:hover .tide-marker-dot {
+            transform: rotate(45deg) scale(1.35);
+            background: #1fc2c2;
         }
         /* Forecast timeline scrubber: a 16-day track with day ticks and a
            sliding playhead. The real <input type="range"> sits invisibly on
@@ -131,6 +158,15 @@
             .timeline-playhead { bottom: 5px; }
         }
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
+        /* Keep the bottom bar clear of the iOS home indicator */
+        .bottom-controls { bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important; }
+        /* The favorites list must scroll on touch devices */
+        #buoy-containers {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            touch-action: pan-y;
+        }
         </style>
     </head>
 
@@ -141,9 +177,9 @@
 
         <!-- 1) Wrap your map div inside #mapView so toggleView can hide/show it -->
         <div id="mapView" class="absolute inset-0 z-0">
-            <div 
+            <div
                           id="map"
-                          class="absolute inset-0 z-0 h-screen w-screen" 
+                          class="absolute inset-0 z-0"
                           style="background: #ccc;"
                           >
                           <!-- Initialize map -->
@@ -296,7 +332,7 @@
                 <div id="legendReadout" class="text-xs mt-2 min-h-[1rem] text-gray-700 dark:text-gray-200"></div>
                 <label class="flex items-center gap-1.5 mt-1 text-xs dark:text-white cursor-pointer">
                     <input type="checkbox" id="arrowsToggle" checked>
-                    Direction arrows
+                    Swell arrows
                 </label>
                 <label class="flex items-center gap-1.5 mt-1 text-xs dark:text-white cursor-pointer">
                     <input type="checkbox" id="heatmapToggle" checked>
@@ -585,6 +621,10 @@
                 return `/static/heatmap_${String(hour).padStart(3, '0')}.png`;
             }
 
+            function hourToPartitionsFilename(hour) {
+                return `/static/swell_partitions_${String(hour).padStart(3, '0')}.geojson`;
+            }
+
             // Height bands — must match FIXED_LEVELS in gfs_to_contours.py.
             // Storm-scale ramp (weather-map convention): calm blues through
             // green/yellow into red and near-black for extreme swell.
@@ -711,6 +751,7 @@
                 if (arrowsToggle && !arrowsToggle.checked) {
                     map.setLayoutProperty('swell-arrows', 'visibility', 'none');
                 }
+
             }
 
             // --- Heatmap rendering -------------------------------------------
@@ -956,7 +997,24 @@
                 if (legendReadout && !wantsHeatmap()) legendReadout.textContent = '';
             });
 
-            // Hovering an arrow shows the full swell reading
+            function nearestPointFeature(features, lngLat, maxDist2 = 4) {
+                let best = null;
+                let bestDist = maxDist2; // squared degrees
+                for (const f of features) {
+                    const [flng, flat] = f.geometry.coordinates;
+                    const dlng = Math.min(Math.abs(flng - lngLat.lng), 360 - Math.abs(flng - lngLat.lng));
+                    const dist = dlng * dlng + (flat - lngLat.lat) * (flat - lngLat.lat);
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        best = f;
+                    }
+                }
+                return best;
+            }
+
+            // Hovering an arrow shows the full swell reading; the individual
+            // swell systems from swell_partitions_XXX.geojson stream in once
+            // that frame is cached.
             const arrowPopup = new maplibregl.Popup({
                 closeButton: false,
                 closeOnClick: false,
@@ -964,13 +1022,30 @@
             });
             map.on('mouseenter', 'swell-arrows', (e) => {
                 const p = e.features[0].properties;
-                arrowPopup
-                    .setLngLat(e.lngLat)
-                    .setHTML(`<div class="text-xs">${p.h} m @ ${p.p} s from ${p.d}&deg;</div>`)
-                    .addTo(map);
+                const lngLat = e.lngLat;
+                const base = `<div class="text-xs">${p.h} m @ ${p.p} s from ${p.d}&deg;</div>`;
+                arrowPopup.setLngLat(lngLat).setHTML(base).addTo(map);
+
+                loadFrame(hourToPartitionsFilename(forecastHours[currentIndex])).then(fc => {
+                    if (!arrowPopup.isOpen() || !fc.features || !fc.features.length) return;
+                    const f = nearestPointFeature(fc.features, lngLat);
+                    if (!f) return;
+                    const rows = [];
+                    for (let k = 1; k <= 3; k++) {
+                        const h = f.properties[`h${k}`];
+                        if (h === undefined) continue;
+                        rows.push(`<div class="text-xs" style="color: #c6c7ca;">${h} m @ ${f.properties[`p${k}`]} s from ${f.properties[`d${k}`]}&deg;</div>`);
+                    }
+                    if (rows.length > 1) {
+                        arrowPopup.setHTML(base +
+                            `<div class="mono" style="margin: 6px 0 2px; font-size: 9px; color: #8b8d93; text-transform: uppercase;">Swell systems</div>` +
+                            rows.join(''));
+                    }
+                });
             });
             map.on('mouseleave', 'swell-arrows', () => arrowPopup.remove());
 
+            // Wind arrows: hover shows speed (converted to mph) and origin
             document.getElementById('arrowsToggle').addEventListener('change', (e) => {
                 if (map.getLayer('swell-arrows')) {
                     map.setLayoutProperty('swell-arrows', 'visibility',
@@ -1224,7 +1299,7 @@
                 const isFavorite = userBuoys.includes(stationId);
                 button.textContent = isFavorite ? '−' : '+';
                 button.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
-                button.className = `favorite-btn h-8 w-8 flex items-center justify-center text-sm font-semibold border border-[#3b3d42] bg-[#202125] ${
+                button.className = `favorite-btn h-10 w-10 flex items-center justify-center text-lg font-semibold border border-[#3b3d42] bg-[#202125] ${
                     isFavorite ? 'text-[#e06c75] hover:bg-[#34363b]' : 'text-[#6fcf97] hover:bg-[#34363b]'
                 }`;
             }
@@ -1252,14 +1327,14 @@
                     <div class="flex gap-1.5">
                         <button
                             onclick="openForecast('${buoy.stationId}')"
-                            class="toolbar-button !h-8 flex-1 justify-center">
+                            class="toolbar-button !h-10 flex-1 justify-center">
                             Report & forecast
                         </button>
                         <button
                             id="fav-${buoy.stationId}"
                             onclick="toggleFavorite('${buoy.stationId}')"
                             data-station-id="${buoy.stationId}"
-                            class="favorite-btn h-8 w-8 flex items-center justify-center text-sm font-semibold border border-[#3b3d42] bg-[#202125]">
+                            class="favorite-btn h-10 w-10 flex items-center justify-center text-lg font-semibold border border-[#3b3d42] bg-[#202125]">
                         </button>
                     </div>
                 </div>`;
@@ -1445,7 +1520,104 @@
             map.setCenter([-119.069824, 33.101608]);
             map.setZoom(3);
 
+            // --- Tide stations (NOAA CO-OPS, from tides.json) ------------
+            // tides.json: { stations: [{ id, name, lat, lon, predictions:
+            // [{t, v}], observations: [{t, v}] }], errors: [...] }. Heights
+            // are meters MLLW, timestamps UTC. Absent file = no tide layer.
+            function tideDate(t) {
+                return new Date(t.replace(' ', 'T') + 'Z');
+            }
+
+            const M_TO_FT = 3.28084;
+
+            function tidePopupHTML(st) {
+                const now = Date.now();
+                const preds = (st.predictions || []).map(e => ({ t: tideDate(e.t).getTime(), v: parseFloat(e.v) }));
+                const obs = (st.observations || []).map(e => ({ t: tideDate(e.t).getTime(), v: parseFloat(e.v) }));
+
+                let html = `<div class="w-[250px]">
+                    <div class="text-[13px] font-medium text-white leading-snug mb-1 pr-4">${st.name || 'Tide station'}</div>
+                    <div class="mono text-[10px] text-[#8b8d93] mb-2">TIDE ${st.id} &middot; MLLW</div>`;
+
+                if (preds.length < 2) {
+                    return html + '<div class="text-xs text-[#8b8d93]">No predictions available.</div></div>';
+                }
+
+                // current level + trend from the two predictions around now
+                let i = preds.findIndex(p => p.t > now);
+                if (i < 1) i = 1;
+                const before = preds[i - 1], after = preds[Math.min(i, preds.length - 1)];
+                const frac = after.t > before.t ? (now - before.t) / (after.t - before.t) : 0;
+                const level = before.v + (after.v - before.v) * Math.max(0, Math.min(1, frac));
+                const rising = after.v >= before.v;
+
+                // next local extremum after now
+                let extremum = null;
+                for (let k = Math.max(i, 1); k < preds.length - 1; k++) {
+                    const isMax = preds[k].v >= preds[k - 1].v && preds[k].v >= preds[k + 1].v;
+                    const isMin = preds[k].v <= preds[k - 1].v && preds[k].v <= preds[k + 1].v;
+                    if (preds[k].t > now && (isMax || isMin)) {
+                        extremum = { ...preds[k], kind: isMax ? 'High' : 'Low' };
+                        break;
+                    }
+                }
+                const fmtTime = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+                html += `<div class="text-xs text-white font-semibold">${(level * M_TO_FT).toFixed(1)} ft &middot; ${rising ? 'rising' : 'falling'}</div>`;
+                if (extremum) {
+                    html += `<div class="text-[11px] text-[#a7a9ae] mt-0.5">${extremum.kind} ${(extremum.v * M_TO_FT).toFixed(1)} ft at ${fmtTime.format(new Date(extremum.t))}</div>`;
+                }
+
+                // sparkline: last 24h observed (gray) + next 48h predicted (teal)
+                const t0 = now - 24 * 3600e3, t1 = now + 48 * 3600e3;
+                const window_ = { obs: obs.filter(p => p.t >= t0 && p.t <= now), preds: preds.filter(p => p.t >= t0 && p.t <= t1) };
+                const all = window_.obs.concat(window_.preds);
+                if (all.length > 1) {
+                    const W = 250, H = 56, PAD = 4;
+                    const vMin = Math.min(...all.map(p => p.v)), vMax = Math.max(...all.map(p => p.v));
+                    const xOf = t => ((t - t0) / (t1 - t0)) * W;
+                    const yOf = v => vMax === vMin ? H / 2 : PAD + (1 - (v - vMin) / (vMax - vMin)) * (H - 2 * PAD);
+                    const line = pts => pts.map((p, j) => `${j ? 'L' : 'M'}${xOf(p.t).toFixed(1)} ${yOf(p.v).toFixed(1)}`).join(' ');
+                    const nowX = xOf(now).toFixed(1);
+                    html += `<svg width="${W}" height="${H}" class="mt-2" style="display:block;">
+                        <line x1="${nowX}" y1="0" x2="${nowX}" y2="${H}" stroke="#5e6ad2" stroke-dasharray="3,3"/>
+                        ${window_.obs.length > 1 ? `<path d="${line(window_.obs.filter((_, j) => j % 5 === 0))}" fill="none" stroke="#8b8d93" stroke-width="1"/>` : ''}
+                        <path d="${line(window_.preds)}" fill="none" stroke="#15a3a3" stroke-width="1.5"/>
+                        <circle cx="${nowX}" cy="${yOf(level).toFixed(1)}" r="2.5" fill="#fff"/>
+                    </svg>
+                    <div class="mono text-[9px] text-[#6f7177] mt-1">-24H &middot; NOW &middot; +48H</div>`;
+                }
+                return html + '</div>';
+            }
+
+            async function loadTideStations() {
+                try {
+                    const response = await fetch('/static/tides.json');
+                    if (!response.ok) return; // older pipeline run: no tides
+                    const payload = await response.json();
+                    for (const st of payload.stations || []) {
+                        if (typeof st.lat !== 'number' || typeof st.lon !== 'number') continue;
+                        const el = document.createElement('div');
+                        el.className = 'tide-marker';
+                        el.title = `${st.name || st.id} tide station`;
+                        const dot = document.createElement('div');
+                        dot.className = 'tide-marker-dot';
+                        el.appendChild(dot);
+
+                        const popup = new maplibregl.Popup({ offset: 12, maxWidth: '300px' });
+                        // Build the popup lazily so "now" is fresh on open
+                        popup.on('open', () => popup.setHTML(tidePopupHTML(st)));
+                        new maplibregl.Marker({ element: el })
+                            .setLngLat([st.lon, st.lat])
+                            .setPopup(popup)
+                            .addTo(map);
+                    }
+                } catch (error) {
+                    console.warn('Tide stations unavailable:', error);
+                }
+            }
+
             loadBuoyStations();
+            loadTideStations();
         </script>
 
 
