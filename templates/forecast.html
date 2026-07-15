@@ -47,7 +47,9 @@
                 const st = dayStats[date];
                 if (!st) { el.innerHTML = ''; return; }
                 let html = `${st.avgFt.toFixed(1)} ft avg &middot; <span style="color: ${CONDITION_COLORS[st.cond]};">${st.cond}</span>`;
-                if (windState === 'ready') {
+                if (windState === 'loading') {
+                    html += ' &middot; <span class="wind-loading">wind &hellip;</span>';
+                } else if (windState === 'ready') {
                     const parts = date.split('-');
                     const dayStart = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
                     const pts = windSamples.filter(w =>
@@ -90,13 +92,14 @@
                         d: s.d,
                     }));
                     windState = 'ready';
-                    // redraw the strip so the wind lane appears
-                    buildSwellStrip();
-                    if (stripSelectedDate) updateStripSelection(stripSelectedDate);
                 } catch (error) {
                     console.warn('Wind forecast unavailable:', error);
                 } finally {
                     if (windState !== 'ready') windState = 'none';
+                    // redraw the strip so the wind lane's loading placeholder
+                    // becomes the data (or collapses if none is available)
+                    buildSwellStrip();
+                    if (stripSelectedDate) updateStripSelection(stripSelectedDate);
                     if (currentDay.length) updateChart(currentDay, svg);
                     if (currentDate) updateDayHeader(currentDate);
                 }
@@ -224,11 +227,14 @@
 
                 const windPts = windSamples.filter(w => w.t >= domainStart && w.t <= domainEnd);
                 const hasWind = windPts.length > 1;
+                // reserve the wind lane while /api/wind is in flight so the
+                // strip doesn't change height when the data lands
+                const showWindLane = hasWind || windState === 'loading';
 
                 // lane geometry: swell on top, wind beneath, labels at bottom
                 const swTop = 14, swBase = 78;
                 const wdTop = swBase + 16, wdBase = wdTop + 40;
-                const gridBase = hasWind ? wdBase : swBase;
+                const gridBase = showWindLane ? wdBase : swBase;
                 const height = gridBase + 16;
 
                 const maxFt = d3.max(stripPts, p => p.ft) || 1;
@@ -263,7 +269,7 @@
                             .text(stripDayFmt(day));
                     }
                 });
-                for (const baseline of hasWind ? [swBase, wdBase] : [swBase]) {
+                for (const baseline of showWindLane ? [swBase, wdBase] : [swBase]) {
                     svg.append('line')
                         .attr('x1', 0).attr('x2', width)
                         .attr('y1', baseline).attr('y2', baseline)
@@ -290,12 +296,27 @@
 
                 // wind lane
                 let yw = null;
-                if (hasWind) {
-                    const maxMph = d3.max(windPts, w => w.s) * 2.237;
-                    yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 5)]).range([wdBase, wdTop]);
+                if (showWindLane) {
                     stripMono(svg.append('text'), 8, '#6f7177')
                         .attr('x', 2).attr('y', wdTop - 5)
                         .text('WIND (MPH)');
+                }
+                if (showWindLane && !hasWind) {
+                    // still loading: pulsing placeholder in the lane
+                    const wdMid = (wdTop + wdBase) / 2;
+                    svg.append('line').attr('class', 'wind-loading')
+                        .attr('x1', 0).attr('x2', width)
+                        .attr('y1', wdMid).attr('y2', wdMid)
+                        .attr('stroke', '#e2b86b').attr('stroke-width', 1.5)
+                        .attr('stroke-dasharray', '4,5');
+                    stripMono(svg.append('text').attr('class', 'wind-loading'), 9, '#e2b86b')
+                        .attr('x', width / 2).attr('y', wdMid - 8)
+                        .attr('text-anchor', 'middle')
+                        .text('loading wind…');
+                }
+                if (hasWind) {
+                    const maxMph = d3.max(windPts, w => w.s) * 2.237;
+                    yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 5)]).range([wdBase, wdTop]);
                     svg.append('path').datum(windPts)
                         .attr('fill', 'none').attr('stroke', '#e2b86b').attr('stroke-width', 1.5)
                         .attr('d', d3.line().x(w => x(w.t)).y(w => yw(w.s * 2.237)).curve(d3.curveMonotoneX));
