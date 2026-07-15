@@ -35,6 +35,22 @@
         .icon-button:hover { color: #fff; background: #2a2c30; border-color: #3b3d42; }
         .toolbar-button { height: 32px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid #3b3d42; background: #202125; color: #d6d7da; font-size: 12px; font-weight: 500; }
         .toolbar-button:hover, .toolbar-button[aria-expanded="true"] { background: #2a2c30; color: #fff; }
+        /* Buoy popup card. Styled with plain CSS rather than runtime
+           Tailwind utility classes so the buttons hold their size and
+           layout everywhere, including mobile. */
+        .buoy-popup { width: min(230px, calc(100vw - 56px)); }
+        .buoy-popup-name { margin: 0 16px 4px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
+        .buoy-popup-id { margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b8d93; }
+        .buoy-popup-actions { display: flex; gap: 6px; }
+        .buoy-popup-actions .toolbar-button { height: 40px; flex: 1; justify-content: center; }
+        .favorite-btn {
+            width: 40px; height: 40px; flex: none;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; font-weight: 600; line-height: 1;
+            border: 1px solid #3b3d42; background: #202125; color: #6fcf97;
+        }
+        .favorite-btn:hover { background: #34363b; }
+        .favorite-btn.is-favorite { color: #e06c75; }
         #favoritesView { width: min(390px, calc(100vw - 24px)); bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)); transform: translateX(calc(100% + 24px)); transition: transform 180ms ease; }
         #favoritesView.is-open { transform: translateX(0); }
         #drawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
@@ -1299,9 +1315,7 @@
                 const isFavorite = userBuoys.includes(stationId);
                 button.textContent = isFavorite ? '−' : '+';
                 button.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
-                button.className = `favorite-btn h-10 w-10 flex items-center justify-center text-lg font-semibold border border-[#3b3d42] bg-[#202125] ${
-                    isFavorite ? 'text-[#e06c75] hover:bg-[#34363b]' : 'text-[#6fcf97] hover:bg-[#34363b]'
-                }`;
+                button.classList.toggle('is-favorite', isFavorite);
             }
 
             // Create a MutationObserver to watch for new buttons
@@ -1321,20 +1335,20 @@
 
             function createPopupContent(buoy) {
                 return `
-                <div class="w-[230px]">
-                    <div class="text-[13px] font-medium text-white leading-snug break-words mb-1 pr-4">${buoy.name}</div>
-                    <div class="mono text-[10px] text-[#8b8d93] mb-3">BUOY ${buoy.stationId}</div>
-                    <div class="flex gap-1.5">
+                <div class="buoy-popup">
+                    <div class="buoy-popup-name">${buoy.name}</div>
+                    <div class="buoy-popup-id">BUOY ${buoy.stationId}</div>
+                    <div class="buoy-popup-actions">
                         <button
                             onclick="openForecast('${buoy.stationId}')"
-                            class="toolbar-button !h-10 flex-1 justify-center">
+                            class="toolbar-button">
                             Report & forecast
                         </button>
                         <button
                             id="fav-${buoy.stationId}"
                             onclick="toggleFavorite('${buoy.stationId}')"
                             data-station-id="${buoy.stationId}"
-                            class="favorite-btn h-10 w-10 flex items-center justify-center text-lg font-semibold border border-[#3b3d42] bg-[#202125]">
+                            class="favorite-btn">
                         </button>
                     </div>
                 </div>`;

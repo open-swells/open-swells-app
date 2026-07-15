@@ -173,9 +173,9 @@
                     card.className = 'forecastcard text-white';
                     card.setAttribute('data-date', key);
                     card.innerHTML =
-                        `<div class="fc-day">${cardDayFmt.format(d)}<span class="fc-md"> ${d.getMonth() + 1}/${d.getDate()}</span></div>` +
+                        `<div class="fc-day">${cardDayFmt.format(d)} ${d.getMonth() + 1}/${d.getDate()}</div>` +
                         `<div class="fc-height">${avgFt.toFixed(1)}ft</div>` +
-                        `<div class="fc-cond" style="color: ${CONDITION_COLORS[cond]};"><span>${cond}</span></div>`;
+                        `<div class="fc-cond" style="color: ${CONDITION_COLORS[cond]};">${cond}</div>`;
                     container.appendChild(card);
                 }
             }
@@ -200,6 +200,7 @@
             }
 
             const stripTimeFmt = d3.timeFormat('%a %-d, %-I %p');
+            const stripDayFmt = d3.timeFormat('%a %-d');
 
             function stripMono(sel, size, color) {
                 return sel.attr('fill', color).attr('font-size', size)
@@ -224,12 +225,11 @@
                 const windPts = windSamples.filter(w => w.t >= domainStart && w.t <= domainEnd);
                 const hasWind = windPts.length > 1;
 
-                // lane geometry: swell on top, wind beneath; the day cards
-                // below the strip are its x-axis labels, so no label row
+                // lane geometry: swell on top, wind beneath, labels at bottom
                 const swTop = 14, swBase = 78;
                 const wdTop = swBase + 16, wdBase = wdTop + 40;
                 const gridBase = hasWind ? wdBase : swBase;
-                const height = gridBase + 6;
+                const height = gridBase + 16;
 
                 const maxFt = d3.max(stripPts, p => p.ft) || 1;
                 const y = d3.scaleLinear().domain([0, maxFt * 1.2]).range([swBase, swTop]);
@@ -242,19 +242,26 @@
                 grad.append('stop').attr('offset', '0%').attr('stop-color', '#5e6ad2').attr('stop-opacity', 0.45);
                 grad.append('stop').attr('offset', '100%').attr('stop-color', '#5e6ad2').attr('stop-opacity', 0.02);
 
-                // selected-day band runs to the bottom edge so it reads as
-                // one column with the selected card beneath
+                // selected-day band spans both lanes
                 stripSel = svg.append('rect')
-                    .attr('y', swTop - 6).attr('height', height - swTop + 6)
+                    .attr('y', swTop - 6).attr('height', gridBase - swTop + 6)
                     .attr('fill', 'rgba(94, 106, 210, 0.16)').attr('display', 'none');
 
-                // day grid: hairlines run through both lanes to the card row
+                // day grid: hairlines through both lanes, labels at the bottom
+                const labelStep = width < 520 ? 4 : 2;
                 const days = d3.timeDay.range(d3.timeDay.offset(d3.timeDay.floor(domainStart), 1), domainEnd);
-                days.forEach(day => {
+                days.forEach((day, i) => {
                     svg.append('line')
                         .attr('x1', x(day)).attr('x2', x(day))
-                        .attr('y1', swTop - 6).attr('y2', height)
+                        .attr('y1', swTop - 6).attr('y2', gridBase + 4)
                         .attr('stroke', 'rgba(255, 255, 255, 0.05)');
+                    if (i % labelStep === 1) {
+                        stripMono(svg.append('text'), 9, '#6f7177')
+                            .attr('x', Math.max(18, Math.min(width - 18, x(day))))
+                            .attr('y', height - 4)
+                            .attr('text-anchor', 'middle')
+                            .text(stripDayFmt(day));
+                    }
                 });
                 for (const baseline of hasWind ? [swBase, wdBase] : [swBase]) {
                     svg.append('line')
@@ -575,31 +582,30 @@
         .swell-strip { margin-top: 12px; background: #202125; border: 1px solid #34363b; }
         .swell-strip .strip-title, .swell-strip #stripReadout { font-family: 'JetBrains Mono', monospace; }
         .swell-strip svg { display: block; }
-        /* The day cards are the strip's x-axis: one equal-width column per
-           forecast day inside the same frame, hairline-separated so the
-           strip's day grid continues through them. */
+        /* One equal-width column per forecast day; the row scrolls on
+           narrow screens. The selected day is also shown as a band in the
+           strip above, so the strip stays readable while this scrolls. */
         #forecastContainer {
             display: grid;
             grid-auto-flow: column;
-            grid-auto-columns: minmax(0, 1fr);
-            border-top: 1px solid #2c2e33;
+            grid-auto-columns: minmax(48px, 1fr);
+            gap: 2px;
+            margin-top: 2px;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #45474d transparent;
         }
         .forecastcard {
             min-width: 0;
-            padding: 7px 2px 8px;
-            border-left: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 6px 2px;
+            background: #202125;
+            border: 1px solid #34363b;
             cursor: pointer;
             text-align: center;
-            overflow: hidden;
-            transition: background 120ms ease;
+            transition: border-color 120ms ease, background 120ms ease;
         }
-        .forecastcard:first-child { border-left: none; }
-        .forecastcard:hover { background: rgba(255, 255, 255, 0.03); }
-        .forecastcard.selectedforecast {
-            background: rgba(94, 106, 210, 0.16);
-            box-shadow: inset 0 -2px 0 #5e6ad2;
-        }
-        .forecastcard.selectedforecast .fc-day { color: #c8ceff; }
+        .forecastcard:hover { background: #292a2f; }
+        .forecastcard.selectedforecast { background: #292a35; border-color: #5e6ad2; }
         .forecastcard .fc-day {
             font-family: 'JetBrains Mono', monospace;
             font-size: 9px;
@@ -653,30 +659,23 @@
             line-height: 1.65;
             box-shadow: 0 8px 24px rgba(0,0,0,.35);
         }
-        @media (max-width: 640px) {
-            /* narrow columns: weekday only, condition becomes a color bar */
-            .forecastcard .fc-md { display: none; }
-            .forecastcard .fc-height { font-size: 9px; }
-            .forecastcard .fc-cond span { display: none; }
-            .forecastcard .fc-cond { height: 3px; margin: 4px 3px 0; background: currentColor; }
-        }
         @media (max-width: 520px) {
             .swell-detail { padding-inline: 6px; }
             .swell-legend { gap: 4px 8px; }
         }
     </style>
 
-    <!-- 16-day outlook: swell + wind lanes with one day card per column in
-         the same frame. The cards are the strip's x-axis labels; both are
-         built from the same local-day grouping, so the columns align. -->
+    <!-- 16-day outlook: swell + wind lanes. The selected day is shown as a
+         band in the strip; the day cards beneath are an independent,
+         horizontally scrollable row built from the same local-day grouping. -->
     <div class="swell-strip">
         <div class="flex items-center justify-between px-3 pt-2">
             <span class="strip-title text-[10px] font-semibold uppercase text-[#8b8d93]">Swell &amp; wind &middot; 16 day outlook</span>
             <span id="stripReadout" class="text-[10px] text-[#8b8d93]">Select a day for hourly detail</span>
         </div>
         <div id="swellStrip"></div>
-        <div id="forecastContainer"></div>
     </div>
+    <div id="forecastContainer"></div>
     <div class="swell-detail">
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
             <div class="swell-detail-heading text-[9px] font-semibold uppercase tracking-wide text-[#7f8187]">Hourly swell · height & direction</div>
