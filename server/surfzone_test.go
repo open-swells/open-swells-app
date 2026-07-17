@@ -226,7 +226,7 @@ func TestSurfZoneHandlers(t *testing.T) {
 }
 
 func TestBeachPageTemplate(t *testing.T) {
-	tmpl := loadTemplates()
+	tmpl := loadTemplates(filepath.Join("..", "web", "templates"))
 	fcs, err := parseSurfZoneProduct(loadSurfFixture(t, "caz043.txt"), "ca", surfFixtureNow)
 	if err != nil {
 		t.Fatal(err)

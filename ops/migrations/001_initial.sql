@@ -1,7 +1,7 @@
 -- Reference schema for main.db. The app applies these statements itself as
 -- startup migrations (openDatabase in main.go), so a missing db file is
 -- created automatically; this file is for rebuilding by hand:
---   sqlite3 main.db < schema.sql
+--   sqlite3 main.db < ops/migrations/001_initial.sql
 
 -- user table
 CREATE TABLE IF NOT EXISTS users (
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS user_buoys (
 -- "favorites for user". The app applies this at startup too.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_user_buoys_uid_buoy ON user_buoys (uid, buoy_id);
 
--- (many-to-many user ids to favorite surf spot ids from beaches.json)
+-- (many-to-many user ids to favorite surf spot ids from data/spots.json)
 CREATE TABLE IF NOT EXISTS user_spots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uid TEXT NOT NULL,

@@ -136,18 +136,18 @@
 
             <div class="eyebrow">Running the app</div>
             <p>
-                Two repos work together: <a href="https://github.com/open-swells/grib-parse-collect">grib-parse-collect</a> downloads
+                For local development, two repos work together: <a href="https://github.com/open-swells/grib-parse-collect">grib-parse-collect</a> downloads
                 the wave model GRIB files and renders the forecast layers, and
                 <a href="https://github.com/open-swells/open-swells-app">open-swells-app</a> serves the map.
                 Clone them side by side — the <code>--local</code> flag copies generated layers
-                into the sibling <code>open-swells-app/static/</code> directory.
+                into the sibling <code>open-swells-app/data/forecast/</code> directory.
             </p>
             <div class="panel">
                 <ol>
                     <li><code>$ git clone https://github.com/open-swells/open-swells-app</code></li>
                     <li><code>$ git clone https://github.com/open-swells/grib-parse-collect</code></li>
                     <li><code>$ cd grib-parse-collect && ./run.sh --local --verbose</code></li>
-                    <li><code>$ cd ../open-swells-app && go run .</code></li>
+                    <li><code>$ cd ../open-swells-app && go run ./server</code></li>
                     <li>Go to <code>localhost:8081</code></li>
                 </ol>
             </div>
@@ -156,7 +156,7 @@
             <div class="panel">
                 <ul>
                     <li><strong>open-swells-app</strong> — Go 1.21+. Runs without configuration
-                        (<code>PORT</code>, <code>DB_PATH</code>, and <code>STATIC_DIR</code> are configurable).</li>
+                        (<code>PORT</code>, <code>DB_PATH</code>, and <code>FORECAST_DIR</code> are configurable).</li>
                     <li><strong>grib-parse-collect</strong> — Python 3.13+ managed with
                         <a href="https://docs.astral.sh/uv/">uv</a> (pygrib, numpy, scipy, matplotlib, shapely, geojson),
                         plus <code>rsync</code> for the <code>--local</code> copy step.</li>

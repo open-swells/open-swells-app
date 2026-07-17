@@ -532,7 +532,7 @@ func openDatabase(path string) *sql.DB {
 			SELECT MIN(id) FROM user_buoys GROUP BY uid, buoy_id
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_buoys_uid_buoy ON user_buoys (uid, buoy_id)`,
-		// Favorite surf spots (ids from beaches.json), same shape as
+		// Favorite surf spots (ids from data/spots.json), same shape as
 		// user_buoys.
 		`CREATE TABLE IF NOT EXISTS user_spots (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -658,7 +658,7 @@ func validBuoyID(id string) bool {
 	return stationStore.Has(id)
 }
 
-func loadTemplates() *template.Template {
+func loadTemplates(templateDir string) *template.Template {
 	tmpl := template.New("").Funcs(template.FuncMap{
 		"json":     jsonForTemplate,
 		"ripcolor": ripRiskColor,
@@ -668,8 +668,8 @@ func loadTemplates() *template.Template {
 			return t != "" && t != "none"
 		},
 	})
-	template.Must(tmpl.ParseGlob("templates/*.html"))
-	template.Must(tmpl.ParseGlob("pages/*.html"))
+	template.Must(tmpl.ParseGlob(filepath.Join(templateDir, "components", "*.html")))
+	template.Must(tmpl.ParseGlob(filepath.Join(templateDir, "pages", "*.html")))
 	return tmpl
 }
 
@@ -895,7 +895,9 @@ func healthHandler(db *sql.DB, staticDir string, surfStore *SurfZoneStore) gin.H
 	}
 }
 
-func main() {
+// run configures and starts the OpenSwells HTTP server. It blocks until the
+// process receives an interrupt or termination signal.
+func run() {
 	if err := loadDotEnv(".env"); err != nil {
 		log.Printf("warning: failed to load .env: %v", err)
 	}
@@ -916,7 +918,12 @@ func main() {
 	}
 
 	dbPath := getenvDefault("DB_PATH", "./main.db")
-	staticDir := getenvDefault("STATIC_DIR", "./static")
+	forecastDir := os.Getenv("FORECAST_DIR")
+	if forecastDir == "" {
+		// STATIC_DIR is retained as a compatibility fallback for existing
+		// deployments while they switch their forecast rsync destination.
+		forecastDir = getenvDefault("STATIC_DIR", "./data/forecast")
+	}
 	port := getenvDefault("PORT", "8081")
 
 	db := openDatabase(dbPath)
@@ -928,7 +935,7 @@ func main() {
 	}
 	go stationStore.RunRefresher()
 
-	spotStore, err = NewSpotStore(getenvDefault("SPOTS_PATH", "./beaches.json"))
+	spotStore, err = NewSpotStore(getenvDefault("SPOTS_PATH", "./data/spots.json"))
 	if err != nil {
 		// The map degrades to no spot layer; everything else still works.
 		log.Printf("warning: failed to load surf spots: %v", err)
@@ -947,7 +954,7 @@ func main() {
 	router.Use(gin.Logger(), gin.Recovery())
 
 	cache := NewCache(3 * time.Hour)
-	tmpl := loadTemplates()
+	tmpl := loadTemplates(getenvDefault("TEMPLATE_DIR", "./web/templates"))
 
 	router.ForwardedByClientIP = true
 	trustedProxies := strings.Split(getenvDefault("TRUSTED_PROXIES", "127.0.0.1,::1"), ",")
@@ -958,14 +965,14 @@ func main() {
 	router.GET("/favicon.ico", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
-	router.GET("/static/*filepath", staticHandler(staticDir))
-	router.GET("/healthz", healthHandler(db, staticDir, surfZoneStore))
+	router.GET("/static/*filepath", staticHandler(forecastDir))
+	router.GET("/healthz", healthHandler(db, forecastDir, surfZoneStore))
 	router.GET("/api/buoys", stationStore.handleList)
-	router.GET("/api/wind/:stationId", windForecastHandler(staticDir))
+	router.GET("/api/wind/:stationId", windForecastHandler(forecastDir))
 	router.GET("/api/beaches", surfZoneStore.handleList)
 	router.GET("/api/beach/:zoneId", surfZoneStore.handleZone)
 	router.GET("/api/spots", spotStore.handleList)
-	router.GET("/spot/:id", spotPageHandler(tmpl, staticDir, surfZoneStore))
+	router.GET("/spot/:id", spotPageHandler(tmpl, forecastDir, surfZoneStore))
 
 	router.GET("/", func(c *gin.Context) {
 		renderTemplate(c, tmpl, "landing.html", nil)
@@ -1066,7 +1073,7 @@ func main() {
 
 	router.GET("/forecast-summary", requireAuth(), func(c *gin.Context) {
 		c.Header("Content-Type", "text/html; charset=utf-8")
-		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db, staticDir)
+		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db, forecastDir)
 	})
 
 	realtimeHandler := func(c *gin.Context, extension string) {

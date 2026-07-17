@@ -1,6 +1,6 @@
 package main
 
-// Surf spots: ~6k named breaks loaded from beaches.json. Unlike buoys they
+// Surf spots: ~6k named breaks loaded from data/spots.json. Unlike buoys they
 // have no station bulletin, so a spot's forecast is sampled from the
 // swell_partitions_XXX.geojson grids the pipeline writes into the static
 // dir — nearest wet grid point per forecast hour, interpolated to hourly

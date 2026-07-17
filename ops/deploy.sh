@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
+
 APP_NAME="${APP_NAME:-open-swells-app}"
 ENV_FILE="${ENV_FILE:-.env}"
 DEPLOY_USER="${DEPLOY_USER:-root}"
@@ -38,6 +42,7 @@ rsync -az --delete \
   --exclude '.codex/' \
   --exclude '.env' \
   --exclude 'static/' \
+  --exclude 'data/forecast/' \
   --exclude '*.db' \
   --exclude '*.db-wal' \
   --exclude '*.db-shm' \
@@ -72,7 +77,7 @@ if [[ -z "$GO_BIN" || ! -x "$GO_BIN" ]]; then
 fi
 
 echo "Building with $GO_BIN..."
-"$GO_BIN" build -buildvcs=false -o "$APP_NAME" .
+"$GO_BIN" build -buildvcs=false -o "$APP_NAME" ./server
 
 systemctl restart "$APP_NAME"
 systemctl --no-pager --full status "$APP_NAME"

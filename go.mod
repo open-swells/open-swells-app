@@ -1,4 +1,4 @@
-module projects/gosurf
+module github.com/open-swells/open-swells-app
 
 go 1.21.7
 

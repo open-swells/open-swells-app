@@ -101,7 +101,7 @@ func TestRowTime(t *testing.T) {
 }
 
 func TestLoadTemplates(t *testing.T) {
-	tmpl := loadTemplates()
+	tmpl := loadTemplates(filepath.Join("..", "web", "templates"))
 	for _, name := range []string{"landing.html", "about.html", "today.html", "buoy.html", "report", "forecastsummary"} {
 		if tmpl.Lookup(name) == nil {
 			t.Errorf("template %q not found", name)
@@ -116,7 +116,7 @@ func TestLoadDotEnv(t *testing.T) {
 # local config
 OPEN_SWELLS_TEST_SINGLE='/tmp/firebase.json'
 OPEN_SWELLS_TEST_DOUBLE="./main.db"
-export OPEN_SWELLS_TEST_EXPORT=./static
+export OPEN_SWELLS_TEST_EXPORT=./data/forecast
 OPEN_SWELLS_TEST_EXISTING=from-file
 MALFORMED_LINE
 `)
@@ -146,7 +146,7 @@ MALFORMED_LINE
 	if got := os.Getenv("OPEN_SWELLS_TEST_DOUBLE"); got != "./main.db" {
 		t.Errorf("double quoted value = %q", got)
 	}
-	if got := os.Getenv("OPEN_SWELLS_TEST_EXPORT"); got != "./static" {
+	if got := os.Getenv("OPEN_SWELLS_TEST_EXPORT"); got != "./data/forecast" {
 		t.Errorf("export value = %q", got)
 	}
 	if got := os.Getenv("OPEN_SWELLS_TEST_EXISTING"); got != "from-env" {

@@ -3,8 +3,10 @@ firebase-config.json
 *.geojson
 metadata.json
 .DS_Store
-static/
+data/forecast/
 gosurf
+/open-swells
+/open-swells-app
 *.db
 *.db-wal
 *.db-shm

@@ -18,7 +18,7 @@ This project was previously a 3 day forecast for my local beach using an LSTM ne
 You can run this app locally.
 
 1. clone repo
-2. `$ FIREBASE_CREDENTIALS=/path/to/service-account-key.json go run .`
+2. `$ FIREBASE_CREDENTIALS=/path/to/service-account-key.json go run ./server`
 3. go to localhost:8081
 
 Configuration (all optional except Firebase credentials):
@@ -27,13 +27,22 @@ Configuration (all optional except Firebase credentials):
 | --- | --- | --- |
 | `FIREBASE_CREDENTIALS` | (uses Application Default Credentials) | Path to the Firebase service account key |
 | `PORT` | `8081` | Listen port |
-| `DB_PATH` | `./main.db` | SQLite database path (created automatically; see `schema.sql`) |
-| `STATIC_DIR` | `./static` | Directory with contour geojson + metadata.json |
+| `DB_PATH` | `./main.db` | SQLite database path (created automatically; see `ops/migrations/001_initial.sql`) |
+| `FORECAST_DIR` | `./data/forecast` | Generated forecast GeoJSON, PNG, tide, and metadata files |
+| `SPOTS_PATH` | `./data/spots.json` | Tracked surf-spot reference data |
+| `TEMPLATE_DIR` | `./web/templates` | Go HTML page and component templates |
 | `TRUSTED_PROXIES` | `127.0.0.1,::1` | Comma-separated reverse proxy IPs |
 | `GIN_MODE` | `release` | Set `debug` for verbose gin output |
 
 `GET /healthz` returns 200 when the database is reachable and the contour
 data is fresh (<24h), 503 otherwise — point uptime monitoring at it.
+
+The ignored `data/forecast/` directory contains generated forecast products.
+For local development it is populated by the sibling `grib-parse-collect`
+repository. In production, a separate forecast host delivers those files to
+this directory over rsync. They remain available to the browser under the
+existing `/static/` URL path. Existing deployments may temporarily use
+`STATIC_DIR` as a fallback for `FORECAST_DIR`.
 
 Per-user endpoints (`/api/favorites`, `/forecast-summary`) require a
 Firebase ID token in the `Authorization: Bearer` header; the uid is always
@@ -41,9 +50,10 @@ derived from the verified token.
 
 ### Deploying to Linux
 
-`deploy.sh` deploys the app to `/root/open-swells-app` over SSH, builds it on
+`ops/deploy.sh` deploys the app to `/root/open-swells-app` over SSH, builds it on
 the server, and restarts the existing `open-swells-app` systemd service. The
-tracked `open-swells-app.service` file is provided for initial server setup;
+tracked `ops/systemd/open-swells-app.service` file is provided for initial
+server setup;
 routine deployments do not install or modify the service definition.
 
 Add the server IP to `.env`:
@@ -55,13 +65,13 @@ SERVER_IP=203.0.113.10
 Then run:
 
 ```sh
-./deploy.sh
+./ops/deploy.sh
 ```
 
 Optional overrides:
 
 ```sh
-DEPLOY_USER=root DEPLOY_DIR=/root/open-swells-app APP_NAME=open-swells-app ./deploy.sh
+DEPLOY_USER=root DEPLOY_DIR=/root/open-swells-app APP_NAME=open-swells-app ./ops/deploy.sh
 ```
 
 The server must have Go installed. The server's `.env`, Firebase credentials,
