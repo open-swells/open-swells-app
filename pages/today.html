@@ -665,7 +665,12 @@
             // Check auth state on page load
             // Initialize MapLibre map
 
-                        const forecastHours = Array.from({ length: 129 }, (_, i) => i * 3);
+            // Hourly to f120 (5 days), then 3-hourly to f384 — must match
+            // hour_sequence in grib-parse-collect/gfs_to_contours.py.
+            const forecastHours = [
+                ...Array.from({ length: 121 }, (_, i) => i),
+                ...Array.from({ length: 88 }, (_, i) => 123 + i * 3),
+            ];
 
             // Initialize MapLibre map
             const map = new maplibregl.Map({
