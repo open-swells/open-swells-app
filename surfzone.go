@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"regexp"
 	"sort"
@@ -89,10 +90,11 @@ type SurfZoneStore struct {
 
 	mu       sync.RWMutex
 	byZone   map[string]SurfZoneForecast
-	geo      map[string]surfZoneGeo // zone id -> geometry, db-backed
-	geoMiss  map[string]bool        // zones api.weather.gov doesn't know (404)
-	lastMod  map[string]string      // file URL -> Last-Modified, for conditional GETs
-	fetchErr error                  // last refresh error, surfaced via /healthz
+	geo      map[string]surfZoneGeo   // zone id -> geometry, db-backed
+	geoMiss  map[string]bool          // zones api.weather.gov doesn't know (404)
+	lastMod  map[string]string        // file URL -> Last-Modified, for conditional GETs
+	rings    map[string][][][]float64 // zone id -> parsed boundary rings, for point lookup
+	fetchErr error                    // last refresh error, surfaced via /healthz
 }
 
 func NewSurfZoneStore(db *sql.DB, states []string) *SurfZoneStore {
@@ -109,6 +111,7 @@ func NewSurfZoneStore(db *sql.DB, states []string) *SurfZoneStore {
 		geo:     map[string]surfZoneGeo{},
 		geoMiss: map[string]bool{},
 		lastMod: map[string]string{},
+		rings:   map[string][][][]float64{},
 	}
 }
 
@@ -303,6 +306,156 @@ func (s *SurfZoneStore) fetchMissingGeometry() error {
 		log.Printf("surf zone geometry: fetched %d missing zones", len(missing))
 	}
 	return firstErr
+}
+
+// --- Zone lookup for surf spots -------------------------------------------
+
+// A spot outside every zone polygon still matches the nearest zone whose
+// boundary passes within ~2 miles: spot coordinates sit on the sand or just
+// offshore while zone polygons cover the coastal strip, so anything farther
+// than that is a different stretch of coast. Expressed in degrees of
+// latitude (2 mi / 69 mi per degree); longitudes are cos(lat)-scaled before
+// comparing so the threshold holds east-west too.
+const zoneNearDeg = 2.0 / 69.0
+
+// parseZoneRings flattens a GeoJSON Polygon or MultiPolygon geometry into
+// its rings ([lon, lat] positions).
+func parseZoneRings(raw json.RawMessage) [][][]float64 {
+	var g struct {
+		Type        string          `json:"type"`
+		Coordinates json.RawMessage `json:"coordinates"`
+	}
+	if json.Unmarshal(raw, &g) != nil {
+		return nil
+	}
+	switch g.Type {
+	case "Polygon":
+		var p [][][]float64
+		if json.Unmarshal(g.Coordinates, &p) != nil {
+			return nil
+		}
+		return p
+	case "MultiPolygon":
+		var mp [][][][]float64
+		if json.Unmarshal(g.Coordinates, &mp) != nil {
+			return nil
+		}
+		var rings [][][]float64
+		for _, p := range mp {
+			rings = append(rings, p...)
+		}
+		return rings
+	}
+	return nil
+}
+
+// pointInRings is an even-odd ray cast across all rings, which also handles
+// polygon holes.
+func pointInRings(lat, lon float64, rings [][][]float64) bool {
+	inside := false
+	for _, ring := range rings {
+		for i, j := 0, len(ring)-1; i < len(ring); j, i = i, i+1 {
+			if len(ring[i]) < 2 || len(ring[j]) < 2 {
+				continue
+			}
+			xi, yi := ring[i][0], ring[i][1]
+			xj, yj := ring[j][0], ring[j][1]
+			if (yi > lat) != (yj > lat) && lon < (xj-xi)*(lat-yi)/(yj-yi)+xi {
+				inside = !inside
+			}
+		}
+	}
+	return inside
+}
+
+// minEdgeDist2 is the squared distance from the point to the nearest
+// boundary segment, in degrees-of-latitude equivalent (longitude deltas are
+// scaled by cos(lat)). Segment distance, not vertex distance: a boundary can
+// run straight past a spot for miles without a vertex nearby.
+func minEdgeDist2(lat, lon float64, rings [][][]float64) float64 {
+	lonScale := math.Cos(lat * math.Pi / 180)
+	px, py := lon*lonScale, lat
+	best := math.MaxFloat64
+	for _, ring := range rings {
+		for i, j := 0, len(ring)-1; i < len(ring); j, i = i, i+1 {
+			if len(ring[i]) < 2 || len(ring[j]) < 2 {
+				continue
+			}
+			ax, ay := ring[j][0]*lonScale, ring[j][1]
+			bx, by := ring[i][0]*lonScale, ring[i][1]
+			abx, aby := bx-ax, by-ay
+			t := 0.0
+			if lenSq := abx*abx + aby*aby; lenSq > 0 {
+				t = math.Max(0, math.Min(1, ((px-ax)*abx+(py-ay)*aby)/lenSq))
+			}
+			dx, dy := px-(ax+t*abx), py-(ay+t*aby)
+			if d := dx*dx + dy*dy; d < best {
+				best = d
+			}
+		}
+	}
+	return best
+}
+
+// zoneRings returns the parsed boundary of a zone, parsing and caching on
+// first use (boundaries are static). A zone whose geometry fails to parse
+// caches an empty slice so it isn't re-parsed every request.
+func (s *SurfZoneStore) zoneRings(id string, geom json.RawMessage) [][][]float64 {
+	s.mu.RLock()
+	rings, ok := s.rings[id]
+	s.mu.RUnlock()
+	if ok {
+		return rings
+	}
+	rings = parseZoneRings(geom)
+	if rings == nil {
+		rings = [][][]float64{}
+	}
+	s.mu.Lock()
+	s.rings[id] = rings
+	s.mu.Unlock()
+	return rings
+}
+
+// ZoneForPoint returns the surf zone forecast covering (lat, lon): the zone
+// whose polygon contains the point, else the closest zone whose boundary
+// comes within zoneNearDeg. ok is false when no zone is close enough.
+func (s *SurfZoneStore) ZoneForPoint(lat, lon float64) (SurfZoneForecast, bool) {
+	if s == nil {
+		return SurfZoneForecast{}, false
+	}
+	type candidate struct {
+		id   string
+		geom json.RawMessage
+	}
+	s.mu.RLock()
+	candidates := make([]candidate, 0, len(s.byZone))
+	for id := range s.byZone {
+		if g, ok := s.geo[id]; ok {
+			candidates = append(candidates, candidate{id: id, geom: g.Geometry})
+		}
+	}
+	s.mu.RUnlock()
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].id < candidates[j].id })
+
+	bestID := ""
+	bestDist := math.MaxFloat64
+	for _, cand := range candidates {
+		rings := s.zoneRings(cand.id, cand.geom)
+		if len(rings) == 0 {
+			continue
+		}
+		if pointInRings(lat, lon, rings) {
+			return s.Get(cand.id)
+		}
+		if d := minEdgeDist2(lat, lon, rings); d < bestDist {
+			bestID, bestDist = cand.id, d
+		}
+	}
+	if bestID != "" && bestDist <= zoneNearDeg*zoneNearDeg {
+		return s.Get(bestID)
+	}
+	return SurfZoneForecast{}, false
 }
 
 // fetchZoneGeometry GETs one zone's GeoJSON from api.weather.gov and

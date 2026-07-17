@@ -660,11 +660,34 @@ func validBuoyID(id string) bool {
 
 func loadTemplates() *template.Template {
 	tmpl := template.New("").Funcs(template.FuncMap{
-		"json": jsonForTemplate,
+		"json":     jsonForTemplate,
+		"ripcolor": ripRiskColor,
+		// NWS remark fields are often a literal "None." — not worth a row
+		"notnone": func(s string) bool {
+			t := strings.ToLower(strings.TrimRight(strings.TrimSpace(s), "."))
+			return t != "" && t != "none"
+		},
 	})
 	template.Must(tmpl.ParseGlob("templates/*.html"))
 	template.Must(tmpl.ParseGlob("pages/*.html"))
 	return tmpl
+}
+
+// ripRiskColor mirrors RIP_COLORS in the map page: green/amber/red keyed on
+// the first word of the NWS rip current risk phrase.
+func ripRiskColor(risk string) template.CSS {
+	fields := strings.Fields(strings.ToLower(risk))
+	if len(fields) > 0 {
+		switch fields[0] {
+		case "low":
+			return "#6fcf97"
+		case "moderate":
+			return "#e2b86b"
+		case "high":
+			return "#e06c75"
+		}
+	}
+	return "#8b8d93"
 }
 
 func jsonForTemplate(v interface{}) (template.JS, error) {
@@ -942,7 +965,7 @@ func main() {
 	router.GET("/api/beaches", surfZoneStore.handleList)
 	router.GET("/api/beach/:zoneId", surfZoneStore.handleZone)
 	router.GET("/api/spots", spotStore.handleList)
-	router.GET("/spot/:id", spotPageHandler(tmpl, staticDir))
+	router.GET("/spot/:id", spotPageHandler(tmpl, staticDir, surfZoneStore))
 
 	router.GET("/", func(c *gin.Context) {
 		renderTemplate(c, tmpl, "landing.html", nil)

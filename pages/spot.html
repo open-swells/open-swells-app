@@ -65,6 +65,57 @@
             </div>
         </div>
 
+        {{if .HasZone}}
+        <style>
+            .zone-headline {
+                margin: 0 0 8px; padding: 4px 8px;
+                border: 1px solid #e2b86b; color: #e2b86b;
+                font-size: 10px; font-weight: 600; text-transform: uppercase;
+            }
+            .zone-details { border: 1px solid #34363b; background: #202125; margin-bottom: 12px; }
+            .zone-details summary {
+                cursor: pointer; padding: 8px 12px; list-style: none;
+                display: flex; align-items: center; justify-content: space-between; gap: 8px;
+                font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+                letter-spacing: 0.04em; text-transform: uppercase; color: #8b8d93;
+            }
+            .zone-details summary::-webkit-details-marker { display: none; }
+            .zone-details summary:hover { color: #c6c7ca; }
+            .zone-details summary .chev { transition: transform 120ms ease; flex: none; }
+            .zone-details[open] summary .chev { transform: rotate(180deg); }
+            .zone-body { padding: 0 12px 10px; }
+            .zone-beaches { color: #8b8d93; font-size: 11px; margin-bottom: 4px; }
+            .zone-period { border-top: 1px solid #34363b; padding: 7px 0 8px; }
+            .zone-period-name { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; color: #c6c7ca; text-transform: uppercase; margin-bottom: 4px; }
+            .zone-row { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; padding: 1px 0; }
+            .zone-row .k { color: #7f8187; }
+            .zone-row .v { color: #d6d7da; text-align: right; }
+            .zone-remarks { color: #a7a9ae; font-size: 11px; margin-top: 4px; line-height: 1.45; }
+        </style>
+        <div class="mb-1">
+            {{range .Zone.Headlines}}<div class="zone-headline">{{.}}</div>{{end}}
+            <details class="zone-details">
+                <summary>
+                    <span class="truncate">NWS surf zone report &middot; {{.Zone.ZoneName}} ({{.Zone.ZoneID}})</span>
+                    <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </summary>
+                <div class="zone-body">
+                    {{if .Zone.Beaches}}<div class="zone-beaches">{{.Zone.Beaches}}</div>{{end}}
+                    {{range $i, $p := .Zone.Periods}}{{if lt $i 3}}
+                    <div class="zone-period">
+                        <div class="zone-period-name">{{$p.Name}}</div>
+                        {{if $p.RipRisk}}<div class="zone-row"><span class="k">Rip current</span><span class="v" style="color: {{ripcolor $p.RipRisk}};">{{$p.RipRisk}}</span></div>{{end}}
+                        {{if $p.SurfHeight}}<div class="zone-row"><span class="k">Surf</span><span class="v">{{$p.SurfHeight}}</span></div>{{end}}
+                        {{if $p.WaterTemp}}<div class="zone-row"><span class="k">Water</span><span class="v">{{$p.WaterTemp}}</span></div>{{end}}
+                        {{if $p.Winds}}<div class="zone-row"><span class="k">Wind</span><span class="v">{{$p.Winds}}</span></div>{{end}}
+                        {{if notnone $p.Remarks}}<div class="zone-remarks">{{$p.Remarks}}</div>{{end}}
+                    </div>
+                    {{end}}{{end}}
+                    <div class="zone-row" style="margin-top: 6px;"><span class="k">Issued by NWS {{.Zone.Office}}</span><span class="v">{{.Zone.Issued.Format "Jan 2 15:04 UTC"}}</span></div>
+                </div>
+            </details>
+        </div>
+        {{end}}
         {{if .HasForecast}}
             {{if gt (len .ForecastSummary) 0}}
                 {{$current := index .ForecastSummary 0}}

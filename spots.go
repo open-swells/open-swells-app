@@ -429,10 +429,12 @@ type SpotPageData struct {
 	HasForecast     bool
 	Report          SpotReport
 	HasReport       bool
+	Zone            SurfZoneForecast
+	HasZone         bool
 	ForecastSummary []ForecastSummary
 }
 
-func spotPageHandler(tmpl *template.Template, staticDir string) gin.HandlerFunc {
+func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		spot, ok := spotStore.Get(c.Param("id"))
 		if !ok {
@@ -442,6 +444,9 @@ func spotPageHandler(tmpl *template.Template, staticDir string) gin.HandlerFunc 
 		lat, lon := spot.samplePoint()
 		forecastData := spotForecast(staticDir, lat, lon)
 		report, hasReport := spotReport(staticDir, lat, lon, forecastData)
+		// The NWS surf zone report is matched on the spot itself (not the
+		// offshore sample point): zones cover the coastal strip.
+		zone, hasZone := zones.ZoneForPoint(spot.Lat, spot.Lon)
 		data := SpotPageData{
 			ForecastData:    forecastData,
 			SwellReport:     SwellReport{StationId: spot.ID},
@@ -450,6 +455,8 @@ func spotPageHandler(tmpl *template.Template, staticDir string) gin.HandlerFunc 
 			HasForecast:     len(forecastData.Forecast) > 0,
 			Report:          report,
 			HasReport:       hasReport,
+			Zone:            zone,
+			HasZone:         hasZone,
 			ForecastSummary: generateForecastSummary(forecastData),
 		}
 		renderTemplate(c, tmpl, "spot.html", data)
