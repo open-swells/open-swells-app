@@ -1,0 +1,62 @@
+Expires:202607160900;;025235
+FZUS52 KMFL 151941
+SRFMFL
+
+Surf Zone Forecast
+National Weather Service Miami FL
+341 PM EDT Wed Jul 15 2026
+
+
+FLZ172-160900-
+Coastal Broward-
+Including the beaches of Fort Lauderdale
+341 PM EDT Wed Jul 15 2026
+
+.REST OF TODAY...
+Rip Current Risk*...........Low. 
+Surf Height.................1 foot or less. 
+Thunderstorm Potential**....None. 
+Waterspout Risk**...........None. 
+Water Temperature...........Around 90. 
+Weather.....................Mostly sunny. 
+High Temperature............In the lower 90s. 
+Max Heat Index..............Up to 106. 
+Winds.......................Southeast winds around 10 mph. 
+Tides...
+   Miami Harbor Entrance....Low at 03:50 PM EDT. 
+Sunrise.....................6:39 AM. 
+Sunset......................8:14 PM.
+
+.THURSDAY...
+Rip Current Risk*...........Low. 
+Surf Height.................1 foot or less. 
+Thunderstorm Potential**....None. 
+Weather.....................Partly sunny. 
+High Temperature............In the lower 90s. 
+Max Heat Index..............Up to 107. 
+Winds.......................Light and variable winds, becoming 
+                            southeast around 5 mph in the 
+                            afternoon.
+Tides...
+   Miami Harbor Entrance....High at 10:51 AM EDT.
+                            Low at 04:42 PM EDT. 
+Sunrise.....................6:39 AM. 
+Sunset......................8:14 PM.
+
+&&
+
+Rip Current Risk Category
+* Low Risk - The risk for rip currents is low, however,
+life-threatening rip currents often occur in the vicinity of groins,
+jetties, reefs, and piers.
+* Moderate Risk - Life-threatening rip currents are possible in the
+surf zone.
+* High Risk - Life-threatening rip currents are likely in the surf
+zone.
+
+** For thunderstorm, waterspout, and UV definitions see:
+https://www.weather.gov/beach/mfl
+
+$$
+
+

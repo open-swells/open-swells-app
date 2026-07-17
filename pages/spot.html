@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html class="dark">
+    <head>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+        <script>
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {}
+                }
+            }
+        </script>
+        <style>
+            :root { color-scheme: dark; }
+            * { box-sizing: border-box; }
+            body { font-family: Inter, sans-serif !important; background: #18191c !important; color: #e6e6e6; letter-spacing: 0; }
+            .mono { font-family: 'JetBrains Mono', monospace; }
+            .station-shell { max-width: 1120px; margin: 0 auto; padding: 20px 24px 48px; }
+            .station-header { min-height: 48px; border-bottom: 1px solid #34363b; }
+            .station-action { height: 30px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid #3b3d42; background: #202125; color: #c6c7ca; font-size: 11px; }
+            .station-action:hover { background: #2a2c30; color: white; }
+            #chart-container { border: 1px solid #34363b; background: #202125; overflow-x: auto; padding-top: 8px; }
+            #forecast-table { margin-top: 12px !important; margin-bottom: 24px !important; border: 1px solid #34363b; background: #202125; overflow-x: auto; }
+            #forecast-table th { color: #8b8d93; font-size: 10px; font-weight: 600; padding: 10px 14px !important; }
+            #forecast-table td { padding: 8px 14px !important; white-space: nowrap; }
+            #tooltip { border-radius: 4px !important; background: #18191c !important; border-color: #45474d !important; }
+            body.embedded .standalone-only { display: none !important; }
+            body.embedded .station-shell { padding-top: 14px; }
+            @media (max-width: 767px) {
+                .station-shell { padding: 12px; }
+            }
+        </style>
+        <script>if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));</script>
+    </head>
+
+    <body>
+      <main class="station-shell">
+        <div class="station-header flex items-start justify-between gap-4 mb-4">
+            <!-- Return to Map Link -->
+            <div class="standalone-only min-w-fit">
+                <a href="/map" class="station-action">&#8592; Map</a>
+            </div>
+
+            <!-- Spot Name -->
+            <div class="w-full min-w-0">
+                <h1 class="text-base font-semibold text-white truncate">{{.SpotName}}</h1>
+                <div class="mono text-[10px] text-[#8b8d93] mt-1">{{if .Region}}{{.Region}} &middot; {{end}}GFS-WAVE MODEL FORECAST</div>
+            </div>
+
+            <!-- Icons -->
+            <div class="standalone-only icons flex items-center gap-2 min-w-fit">
+                <a href="/about" class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20" class="md:w-6 md:h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </a>
+                <a href="https://github.com/open-swells/open-swells-app" class="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                        <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        {{if .HasForecast}}
+            {{if gt (len .ForecastSummary) 0}}
+                {{$current := index .ForecastSummary 0}}
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-[10px] font-semibold uppercase text-[#8b8d93]">Current report {{if .HasReport}}<span class="normal-case font-normal">&middot; model, valid {{.Report.Valid}}</span>{{end}}</div>
+                    <div class="flex items-center gap-2">
+                    <span class="text-[10px] text-[#8b8d93]">Current outlook</span>
+                    <span class="px-2 py-1 text-[10px] font-semibold uppercase border"
+                          style="color: {{if eq $current.Condition "good"}}#6fcf97{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor; background: color-mix(in srgb, currentColor 10%, transparent);">
+                        {{$current.Condition}}
+                    </span>
+                    </div>
+                </div>
+            {{end}}
+            {{if .HasReport}}
+            <style>
+                .report-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+                @media (max-width: 719px) { .report-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+                .report-card { min-width: 0; padding: 12px; background: #202125; border: 1px solid #34363b; transition: border-color 120ms ease; }
+                .report-card:hover { border-color: #45474d; }
+                .report-card h2 { margin: 0 0 10px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #8b8d93; }
+                .report-row { display: flex; align-items: center; gap: 10px; }
+                .report-value { min-width: 0; }
+                .report-value .main { color: #f0f0f1; font-size: 13px; font-weight: 600; white-space: nowrap; }
+                .report-value .sub { margin-top: 3px; color: #8b8d93; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .compass { width: 40px; height: 40px; flex: none; }
+                .compass .ring { fill: none; stroke: #3b3d42; stroke-width: 1; }
+                .compass .tick { stroke: #45474d; stroke-width: 1; }
+                .compass .needle { fill: #8f9bff; transform-box: view-box; transform-origin: 50% 50%; }
+            </style>
+            <div class="report-cards">
+                <div class="report-card">
+                    <h2>Primary swell</h2>
+                    <div class="report-row">
+                        <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
+                            <circle class="ring" cx="20" cy="20" r="16"/>
+                            <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
+                            <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
+                            <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
+                            <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
+                            <path class="needle" style="transform: rotate({{.Report.PrimaryDegrees}}deg);"
+                                  d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
+                        </svg>
+                        <div class="report-value">
+                            <div class="main">{{.Report.PrimaryHeight}}ft @ {{.Report.PrimaryPeriod}}s</div>
+                            <div class="sub">{{.Report.PrimaryDegrees}}&deg;</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-card">
+                    <h2>Secondary swell</h2>
+                    <div class="report-row">
+                        {{if .Report.HasSecondary}}
+                        <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
+                            <circle class="ring" cx="20" cy="20" r="16"/>
+                            <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
+                            <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
+                            <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
+                            <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
+                            <path class="needle" style="transform: rotate({{.Report.SecondaryDegrees}}deg);"
+                                  d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
+                        </svg>
+                        <div class="report-value">
+                            <div class="main">{{.Report.SecondaryHeight}}ft @ {{.Report.SecondaryPeriod}}s</div>
+                            <div class="sub">{{.Report.SecondaryDegrees}}&deg;</div>
+                        </div>
+                        {{else}}
+                        <div class="report-value"><div class="main">--</div><div class="sub">No second system</div></div>
+                        {{end}}
+                    </div>
+                </div>
+
+                <div class="report-card">
+                    <h2>Wind</h2>
+                    <div class="report-row">
+                        {{if .Report.HasWind}}
+                        <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
+                            <circle class="ring" cx="20" cy="20" r="16"/>
+                            <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
+                            <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
+                            <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
+                            <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
+                            <path class="needle" style="transform: rotate({{.Report.WindDir}}deg);"
+                                  d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
+                        </svg>
+                        <div class="report-value">
+                            <div class="main">{{.Report.WindSpeed}} mph</div>
+                            <div class="sub">{{.Report.WindDir}}&deg;</div>
+                        </div>
+                        {{else}}
+                        <div class="report-value"><div class="main">--</div><div class="sub">Unavailable</div></div>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+            {{end}}
+            {{template "forecast" .}}
+        {{else}}
+            <div class="mt-8 border border-[#34363b] bg-[#202125] p-6 text-sm text-[#8b8d93]">
+                No model forecast is available for this spot right now — the wave grid
+                has no data near it, or the forecast files are still being generated.
+            </div>
+        {{end}}
+      </main>
+    </body>
+</html>

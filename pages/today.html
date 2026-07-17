@@ -51,6 +51,13 @@
         }
         .favorite-btn:hover { background: #34363b; }
         .favorite-btn.is-favorite { color: #e06c75; }
+        /* Search result kind badges: buoy indigo, beach (surf spot) sand */
+        .search-badge {
+            font-size: 9px; font-weight: 600; text-transform: uppercase;
+            padding: 1px 5px; border: 1px solid currentColor; line-height: 14px;
+        }
+        .search-badge-buoy { color: #8e97e8; }
+        .search-badge-beach { color: #f0a05a; }
         #favoritesView { width: min(390px, calc(100vw - 24px)); bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)); transform: translateX(calc(100% + 24px)); transition: transform 180ms ease; }
         #favoritesView.is-open { transform: translateX(0); }
         #drawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
@@ -118,6 +125,43 @@
             transform: rotate(45deg) scale(1.35);
             background: #1fc2c2;
         }
+        /* Surf zones: green squares at each zone's centroid, distinct from
+           the indigo buoy dots and teal tide diamonds. Clicking one outlines
+           its zone boundary on the map. */
+        .surf-marker {
+            width: 16px; height: 16px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        .surf-marker-dot {
+            width: 10px; height: 10px;
+            background: #6fcf97;
+            border: 2px solid rgba(255, 255, 255, 0.95);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+            transition: transform 120ms ease, background 120ms ease;
+        }
+        .surf-marker:hover .surf-marker-dot {
+            transform: scale(1.35);
+            background: #8adcac;
+        }
+        /* Surf zone popup: the SRF report itself (no separate page) */
+        .surf-popup-headline {
+            margin: 0 0 6px; padding: 2px 6px;
+            border: 1px solid #e2b86b; color: #e2b86b;
+            font-size: 9px; font-weight: 600; text-transform: uppercase;
+        }
+        .surf-popup-period { border-top: 1px solid #34363b; padding: 6px 0 7px; }
+        .surf-popup-period-name {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px; font-weight: 600; color: #8b8d93;
+            text-transform: uppercase; margin-bottom: 3px;
+        }
+        .surf-popup-row { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; line-height: 1.7; }
+        .surf-popup-row .k { color: #8b8d93; flex: none; }
+        .surf-popup-row .v { color: #e6e6e6; text-align: right; }
+        .surf-popup-remarks { font-size: 10px; color: #a7a9ae; margin-top: 3px; }
+        .surf-popup-tides { margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #8b8d93; line-height: 1.6; }
+        .surf-popup-loading { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b8d93; }
         /* Forecast timeline scrubber: a 16-day track with day ticks and a
            sliding playhead. The real <input type="range"> sits invisibly on
            top so dragging/keyboard behavior stays native. */
@@ -412,21 +456,40 @@
                     document.getElementById('showFavoritesBtn').setAttribute('aria-expanded', 'false');
                 }
 
-                function openForecast(stationId, stationName = '') {
-                    if (!stationId) return;
+                // One modal serves both station and beach pages; only the
+                // iframe URL and header text differ.
+                function openModalFrame(url, title, subtitle) {
                     closeFavorites();
                     const modal = document.getElementById('forecastModal');
                     const frame = document.getElementById('forecastFrame');
-                    document.getElementById('forecastModalTitle').textContent = stationName || 'Station report & forecast';
-                    document.getElementById('forecastStation').textContent = `BUOY ${stationId}`;
+                    document.getElementById('forecastModalTitle').textContent = title;
+                    document.getElementById('forecastStation').textContent = subtitle;
                     document.getElementById('forecastLoading').classList.remove('hidden');
                     frame.classList.add('opacity-0');
                     frame.onload = () => {
                         document.getElementById('forecastLoading').classList.add('hidden');
                         frame.classList.remove('opacity-0');
                     };
-                    frame.src = `/forecast/${stationId}`;
+                    frame.src = url;
                     modal.classList.add('is-open');
+                }
+
+                function openForecast(stationId, stationName = '') {
+                    if (!stationId) return;
+                    openModalFrame(`/forecast/${stationId}`,
+                        stationName || 'Station report & forecast', `BUOY ${stationId}`);
+                }
+
+                function openBeach(zoneId, zoneName = '') {
+                    if (!zoneId) return;
+                    openModalFrame(`/beach/${encodeURIComponent(zoneId)}`,
+                        zoneName || 'Beach forecast', `SURF ZONE ${zoneId}`);
+                }
+
+                function openSpot(spotId, spotName = '', region = '') {
+                    if (!spotId) return;
+                    openModalFrame(`/spot/${encodeURIComponent(spotId)}`,
+                        spotName || 'Spot forecast', region ? region.toUpperCase() : 'SURF SPOT');
                 }
 
                 function closeForecast() {
@@ -479,6 +542,7 @@
         </script>
         <script> 
             let userBuoys = [];
+            let userSpots = [];
             const popupMap = new Map(); // Use a Map to store popups by their ID
 
             // All per-user API calls authenticate with the Firebase ID token;
@@ -521,13 +585,15 @@
                         throw new Error('Failed to load user buoys');
                     }
 
-                    userBuoys = await userBuoysResponse.json();
-                    userBuoys = userBuoys.buoys || [];
+                    const favoritesData = await userBuoysResponse.json();
+                    userBuoys = favoritesData.buoys || [];
+                    userSpots = favoritesData.spots || [];
 
-                    console.log('User buoys:', userBuoys);
+                    console.log('User buoys:', userBuoys, 'user spots:', userSpots);
                 } catch (error) {
                     console.error('Error loading user buoys:', error);
                     userBuoys = [];
+                    userSpots = [];
                 }
             }
             // Wait for Firebase authentication
@@ -583,7 +649,8 @@
                 firebase.auth().signOut().then(() => {
                     updateUIForSignedInUser(null);
                     document.getElementById('userPopup').classList.add('hidden');
-                    userBuoys = []
+                    userBuoys = [];
+                    userSpots = [];
                 });
             });
 
@@ -1309,10 +1376,12 @@
             }
 
 
-            // Function to update favorite button appearance
+            // Function to update favorite button appearance (buoy popups
+            // carry data-station-id, spot popups data-spot-id)
             function updateFavoriteButton(button) {
-                const stationId = button.dataset.stationId;
-                const isFavorite = userBuoys.includes(stationId);
+                const isFavorite = button.dataset.spotId
+                    ? userSpots.includes(button.dataset.spotId)
+                    : userBuoys.includes(button.dataset.stationId);
                 button.textContent = isFavorite ? '−' : '+';
                 button.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
                 button.classList.toggle('is-favorite', isFavorite);
@@ -1430,12 +1499,36 @@
                 await loadForecastSummary();
             }
 
+            async function toggleSpotFavorite(spotId) {
+                const user = firebase.auth().currentUser;
+                if (!user) {
+                    alert('Please sign in to manage favorites');
+                    return;
+                }
+                const isFavorite = userSpots.includes(spotId);
+                try {
+                    const response = await authFetch(`/api/spot-favorites/${encodeURIComponent(spotId)}`,
+                        { method: isFavorite ? 'DELETE' : 'POST' });
+                    if (!response.ok) throw new Error(`${response.status} updating spot favorite`);
+                    if (isFavorite) userSpots = userSpots.filter(id => id !== spotId);
+                    else userSpots.push(spotId);
+                    // Restyle any favorite buttons in open popups
+                    document.querySelectorAll(`.favorite-btn[data-spot-id="${CSS.escape(spotId)}"]`)
+                        .forEach(updateFavoriteButton);
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert(`Failed to ${isFavorite ? 'remove' : 'add'} favorite`);
+                }
+                await loadForecastSummary();
+            }
+
 
             // Stations reporting spectral wave data, refreshed daily from
             // NDBC by the server (see stations.go). Markers and search stay
             // empty until the list arrives.
             let currentBuoy = {};
             let buoyData = [];
+            let spotData = []; // surf spots from /api/spots, feeds search
 
             async function loadBuoyStations() {
                 try {
@@ -1450,15 +1543,23 @@
 
             const searchInput = document.getElementById('searchInput');
 
+            // Search covers buoys and surf spots; each result is tagged with
+            // its kind. Spots dominate by count (~6k), so buoys list first
+            // and the total is capped.
+            const SEARCH_RESULT_LIMIT = 20;
             searchInput.addEventListener('input', function(e) {
                 const searchTerm = e.target.value.trim().toLowerCase();
                 if (!searchTerm) {
                     document.getElementById('searchResults').innerHTML = '';
                     return;
                 }
-                let matches = buoyData.filter(buoy =>
-                    buoy.name.toLowerCase().includes(searchTerm) || buoy.stationId.includes(searchTerm));
-                displayMatches(matches);
+                const buoyMatches = buoyData
+                    .filter(buoy => buoy.name.toLowerCase().includes(searchTerm) || buoy.stationId.toLowerCase().includes(searchTerm))
+                    .map(buoy => ({ type: 'buoy', id: buoy.stationId, name: buoy.name, sub: buoy.stationId, lat: buoy.latitude, lon: buoy.longitude, buoy }));
+                const spotMatches = spotData
+                    .filter(s => s.name.toLowerCase().includes(searchTerm) || (s.region || '').toLowerCase().includes(searchTerm))
+                    .map(s => ({ type: 'spot', id: s.id, name: s.name, sub: s.region || '', lat: s.lat, lon: s.lon, region: s.region || '' }));
+                displayMatches([...buoyMatches, ...spotMatches].slice(0, SEARCH_RESULT_LIMIT));
             });
 
             // "/" focuses the search from anywhere; Escape clears and blurs it
@@ -1481,41 +1582,49 @@
                 if (!matches.length) {
                     const empty = document.createElement('div');
                     empty.className = 'px-3 py-2.5 text-xs text-[#8b8d93]';
-                    empty.textContent = 'No stations found';
+                    empty.textContent = 'No matches found';
                     searchResults.appendChild(empty);
                     return;
                 }
 
+                const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
                 matches.forEach(match => {
                     const div = document.createElement('div');
                     div.className = 'flex items-center justify-between gap-3 px-3 py-2 cursor-pointer border-b border-[#26272b] last:border-b-0 hover:bg-[#2a2c30]';
+                    const badge = match.type === 'buoy'
+                        ? '<span class="search-badge search-badge-buoy shrink-0">Buoy</span>'
+                        : '<span class="search-badge search-badge-beach shrink-0">Beach</span>';
                     div.innerHTML =
-                        `<span class="text-[13px] text-[#d6d7da] truncate">${match.name}</span>` +
-                        `<span class="mono text-[10px] text-[#8b8d93] shrink-0">${match.stationId}</span>`;
+                        `<span class="text-[13px] text-[#d6d7da] truncate">${esc(match.name)}</span>` +
+                        `<span class="flex items-center gap-2 shrink-0 max-w-[55%]">${badge}` +
+                        `<span class="mono text-[10px] text-[#8b8d93] truncate">${esc(match.sub)}</span></span>`;
                     div.onclick = function () {
                         searchResults.innerHTML = '';
                         searchInput.value = match.name;
-                        currentBuoy = match;
 
-                        console.log(`Jumping to buoy: ${match.stationId}`);
-
-                        // Retrieve the marker from markerMap
-                        const marker = popupMap.get(match.stationId);
-                        console.log(marker)
-
-                        if (marker) {
-                            // Trigger the popup
-                            marker.togglePopup();
-
-                            // Center the map on the marker with an offset
-                            map.flyTo({
-                                center: [match.longitude, match.latitude],
-                                zoom: 4,
-                                offset: [0, -100], // Offset to account for the popup
-                            });
-                        } else {
-                            console.warn(`No marker found for stationId: ${match.stationId}`);
+                        if (match.type === 'buoy') {
+                            currentBuoy = match.buoy;
+                            const marker = popupMap.get(match.id);
+                            if (marker) {
+                                marker.togglePopup();
+                                map.flyTo({
+                                    center: [match.lon, match.lat],
+                                    zoom: 4,
+                                    offset: [0, -100], // Offset to account for the popup
+                                });
+                            } else {
+                                console.warn(`No marker found for stationId: ${match.id}`);
+                            }
+                            return;
                         }
+
+                        // Spots have no DOM marker: fly in past the cluster
+                        // zoom and open the popup directly.
+                        map.flyTo({ center: [match.lon, match.lat], zoom: 9.5, offset: [0, -100] });
+                        new maplibregl.Popup({ offset: 10, maxWidth: '280px' })
+                            .setLngLat([match.lon, match.lat])
+                            .setHTML(spotPopupHTML({ id: match.id, name: match.name, region: match.region }))
+                            .addTo(map);
                     };
                     searchResults.appendChild(div);
                 });
@@ -1630,8 +1739,233 @@
                 }
             }
 
+            // --- Surf zones: NWS beach forecasts (/api/beaches) -----------
+            // A green marker at each zone's centroid. Clicking opens the
+            // parsed SRF report in a popup and outlines that one zone; the
+            // outline clears when the popup closes, so only the selected
+            // zone is ever drawn.
+            const RIP_COLORS = { low: '#6fcf97', moderate: '#e2b86b', high: '#e06c75' };
+            const ripColor = risk => RIP_COLORS[(risk || '').toLowerCase().split(' ')[0]] || '#8b8d93';
+
+            function ensureSurfOutlineLayer() {
+                if (map.getSource('surf-zone-outline')) return;
+                map.addSource('surf-zone-outline', { type: 'geojson', data: EMPTY_FC });
+                map.addLayer({
+                    id: 'surf-zone-outline-line',
+                    type: 'line',
+                    source: 'surf-zone-outline',
+                    paint: { 'line-color': '#6fcf97', 'line-width': 2, 'line-opacity': 0.9 }
+                });
+            }
+            function showSurfOutline(geometry) {
+                ensureSurfOutlineLayer();
+                map.getSource('surf-zone-outline').setData({ type: 'Feature', geometry, properties: {} });
+            }
+            function clearSurfOutline() {
+                const src = map.getSource('surf-zone-outline');
+                if (src) src.setData(EMPTY_FC);
+            }
+
+            function surfPopupHTML(zone, detail) {
+                const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+                // name goes through a data attribute so quotes in zone names
+                // can't break out of the inline handler
+                const actions = `
+                    <div class="buoy-popup-actions" style="margin-top: 10px;">
+                        <button class="toolbar-button" data-zone="${zone.zoneId}" data-name="${escAttr(zone.zoneName)}"
+                            onclick="openBeach(this.dataset.zone, this.dataset.name)">Full forecast</button>
+                    </div>`;
+                let html = `
+                <div class="buoy-popup">
+                    <div class="buoy-popup-name">${zone.zoneName}</div>
+                    <div class="buoy-popup-id">SURF ZONE ${zone.zoneId} &middot; NWS ${zone.office}</div>`;
+                if (!detail) {
+                    return html + '<div class="surf-popup-loading">Loading forecast&hellip;</div>' + actions + '</div>';
+                }
+                for (const h of detail.headlines || []) {
+                    html += `<div class="surf-popup-headline">${h}</div>`;
+                }
+                detail.periods.slice(0, 3).forEach((p, i) => {
+                    html += `<div class="surf-popup-period">
+                        <div class="surf-popup-period-name">${p.name}</div>`;
+                    if (p.ripRisk) html += `<div class="surf-popup-row"><span class="k">Rip current</span><span class="v" style="color: ${ripColor(p.ripRisk)};">${p.ripRisk}</span></div>`;
+                    if (p.surfHeight) html += `<div class="surf-popup-row"><span class="k">Surf</span><span class="v">${p.surfHeight}</span></div>`;
+                    if (p.waterTemp) html += `<div class="surf-popup-row"><span class="k">Water</span><span class="v">${p.waterTemp}</span></div>`;
+                    if (p.winds) html += `<div class="surf-popup-row"><span class="k">Wind</span><span class="v">${p.winds}</span></div>`;
+                    if (p.remarks && !/^none\.?$/i.test(p.remarks)) {
+                        html += `<div class="surf-popup-remarks">${p.remarks}</div>`;
+                    }
+                    // tides get long; show them for the first period only
+                    if (i === 0 && p.tides && p.tides.length) {
+                        html += `<div class="surf-popup-tides">${p.tides.slice(0, 4).join('<br>')}</div>`;
+                    }
+                    html += '</div>';
+                });
+                return html + actions + '</div>';
+            }
+
+            const surfZoneDetails = new Map();
+            async function surfZoneDetail(zoneId) {
+                if (surfZoneDetails.has(zoneId)) return surfZoneDetails.get(zoneId);
+                try {
+                    const response = await fetch(`/api/beach/${encodeURIComponent(zoneId)}`);
+                    if (!response.ok) return null;
+                    const detail = await response.json();
+                    surfZoneDetails.set(zoneId, detail);
+                    return detail;
+                } catch (error) {
+                    console.warn('Surf zone detail unavailable:', error);
+                    return null;
+                }
+            }
+
+            async function loadSurfZones() {
+                try {
+                    const response = await fetch('/api/beaches');
+                    if (!response.ok) return;
+                    const zones = await response.json();
+                    for (const z of zones) {
+                        if (typeof z.lat !== 'number' || typeof z.lon !== 'number') continue;
+                        const el = document.createElement('div');
+                        el.className = 'surf-marker';
+                        el.title = `${z.zoneName} beach forecast`;
+                        const dot = document.createElement('div');
+                        dot.className = 'surf-marker-dot';
+                        el.appendChild(dot);
+
+                        const popup = new maplibregl.Popup({ offset: 12, maxWidth: '300px' });
+                        popup.on('open', async () => {
+                            popup.setHTML(surfPopupHTML(z, null));
+                            const detail = await surfZoneDetail(z.zoneId);
+                            if (!popup.isOpen()) return;
+                            if (detail) {
+                                popup.setHTML(surfPopupHTML(z, detail));
+                                if (detail.geometry) showSurfOutline(detail.geometry);
+                            }
+                        });
+                        popup.on('close', clearSurfOutline);
+                        new maplibregl.Marker({ element: el })
+                            .setLngLat([z.lon, z.lat])
+                            .setPopup(popup)
+                            .addTo(map);
+                    }
+                } catch (error) {
+                    console.warn('Surf zones unavailable:', error);
+                }
+            }
+
+            // --- Surf spots: ~6k named breaks (/api/spots) ----------------
+            // Too many for DOM markers, so they render as a clustered WebGL
+            // circle layer. Clicking a spot opens a popup whose button loads
+            // the model forecast page in the shared modal iframe.
+            const SPOT_COLOR = '#f0a05a';
+
+            function spotPopupHTML(p) {
+                const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+                return `
+                <div class="buoy-popup">
+                    <div class="buoy-popup-name">${esc(p.name)}</div>
+                    <div class="buoy-popup-id">${esc(p.region || 'SURF SPOT')}</div>
+                    <div class="buoy-popup-actions">
+                        <button class="toolbar-button" data-spot="${esc(p.id)}" data-name="${esc(p.name)}" data-region="${esc(p.region || '')}"
+                            onclick="openSpot(this.dataset.spot, this.dataset.name, this.dataset.region)">Report &amp; forecast</button>
+                        <button class="favorite-btn" data-spot-id="${esc(p.id)}"
+                            onclick="toggleSpotFavorite(this.dataset.spotId)"></button>
+                    </div>
+                </div>`;
+            }
+
+            function addSpotLayers(fc) {
+                if (map.getSource('surf-spots')) return;
+                map.addSource('surf-spots', {
+                    type: 'geojson', data: fc,
+                    cluster: true, clusterMaxZoom: 8, clusterRadius: 42
+                });
+                map.addLayer({
+                    id: 'spot-clusters', type: 'circle', source: 'surf-spots',
+                    filter: ['has', 'point_count'],
+                    paint: {
+                        'circle-color': SPOT_COLOR,
+                        'circle-opacity': 0.8,
+                        'circle-radius': ['step', ['get', 'point_count'], 9, 25, 13, 100, 17],
+                        'circle-stroke-width': 1.5,
+                        'circle-stroke-color': 'rgba(255, 255, 255, 0.9)'
+                    }
+                });
+                map.addLayer({
+                    id: 'spot-points', type: 'circle', source: 'surf-spots',
+                    filter: ['!', ['has', 'point_count']],
+                    paint: {
+                        'circle-color': SPOT_COLOR,
+                        'circle-radius': 5,
+                        'circle-stroke-width': 1.5,
+                        'circle-stroke-color': 'rgba(255, 255, 255, 0.95)'
+                    }
+                });
+                // Cluster counts reuse a font the basemap style already
+                // loads, since only its own glyphs are guaranteed to exist.
+                const symbolLayer = map.getStyle().layers.find(
+                    l => l.type === 'symbol' && l.layout && l.layout['text-font']);
+                if (symbolLayer) {
+                    map.addLayer({
+                        id: 'spot-cluster-count', type: 'symbol', source: 'surf-spots',
+                        filter: ['has', 'point_count'],
+                        layout: {
+                            'text-field': ['get', 'point_count_abbreviated'],
+                            'text-font': symbolLayer.layout['text-font'],
+                            'text-size': 10,
+                            'text-allow-overlap': true
+                        },
+                        paint: { 'text-color': '#1b1c1f' }
+                    });
+                }
+
+                map.on('click', 'spot-clusters', (e) => {
+                    const f = map.queryRenderedFeatures(e.point, { layers: ['spot-clusters'] })[0];
+                    if (!f) return;
+                    map.easeTo({ center: f.geometry.coordinates, zoom: map.getZoom() + 2 });
+                });
+                map.on('click', 'spot-points', (e) => {
+                    const f = e.features && e.features[0];
+                    if (!f) return;
+                    new maplibregl.Popup({ offset: 10, maxWidth: '280px' })
+                        .setLngLat(f.geometry.coordinates.slice())
+                        .setHTML(spotPopupHTML(f.properties))
+                        .addTo(map);
+                });
+                for (const layer of ['spot-clusters', 'spot-points']) {
+                    map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
+                    map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = ''; });
+                }
+            }
+
+            async function loadSurfSpots() {
+                try {
+                    const response = await fetch('/api/spots');
+                    if (!response.ok) return;
+                    const spots = await response.json();
+                    spotData = spots;
+                    const fc = {
+                        type: 'FeatureCollection',
+                        features: spots
+                            .filter(s => typeof s.lat === 'number' && typeof s.lon === 'number')
+                            .map(s => ({
+                                type: 'Feature',
+                                geometry: { type: 'Point', coordinates: [s.lon, s.lat] },
+                                properties: { id: s.id, name: s.name, region: s.region || '' }
+                            }))
+                    };
+                    if (map.isStyleLoaded()) addSpotLayers(fc);
+                    else map.once('load', () => addSpotLayers(fc));
+                } catch (error) {
+                    console.warn('Surf spots unavailable:', error);
+                }
+            }
+
             loadBuoyStations();
             loadTideStations();
+            loadSurfZones();
+            loadSurfSpots();
         </script>
 
 

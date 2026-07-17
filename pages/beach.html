@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html class="dark">
+    <head>
+        <title>{{.ZoneName}} — OpenSwells</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+        <script>
+            tailwind.config = { darkMode: 'class', theme: { extend: {} } }
+        </script>
+        <style>
+            :root { color-scheme: dark; }
+            * { box-sizing: border-box; }
+            body { font-family: Inter, sans-serif !important; background: #18191c !important; color: #e6e6e6; letter-spacing: 0; }
+            .mono { font-family: 'JetBrains Mono', monospace; }
+            .station-shell { max-width: 1120px; margin: 0 auto; padding: 20px 24px 48px; }
+            .station-header { min-height: 48px; border-bottom: 1px solid #34363b; }
+            .station-action { height: 30px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid #3b3d42; background: #202125; color: #c6c7ca; font-size: 11px; }
+            .station-action:hover { background: #2a2c30; color: white; }
+            .srf-headline {
+                display: inline-block; margin: 0 6px 6px 0; padding: 3px 8px;
+                border: 1px solid #e2b86b; color: #e2b86b;
+                font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+            }
+            .srf-periods { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; margin-top: 12px; }
+            .srf-period { background: #202125; border: 1px solid #34363b; padding: 12px 14px 14px; }
+            .srf-period-name {
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 10px; font-weight: 600; color: #8b8d93;
+                text-transform: uppercase; margin-bottom: 8px;
+                padding-bottom: 8px; border-bottom: 1px solid #2c2e33;
+            }
+            .srf-row { display: flex; justify-content: space-between; gap: 16px; font-size: 12px; line-height: 1.9; }
+            .srf-row .k { color: #8b8d93; flex: none; }
+            .srf-row .v { text-align: right; }
+            .srf-remarks { margin-top: 8px; font-size: 11px; color: #a7a9ae; }
+            .srf-tides { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b8d93; line-height: 1.7; }
+            .srf-raw { margin-top: 14px; background: #202125; border: 1px solid #34363b; }
+            .srf-raw summary {
+                cursor: pointer; padding: 10px 14px;
+                font-size: 10px; font-weight: 600; text-transform: uppercase; color: #7f8187;
+            }
+            .srf-raw summary:hover { color: #c6c7ca; }
+            .srf-raw pre {
+                margin: 0; padding: 4px 14px 14px; overflow-x: auto;
+                font-family: 'JetBrains Mono', monospace; font-size: 10px;
+                line-height: 1.6; color: #a7a9ae; white-space: pre-wrap;
+            }
+            body.embedded .standalone-only { display: none !important; }
+            body.embedded .station-shell { padding-top: 14px; }
+            @media (max-width: 767px) {
+                .station-shell { padding: 12px; }
+            }
+        </style>
+        <script>if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));</script>
+    </head>
+
+    <body>
+      <main class="station-shell">
+        <div class="station-header flex items-start justify-between gap-4 mb-4">
+            <div class="standalone-only min-w-fit">
+                <a href="/map" class="station-action">&#8592; Map</a>
+            </div>
+            <div class="w-full min-w-0">
+                <h1 class="text-base font-semibold text-white truncate">{{.ZoneName}}</h1>
+                <div class="mono text-[10px] text-[#8b8d93] mt-1">SURF ZONE {{.ZoneID}} &middot; NWS {{.Office}} &middot; ISSUED {{.Issued.Format "Jan 2 15:04"}} UTC</div>
+            </div>
+        </div>
+
+        {{if .Beaches}}<div class="text-[11px] text-[#8b8d93] mb-2">{{.Beaches}}</div>{{end}}
+        {{range .Headlines}}<span class="srf-headline">{{.}}</span>{{end}}
+
+        <div class="srf-periods">
+            {{range .Periods}}
+            <section class="srf-period">
+                <div class="srf-period-name">{{.Name}}</div>
+                {{if .RipRisk}}
+                <div class="srf-row"><span class="k">Rip current risk</span>
+                    <span class="v" style="color: {{if eq .RipRisk "High"}}#e06c75{{else if eq .RipRisk "Moderate"}}#e2b86b{{else if eq .RipRisk "Low"}}#6fcf97{{else}}#8b8d93{{end}};">{{.RipRisk}}</span></div>
+                {{end}}
+                {{if .SurfHeight}}<div class="srf-row"><span class="k">Surf height</span><span class="v">{{.SurfHeight}}</span></div>{{end}}
+                {{if .WaterTemp}}<div class="srf-row"><span class="k">Water temperature</span><span class="v">{{.WaterTemp}}</span></div>{{end}}
+                {{if .Winds}}<div class="srf-row"><span class="k">Winds</span><span class="v">{{.Winds}}</span></div>{{end}}
+                {{if .Weather}}<div class="srf-row"><span class="k">Weather</span><span class="v">{{.Weather}}</span></div>{{end}}
+                {{range $k, $v := .Fields}}<div class="srf-row"><span class="k">{{$k}}</span><span class="v">{{$v}}</span></div>{{end}}
+                {{if .Remarks}}<div class="srf-remarks">{{.Remarks}}</div>{{end}}
+                {{if .Tides}}<div class="srf-tides">{{range .Tides}}{{.}}<br>{{end}}</div>{{end}}
+            </section>
+            {{end}}
+        </div>
+
+        <details class="srf-raw">
+            <summary>Full NWS product text</summary>
+            <pre>{{.Raw}}</pre>
+        </details>
+
+        <div class="mono text-[9px] text-[#6f7177] mt-3">
+            SOURCE: NATIONAL WEATHER SERVICE SURF ZONE FORECAST ({{.Office}}) &middot; EXPIRES {{.Expires.Format "Jan 2 15:04"}} UTC
+        </div>
+      </main>
+    </body>
+</html>

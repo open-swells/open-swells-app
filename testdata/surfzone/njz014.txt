@@ -1,0 +1,60 @@
+Expires:202607161000;;024918
+FZUS51 KPHI 151935
+SRFPHI
+
+Surf Zone Forecast for New Jersey and Delaware
+National Weather Service Mount Holly NJ
+335 PM EDT Wed Jul 15 2026
+
+
+NJZ014-161000-
+Eastern Monmouth-
+Including the beaches of Sandy Hook
+335 PM EDT Wed Jul 15 2026
+
+.THURSDAY...
+Rip Current Risk............Low. 
+Surf Height.................Around 1 foot. 
+Thunderstorm Potential**....None. 
+UV Index**..................High. 
+Water Temperature...........In the mid 70s. 
+Weather.....................Mostly sunny. Areas of smoke. 
+High Temperature............Around 90. 
+Winds.......................West winds 5 to 10 mph.
+Tides...
+   Belmar...................High at 09:34 AM EDT.
+                            Low at 03:30 PM EDT. 
+Sunrise.....................5:40 AM. 
+Sunset......................8:24 PM.
+
+.FRIDAY...
+Rip Current Risk............Low. 
+Surf Height.................Around 1 foot. 
+Thunderstorm Potential**....None. 
+Weather.....................Sunny. Areas of smoke. 
+High Temperature............In the mid 80s. 
+Winds.......................North winds around 5 mph, becoming 
+                            southeast in the afternoon.
+Tides...
+   Belmar...................High at 10:28 AM EDT.
+                            Low at 04:20 PM EDT. 
+Sunrise.....................5:41 AM. 
+Sunset......................8:24 PM.
+
+&&
+
+Rip Current Risk Category
+* Low Risk - The risk for rip currents is low, however,
+life-threatening rip currents often occur in the vicinity of groins,
+jetties, reefs, and piers.
+* Moderate Risk - Life-threatening rip currents are possible in the
+surf zone.
+* High Risk - Life-threatening rip currents are likely in the surf
+zone.
+
+** For thunderstorm, waterspout, and UV definitions see:
+https://www.weather.gov/beach/phi
+
+$$
+
+

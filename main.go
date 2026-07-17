@@ -439,12 +439,24 @@ type BuoyWithSummary struct {
 	OfflineSince string // e.g. "Jul 3"; only set when Offline
 }
 
-func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache *Cache, uid string, db *sql.DB) {
+func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache *Cache, uid string, db *sql.DB, staticDir string) {
 	buoyIDs, err := getBuoysForUser(db, uid)
 	if err != nil {
 		log.Printf("Failed to get buoys for user: %v", err)
 		http.Error(w, "failed to load favorites", http.StatusInternalServerError)
 		return
+	}
+	spotIDs, err := getSpotsForUser(db, uid)
+	if err != nil {
+		log.Printf("Failed to get spots for user: %v", err)
+		http.Error(w, "failed to load favorites", http.StatusInternalServerError)
+		return
+	}
+	spots := make([]SpotFavorite, 0, len(spotIDs))
+	for _, spotID := range spotIDs {
+		if spot, ok := spotStore.Get(spotID); ok {
+			spots = append(spots, spotFavoriteEntry(staticDir, spot))
+		}
 	}
 
 	buoys := make([]BuoyWithSummary, len(buoyIDs))
@@ -488,7 +500,8 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 
 	err = tmpl.ExecuteTemplate(w, "forecastsummary", struct {
 		Buoys []BuoyWithSummary
-	}{Buoys: buoys})
+		Spots []SpotFavorite
+	}{Buoys: buoys, Spots: spots})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -519,6 +532,15 @@ func openDatabase(path string) *sql.DB {
 			SELECT MIN(id) FROM user_buoys GROUP BY uid, buoy_id
 		)`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_buoys_uid_buoy ON user_buoys (uid, buoy_id)`,
+		// Favorite surf spots (ids from beaches.json), same shape as
+		// user_buoys.
+		`CREATE TABLE IF NOT EXISTS user_spots (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			uid TEXT NOT NULL,
+			spot_id TEXT NOT NULL,
+			FOREIGN KEY (uid) REFERENCES users (uid) ON DELETE CASCADE
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_spots_uid_spot ON user_spots (uid, spot_id)`,
 		// Station registry, refreshed daily from NDBC (see stations.go).
 		// Inactive rows are stations that stopped reporting; they are kept
 		// so favorites keep resolving to a name.
@@ -529,6 +551,15 @@ func openDatabase(path string) *sql.DB {
 			longitude REAL NOT NULL,
 			active INTEGER NOT NULL DEFAULT 1,
 			last_seen TEXT NOT NULL,
+			updated_at TEXT NOT NULL
+		)`,
+		// Surf zone geometry from api.weather.gov, fetched once per zone
+		// (see surfzone.go). Zone boundaries are static in practice.
+		`CREATE TABLE IF NOT EXISTS surf_zones (
+			zone_id TEXT PRIMARY KEY,
+			latitude REAL NOT NULL,
+			longitude REAL NOT NULL,
+			geometry TEXT NOT NULL,
 			updated_at TEXT NOT NULL
 		)`,
 	}
@@ -569,6 +600,37 @@ func getBuoysForUser(db *sql.DB, uid string) ([]string, error) {
 		buoys = append(buoys, buoyID)
 	}
 	return buoys, rows.Err()
+}
+
+func insertUserSpot(db *sql.DB, uid, spotID string) error {
+	if _, err := db.Exec(`INSERT OR IGNORE INTO users (uid) VALUES (?)`, uid); err != nil {
+		return err
+	}
+	_, err := db.Exec(`INSERT OR IGNORE INTO user_spots (uid, spot_id) VALUES (?, ?)`, uid, spotID)
+	return err
+}
+
+func deleteUserSpot(db *sql.DB, uid, spotID string) error {
+	_, err := db.Exec(`DELETE FROM user_spots WHERE uid = ? AND spot_id = ?`, uid, spotID)
+	return err
+}
+
+func getSpotsForUser(db *sql.DB, uid string) ([]string, error) {
+	rows, err := db.Query(`SELECT spot_id FROM user_spots WHERE uid = ?`, uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	spots := []string{}
+	for rows.Next() {
+		var spotID string
+		if err := rows.Scan(&spotID); err != nil {
+			return nil, err
+		}
+		spots = append(spots, spotID)
+	}
+	return spots, rows.Err()
 }
 
 // requireAuth verifies the Firebase ID token from the Authorization header
@@ -761,11 +823,25 @@ func loadDotEnv(path string) error {
 	return nil
 }
 
-func healthHandler(db *sql.DB, staticDir string) gin.HandlerFunc {
+func healthHandler(db *sql.DB, staticDir string, surfStore *SurfZoneStore) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		problems := []string{}
+		warnings := []string{}
 		if err := db.Ping(); err != nil {
 			problems = append(problems, "database unreachable")
+		}
+
+		// Beach forecasts degrade the page, not the service: an NWS outage
+		// with zones still cached is a warning; no zones at all (and a
+		// failing refresh) means the beach layer is actually down.
+		if surfStore != nil {
+			if err, zones := surfStore.LastError(), surfStore.ZoneCount(); err != nil {
+				if zones == 0 {
+					problems = append(problems, fmt.Sprintf("surf zone data unavailable: %v", err))
+				} else {
+					warnings = append(warnings, fmt.Sprintf("surf zone refresh: %v", err))
+				}
+			}
 		}
 
 		metadataPath := filepath.Join(staticDir, "metadata.json")
@@ -785,10 +861,14 @@ func healthHandler(db *sql.DB, staticDir string) gin.HandlerFunc {
 		}
 
 		if len(problems) > 0 {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "degraded", "problems": problems})
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "degraded", "problems": problems, "warnings": warnings})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		resp := gin.H{"status": "ok"}
+		if len(warnings) > 0 {
+			resp["warnings"] = warnings
+		}
+		c.JSON(http.StatusOK, resp)
 	}
 }
 
@@ -825,6 +905,18 @@ func main() {
 	}
 	go stationStore.RunRefresher()
 
+	spotStore, err = NewSpotStore(getenvDefault("SPOTS_PATH", "./beaches.json"))
+	if err != nil {
+		// The map degrades to no spot layer; everything else still works.
+		log.Printf("warning: failed to load surf spots: %v", err)
+	}
+
+	surfZoneStore := NewSurfZoneStore(db, strings.Split(getenvDefault("SURF_ZONE_STATES", "ca"), ","))
+	if err := surfZoneStore.LoadGeometry(); err != nil {
+		log.Printf("warning: failed to load surf zone geometry cache: %v", err)
+	}
+	go surfZoneStore.RunRefresher()
+
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -844,9 +936,13 @@ func main() {
 		c.Status(http.StatusNoContent)
 	})
 	router.GET("/static/*filepath", staticHandler(staticDir))
-	router.GET("/healthz", healthHandler(db, staticDir))
+	router.GET("/healthz", healthHandler(db, staticDir, surfZoneStore))
 	router.GET("/api/buoys", stationStore.handleList)
 	router.GET("/api/wind/:stationId", windForecastHandler(staticDir))
+	router.GET("/api/beaches", surfZoneStore.handleList)
+	router.GET("/api/beach/:zoneId", surfZoneStore.handleZone)
+	router.GET("/api/spots", spotStore.handleList)
+	router.GET("/spot/:id", spotPageHandler(tmpl, staticDir))
 
 	router.GET("/", func(c *gin.Context) {
 		renderTemplate(c, tmpl, "landing.html", nil)
@@ -864,6 +960,22 @@ func main() {
 			forecastdata = ForecastData{}
 		}
 		renderTemplate(c, tmpl, "today.html", MapPageData{ForecastData: forecastdata})
+	})
+
+	// Full-page beach forecast, shown standalone or inside the map's modal
+	// iframe (same pattern as /forecast/:stationId).
+	router.GET("/beach/:zoneId", func(c *gin.Context) {
+		zoneID := strings.ToUpper(c.Param("zoneId"))
+		if !surfZoneIDRe.MatchString(zoneID) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Unknown zone"})
+			return
+		}
+		f, ok := surfZoneStore.Get(zoneID)
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Unknown zone"})
+			return
+		}
+		renderTemplate(c, tmpl, "beach.html", f)
 	})
 
 	router.GET("/forecast/:stationId", func(c *gin.Context) {
@@ -931,7 +1043,7 @@ func main() {
 
 	router.GET("/forecast-summary", requireAuth(), func(c *gin.Context) {
 		c.Header("Content-Type", "text/html; charset=utf-8")
-		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db)
+		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db, staticDir)
 	})
 
 	realtimeHandler := func(c *gin.Context, extension string) {
@@ -989,13 +1101,20 @@ func main() {
 
 	favorites := api.Group("/favorites", requireAuth())
 	favorites.GET("", func(c *gin.Context) {
-		buoys, err := getBuoysForUser(db, c.GetString("uid"))
+		uid := c.GetString("uid")
+		buoys, err := getBuoysForUser(db, uid)
 		if err != nil {
 			log.Printf("Failed to get user buoys: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user buoys"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"buoys": buoys})
+		spots, err := getSpotsForUser(db, uid)
+		if err != nil {
+			log.Printf("Failed to get user spots: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user spots"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"buoys": buoys, "spots": spots})
 	})
 	favorites.POST("/:buoyID", func(c *gin.Context) {
 		buoyID := c.Param("buoyID")
@@ -1013,6 +1132,31 @@ func main() {
 	favorites.DELETE("/:buoyID", func(c *gin.Context) {
 		if err := deleteUserBuoy(db, c.GetString("uid"), c.Param("buoyID")); err != nil {
 			log.Printf("Failed to delete user buoy: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove favorite"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Favorite removed"})
+	})
+
+	// Spot favorites live in their own group: gin can't mix a static
+	// "spots" segment with the ":buoyID" wildcard above.
+	spotFavorites := api.Group("/spot-favorites", requireAuth())
+	spotFavorites.POST("/:spotID", func(c *gin.Context) {
+		spotID := c.Param("spotID")
+		if _, ok := spotStore.Get(spotID); !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Unknown spot ID"})
+			return
+		}
+		if err := insertUserSpot(db, c.GetString("uid"), spotID); err != nil {
+			log.Printf("Failed to insert user spot: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add favorite"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"message": "Favorite added"})
+	})
+	spotFavorites.DELETE("/:spotID", func(c *gin.Context) {
+		if err := deleteUserSpot(db, c.GetString("uid"), c.Param("spotID")); err != nil {
+			log.Printf("Failed to delete user spot: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove favorite"})
 			return
 		}

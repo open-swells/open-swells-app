@@ -1,0 +1,49 @@
+Expires:202607160930;;021497
+FZUS56 KSGX 151831
+SRFSGX
+
+Surf Zone Forecast
+National Weather Service San Diego CA
+1131 AM PDT Wed Jul 15 2026
+
+
+CAZ043-160930-
+San Diego County Coastal Areas-
+1131 AM PDT Wed Jul 15 2026
+
+...BEACH HAZARDS STATEMENT THROUGH 12 AM THURSDAY...
+...MODERATE RIP CURRENT RISK...
+
+.TODAY...
+Rip Current Risk*.............Moderate.
+Surf Height...................2 to 4 feet.
+Thunderstorm Potential........None expected.
+Water Temperature.............68 to 73 degrees.
+Tides.........................
+        La Jolla..............Low -1.5 feet (MLLW) 05:54 AM PDT.
+                              High 4.2 feet (MLLW) 12:24 PM PDT.
+                              Low 1.8 feet (MLLW) 05:16 PM PDT.
+                              High 6.7 feet (MLLW) 11:27 PM PDT.
+Remarks.......................Mixed south swell from 210 degrees and west swell from 280 degrees.
+
+.THURSDAY...
+Rip Current Risk*.............Moderate.
+Surf Height...................2 to 4 feet.
+Thunderstorm Potential........None expected.
+Tides.........................
+        La Jolla..............Low -1.1 feet (MLLW) 06:34 AM PDT.
+                              High 4.4 feet (MLLW) 01:05 PM PDT.
+                              Low 1.8 feet (MLLW) 06:10 PM PDT.
+                              High 6.2 feet (MLLW) 11:14 PM PDT.
+Remarks.......................Mixed south swell from 210 degrees and west swell from 260 degrees.
+
+
+&&
+
+Rip Current Risks:
+* Low Risk - Life threatening rip currents are unlikely but still could occur.
+* Moderate Risk - Life threatening rip currents are possible.
+* High Risk - Life threatening rip currents are likely.
+
+$$
+

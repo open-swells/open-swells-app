@@ -1,0 +1,49 @@
+Expires:202607161030;;024745
+FZUS56 KLOX 151927
+SRFLOX
+
+Surf Zone Forecast
+National Weather Service Los Angeles/Oxnard
+1227 PM PDT Wed Jul 15 2026
+
+
+CAZ349-350-161030-
+Santa Barbara County Southwestern Coast-
+Santa Barbara County Southeastern Coast-
+1227 PM PDT Wed Jul 15 2026
+
+...BEACH HAZARDS STATEMENT THROUGH 3 AM THURSDAY...
+...MODERATE RIP CURRENT RISK...
+
+.THIS AFTERNOON THROUGH THURSDAY...
+Rip Current Risk*.............Moderate.
+Surf Height...................2 to 4 feet.
+Thunderstorm Potential........None expected.
+Water Temperature.............Around 65 degrees.
+Tides.........................Low -1.2 feet (MLLW) 07:06 AM PDT.
+                              High 4.3 feet (MLLW) 01:38 PM PDT.
+                              Low 1.9 feet (MLLW) 06:37 PM PDT.
+                              High 6.1 feet (MLLW) 11:41 PM PDT.
+Remarks.......................West swell.
+
+.FRIDAY...
+Rip Current Risk*.............Moderate.
+Surf Height...................2 to 4 feet.
+Thunderstorm Potential........None expected.
+Tides.........................Low -0.7 feet (MLLW) 07:45 AM PDT.
+                              High 4.5 feet (MLLW) 02:20 PM PDT.
+                              Low 1.9 feet (MLLW) 07:38 PM PDT.
+Remarks.......................West swell.
+
+
+&&
+
+Rip Current Risks:
+* Low Risk - Life threatening rip currents are unlikely but still could occur.
+* Moderate Risk - Life threatening rip currents are possible.
+* High Risk - Life threatening rip currents are likely.
+
+$$
+
+
+

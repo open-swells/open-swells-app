@@ -29,9 +29,9 @@
             padding: 1rem;
         }
     </style>
-{{if eq (len .Buoys) 0}}
+{{if and (eq (len .Buoys) 0) (eq (len .Spots) 0)}}
 <div class="text-center p-4 dark:text-white">
-    <p>No favorite buoys found. Add buoys to see their forecast summaries.</p>
+    <p>No favorites found. Add buoys or beaches to see their forecast summaries.</p>
 </div>
 {{else}}
     {{range .Buoys}}
@@ -84,6 +84,50 @@
                     <div class="favorite-subvalue">Water {{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;{{else}}--{{end}}</div>
                 </div>
         </div>
+    </div>
+    {{end}}
+    {{range .Spots}}
+    <div class="buoy bg-[#202125] border border-[#34363b] mb-2 p-3">
+        <div class="buoy-name flex justify-between items-start gap-2 text-white">
+            <div class="min-w-0">
+                <div class="text-xs font-semibold leading-5 truncate">{{.Name}}</div>
+                <div class="flex items-center gap-2">
+                    <span class="font-mono text-[9px] font-semibold uppercase text-[#f0a05a] border border-current px-1 leading-4">Beach</span>
+                    {{if .Region}}<span class="font-mono text-[10px] text-[#8b8d93] truncate">{{.Region}}</span>{{end}}
+                </div>
+            </div>
+            <div class="flex justify-end gap-1 shrink-0">
+                <button onclick="openSpot('{{.ID}}', '{{.Name}}', '{{.Region}}')" class="h-7 px-2 border border-[#45474d] bg-[#292a2f] hover:bg-[#34363b] text-[10px] text-white">Open</button>
+                <button onclick="toggleSpotFavorite('{{.ID}}')" class="h-7 w-7 border border-[#45474d] text-[#9b9da3] hover:text-red-400" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">&times;</button>
+            </div>
+        </div>
+
+        {{if gt (len .Summary) 0}}
+            {{$current := index .Summary 0}}
+            <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
+                <span class="text-[9px] font-semibold uppercase text-[#7f8187]">Current outlook</span>
+                <span class="px-2 py-0.5 border text-[9px] font-semibold uppercase" style="color: {{if eq $current.Condition "good"}}#6fcf97{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor;">{{$current.Condition}}</span>
+            </div>
+        {{else}}
+            <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
+                <span class="text-[9px] font-semibold uppercase text-[#7f8187]">Current outlook</span>
+                <span class="text-[9px] text-[#8b8d93]">Unavailable</span>
+            </div>
+        {{end}}
+        {{if not .HasError}}
+        <div class="favorite-metrics">
+                <div class="favorite-metric">
+                    <div class="favorite-label">Primary swell</div>
+                    <div class="favorite-value">{{if .Primary}}{{.Primary}}{{else}}--{{end}}</div>
+                    <div class="favorite-subvalue">{{if .PrimarySub}}{{.PrimarySub}}&deg;{{else}}Direction --{{end}}</div>
+                </div>
+                <div class="favorite-metric">
+                    <div class="favorite-label">Secondary swell</div>
+                    <div class="favorite-value">{{if .Secondary}}{{.Secondary}}{{else}}--{{end}}</div>
+                    <div class="favorite-subvalue">{{if .SecondarySub}}{{.SecondarySub}}&deg;{{else}}Direction --{{end}}</div>
+                </div>
+        </div>
+        {{end}}
     </div>
     {{end}}
 {{end}}
