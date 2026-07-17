@@ -148,7 +148,7 @@
             </style>
             <div class="report-cards">
                 <div class="report-card">
-                    <h2>Primary swell</h2>
+                    <h2>{{if .Report.SwellHeight}}Seas &middot; nearshore{{else}}Primary swell{{end}}</h2>
                     <div class="report-row">
                         <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
                             <circle class="ring" cx="20" cy="20" r="16"/>
@@ -161,7 +161,7 @@
                         </svg>
                         <div class="report-value">
                             <div class="main">{{.Report.PrimaryHeight}}ft @ {{.Report.PrimaryPeriod}}s</div>
-                            <div class="sub">{{.Report.PrimaryDegrees}}&deg;</div>
+                            <div class="sub">{{.Report.PrimaryDegrees}}&deg;{{if .Report.SwellHeight}} &middot; swell {{.Report.SwellHeight}}ft{{end}}</div>
                         </div>
                     </div>
                 </div>

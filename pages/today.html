@@ -929,6 +929,112 @@
                         map.setPaintProperty(layer, 'raster-opacity', 0);
                     }
                 }
+                for (const layer of nwpsLayers) {
+                    if (map.getLayer(layer.id)) {
+                        map.setPaintProperty(layer.id, 'raster-opacity', 0);
+                    }
+                }
+            }
+
+            // --- NWPS nearshore overlays ---------------------------------
+            // Regional high-res wave frames (nwps_<wfo>_<grid>_<HHH>.png),
+            // valid-time-aligned with the global heatmap hours and drawn on
+            // top of it. Hours a domain doesn't cover just fade the overlay
+            // out and the global field shows through.
+            let nwpsLayers = []; // [{id, prefix, bounds, hours: Set}]
+
+            // NWPS bounds are regional 0..360 (never global), so unlike the
+            // heatmap no image rolling is needed — only a coordinate shift.
+            function normalizeNwpsBounds(b) {
+                const wrap = lon => (lon > 180 ? lon - 360 : lon);
+                return { west: wrap(b.west), east: wrap(b.east), north: b.north, south: b.south };
+            }
+
+            function nwpsFrameUrl(layer, hour) {
+                return `${layer.prefix}${String(hour).padStart(3, '0')}.png`;
+            }
+
+            // Same LRU-of-object-URLs pattern as loadImageFrame, minus the
+            // longitude roll (rollHeatmapBlob keys off the *global* bounds
+            // and would wrongly split these regional PNGs).
+            const nwpsImageCache = new Map(); // url -> Promise<objectURL|null>
+            function loadNwpsFrame(url) {
+                if (nwpsImageCache.has(url)) {
+                    const cached = nwpsImageCache.get(url);
+                    nwpsImageCache.delete(url);
+                    nwpsImageCache.set(url, cached); // refresh LRU position
+                    return cached;
+                }
+                const promise = fetch(url)
+                    .then(r => {
+                        if (!r.ok) throw new Error(`${r.status} for ${url}`);
+                        return r.blob();
+                    })
+                    .then(blob => URL.createObjectURL(blob))
+                    .then(objectUrl => decodeImageUrl(objectUrl))
+                    .catch(() => null); // hour not covered: global shows through
+                nwpsImageCache.set(url, promise);
+                if (nwpsImageCache.size > FRAME_CACHE_MAX) {
+                    const oldest = nwpsImageCache.keys().next().value;
+                    nwpsImageCache.get(oldest).then(u => u && URL.revokeObjectURL(u));
+                    nwpsImageCache.delete(oldest);
+                }
+                return promise;
+            }
+
+            function maybeAddNwpsLayers() {
+                // Needs the style loaded, like maybeAddHeatmapLayers.
+                if (!nwpsLayers.length || !map.getLayer('contour-fills')) return;
+                for (const layer of nwpsLayers) {
+                    if (map.getSource(layer.id)) continue;
+                    const b = layer.bounds;
+                    map.addSource(layer.id, {
+                        type: 'image',
+                        url: TRANSPARENT_PX,
+                        coordinates: [
+                            [b.west, b.north],
+                            [b.east, b.north],
+                            [b.east, b.south],
+                            [b.west, b.south],
+                        ],
+                    });
+                    // Above heatmap-a/b, below contours/arrows/labels. The
+                    // metadata orders CG1 before CG2, so finer grids added
+                    // later naturally land on top.
+                    map.addLayer({
+                        id: layer.id,
+                        type: 'raster',
+                        source: layer.id,
+                        paint: {
+                            'raster-opacity': 0,
+                            'raster-opacity-transition': { duration: HEATMAP_FADE_MS },
+                            'raster-resampling': 'linear',
+                            'raster-fade-duration': 0,
+                        },
+                    }, 'contour-fills');
+                }
+            }
+
+            // Single-buffered (no a/b ping-pong): the regional PNGs are tiny
+            // and sit on the crossfading global heatmap, so a hard swap is
+            // barely perceptible.
+            async function updateNwpsFrames(hours, token, wantHeatmap) {
+                for (const layer of nwpsLayers) {
+                    if (!map.getSource(layer.id)) continue;
+                    if (wantHeatmap && layer.hours.has(hours)) {
+                        const url = await loadNwpsFrame(nwpsFrameUrl(layer, hours));
+                        if (token !== updateToken) return;
+                        if (url) {
+                            map.getSource(layer.id).updateImage({ url });
+                            // Full opacity: the PNG's own alpha channel does
+                            // the transparency and edge fading; 0.85 here
+                            // would re-dim it against the global layer.
+                            map.setPaintProperty(layer.id, 'raster-opacity', 1.0);
+                            continue;
+                        }
+                    }
+                    map.setPaintProperty(layer.id, 'raster-opacity', 0);
+                }
             }
 
             function maybeAddHeatmapLayers() {
@@ -1045,6 +1151,7 @@
                 map.moveLayer('contour-fills', 'swell-arrows');
                 map.moveLayer('hillshade', 'contour-fills');
                 maybeAddHeatmapLayers(); // if metadata arrived before the style
+                maybeAddNwpsLayers();
                 updateMap(currentIndex);
             }
 
@@ -1170,6 +1277,18 @@
                         maybeAddHeatmapLayers();
                     }
 
+                    if (Array.isArray(metadata.nwps_layers)) {
+                        // One layer per grid tier; frames merge every office's
+                        // domain (l.domains lists the contributing WFOs/cycles).
+                        nwpsLayers = metadata.nwps_layers.map(l => ({
+                            id: `nwps-${l.grid}`,
+                            prefix: `/static/nwps_${l.grid}_`,
+                            bounds: normalizeNwpsBounds(l.bounds),
+                            hours: new Set(l.hours),
+                        }));
+                        maybeAddNwpsLayers();
+                    }
+
                     document.getElementById('metadataTimestamp').textContent = timestamp.toLocaleString();
                     buildTimelineTicks(); // labels need forecastStartTime
                     updateTimeDisplay(forecastHours[currentIndex]);
@@ -1265,6 +1384,9 @@
                     const hour = forecastHours[(index + i) % forecastHours.length];
                     if (wantsHeatmap()) {
                         loadImageFrame(hourToHeatmapFilename(hour));
+                        for (const layer of nwpsLayers) {
+                            if (layer.hours.has(hour)) loadNwpsFrame(nwpsFrameUrl(layer, hour));
+                        }
                     } else {
                         loadFrame(hourToFilename(hour));
                     }
@@ -1311,6 +1433,11 @@
                     } else {
                         hideHeatmapLayers();
                     }
+                    // Nearshore overlays follow the global frame. Runs after
+                    // hideHeatmapLayers so a covered hour can still show its
+                    // regional frame over the contour fallback.
+                    await updateNwpsFrames(hours, token, wantHeatmap);
+                    if (token !== updateToken) return;
                 }
                 prefetchFrames(index);
             }
