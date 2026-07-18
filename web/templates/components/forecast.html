@@ -146,10 +146,13 @@
             // users and caused the strip/card misalignment.)
             const dayKeys = Object.keys(dataGroupedByDay).sort();
             const dayStats = {}; // key -> {avgFt, cond}, feeds the day log line
-            const CONDITION_COLORS = { good: '#6fcf97', fair: '#e2b86b', poor: '#e06c75' };
+            const CONDITION_COLORS = { epic: '#b48cff', good: '#45c4b0', fair: '#e2b86b', poor: '#e06c75' };
 
-            // mirrors determineCondition in main.go
-            function conditionFor(avgFt) {
+            // mirrors determineCondition in main.go; spot pages override
+            // per-day with the surf-condition classifier's ratings
+            const condOverride = window.CONDITION_DAY_RATINGS || {};
+            function conditionFor(key, avgFt) {
+                if (condOverride[key]) return condOverride[key];
                 if (avgFt < 0.5) return 'poor';
                 if (avgFt < 1.5) return 'fair';
                 return 'good';
@@ -168,7 +171,7 @@
                     const avgFt = heights.length
                         ? (heights.reduce((a, b) => a + b, 0) / heights.length) * 3.28084
                         : 0;
-                    const cond = conditionFor(avgFt);
+                    const cond = conditionFor(key, avgFt);
                     dayStats[key] = { avgFt, cond };
                     const parts = key.split('-');
                     const d = new Date(parts[0], parts[1] - 1, parts[2]);

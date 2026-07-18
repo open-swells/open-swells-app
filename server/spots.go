@@ -40,6 +40,9 @@ type Spot struct {
 	// (deep bays, island shadows).
 	SampleLat *float64 `json:"sample_lat,omitempty"`
 	SampleLon *float64 `json:"sample_lon,omitempty"`
+	// Optional hand-tuned [from, to] arc of swell directions (degrees true,
+	// clockwise) this break can receive; drives the condition classifier.
+	SwellWindow []float64 `json:"swell_window,omitempty"`
 }
 
 // samplePoint is where this spot reads the wave/wind grids.
@@ -429,15 +432,30 @@ func swellRow(p swellPoint, n *nwpsPoint, t time.Time) ForecastRow {
 	return row
 }
 
+// swellComps extracts the trains present in a grid sample, for the
+// condition classifier.
+func swellComps(p swellPoint) []SwellComponent {
+	comps := make([]SwellComponent, 0, 3)
+	for i := 0; i < 3; i++ {
+		if p.Has[i] {
+			comps = append(comps, SwellComponent{HeightM: p.H[i], PeriodS: p.P[i], DirDeg: p.D[i]})
+		}
+	}
+	return comps
+}
+
 // spotForecast builds a buoy-bulletin-shaped forecast for a location by
 // sampling every 3-hourly partitions grid and interpolating to hourly rows
 // (the forecast chart assumes consecutive hourly rows, like bulletins).
 // Only the leading gap-free run of hours is used: rows after a missing
 // file would land on the wrong timeline slot.
-func spotForecast(staticDir string, lat, lon float64) ForecastData {
+// The second return is the same hourly timeline as raw swell trains
+// (partitions only — NWPS combined seas would double-count wind chop),
+// feeding the condition classifier.
+func spotForecast(staticDir string, lat, lon float64) (ForecastData, []hourSwells) {
 	start, err := time.Parse("20060102_15Z", windForecastStart(staticDir))
 	if err != nil {
-		return ForecastData{}
+		return ForecastData{}, nil
 	}
 
 	type sample struct {
@@ -455,7 +473,7 @@ func spotForecast(staticDir string, lat, lon float64) ForecastData {
 		}
 		p, ok := nearestSwell(points, lat, lon)
 		if !ok {
-			return ForecastData{} // no wave grid near this spot at all
+			return ForecastData{}, nil // no wave grid near this spot at all
 		}
 		if len(samples) > 0 && hour != samples[len(samples)-1].hour+3 {
 			break
@@ -467,23 +485,72 @@ func spotForecast(staticDir string, lat, lon float64) ForecastData {
 		})
 	}
 	if len(samples) == 0 {
-		return ForecastData{}
+		return ForecastData{}, nil
 	}
 
 	var rows []ForecastRow
+	var hours []hourSwells
 	for i := 0; i < len(samples)-1; i++ {
 		for sub := 0; sub < 3; sub++ {
 			hour := samples[i].hour + sub
 			frac := float64(sub) / 3
 			p := lerpSwell(samples[i].p, samples[i+1].p, frac)
 			n := lerpNwps(samples[i].nwps, samples[i+1].nwps, frac)
-			rows = append(rows, swellRow(p, n, start.Add(time.Duration(hour)*time.Hour)))
+			t := start.Add(time.Duration(hour) * time.Hour)
+			rows = append(rows, swellRow(p, n, t))
+			hours = append(hours, hourSwells{Time: t, Comps: swellComps(p)})
 		}
 	}
 	last := samples[len(samples)-1]
-	rows = append(rows, swellRow(last.p, last.nwps, start.Add(time.Duration(last.hour)*time.Hour)))
+	lastT := start.Add(time.Duration(last.hour) * time.Hour)
+	rows = append(rows, swellRow(last.p, last.nwps, lastT))
+	hours = append(hours, hourSwells{Time: lastT, Comps: swellComps(last.p)})
 
-	return ForecastData{Forecast: rows, Date: start.Format("2006010215")}
+	return ForecastData{Forecast: rows, Date: start.Format("2006010215")}, hours
+}
+
+// spotFacing is the bearing (degrees true) from the beach toward open
+// water: the middle of a curated swell window when the spot has one,
+// otherwise estimated as the bearing to the nearest wet wave-grid cell.
+func spotFacing(staticDir string, spot Spot) (float64, bool) {
+	if len(spot.SwellWindow) == 2 {
+		return circularMid(spot.SwellWindow[0], spot.SwellWindow[1]), true
+	}
+	points, err := swellGridPoints(filepath.Join(staticDir, "swell_partitions_000.geojson"))
+	if err != nil {
+		return 0, false
+	}
+	p, ok := nearestSwell(points, spot.Lat, spot.Lon)
+	if !ok {
+		return 0, false
+	}
+	dLon := p.Lon - spot.Lon
+	if dLon > 180 {
+		dLon -= 360
+	} else if dLon < -180 {
+		dLon += 360
+	}
+	dx := dLon * math.Cos(spot.Lat*math.Pi/180)
+	dy := p.Lat - spot.Lat
+	if math.Hypot(dx, dy) < 0.05 { // grid cell on top of the spot: no direction signal
+		return 0, false
+	}
+	return math.Mod(math.Atan2(dx, dy)*180/math.Pi+360, 360), true
+}
+
+// spotConditions runs the classifier over a spot's hourly timeline.
+func spotConditions(staticDir string, spot Spot, hours []hourSwells) []HourlyCondition {
+	if len(hours) == 0 {
+		return nil
+	}
+	facing, hasFacing := spotFacing(staticDir, spot)
+	windStart, err := time.Parse("20060102_15Z", windForecastStart(staticDir))
+	var wind []WindSample
+	if err == nil {
+		lat, lon := spot.samplePoint()
+		wind = windSeriesFor(staticDir, lat, lon)
+	}
+	return conditionSeries(hours, wind, windStart, err == nil, facing, hasFacing, spot.SwellWindow)
 }
 
 // --- Favorites drawer entries ---------------------------------------------
@@ -502,12 +569,13 @@ type SpotFavorite struct {
 func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 	entry := SpotFavorite{ID: spot.ID, Name: spot.Name, Region: spot.Region}
 	lat, lon := spot.samplePoint()
-	forecastData := spotForecast(staticDir, lat, lon)
+	forecastData, hours := spotForecast(staticDir, lat, lon)
 	if len(forecastData.Forecast) == 0 {
 		entry.HasError = true
 		return entry
 	}
 	entry.Summary = generateForecastSummary(forecastData)
+	applyConditionSummary(entry.Summary, spotConditions(staticDir, spot, hours))
 
 	row := forecastData.Forecast[0]
 	format := func(h, p, d string) (string, string) {
@@ -626,6 +694,16 @@ type SpotPageData struct {
 	Zone            SurfZoneForecast
 	HasZone         bool
 	ForecastSummary []ForecastSummary
+	Conditions      []HourlyCondition
+	HasConditions   bool
+	Facing          string // e.g. "SW 225°", empty when unknown
+}
+
+// facingLabel renders a facing bearing as "SW 225°" for the page header.
+func facingLabel(deg float64) string {
+	cardinals := []string{"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}
+	idx := int(math.Round(math.Mod(deg, 360)/22.5)) % 16
+	return fmt.Sprintf("%s %.0f°", cardinals[idx], deg)
 }
 
 func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneStore) gin.HandlerFunc {
@@ -636,8 +714,15 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 			return
 		}
 		lat, lon := spot.samplePoint()
-		forecastData := spotForecast(staticDir, lat, lon)
+		forecastData, hours := spotForecast(staticDir, lat, lon)
 		report, hasReport := spotReport(staticDir, lat, lon, forecastData)
+		conditions := spotConditions(staticDir, spot, hours)
+		summary := generateForecastSummary(forecastData)
+		applyConditionSummary(summary, conditions)
+		facing := ""
+		if deg, ok := spotFacing(staticDir, spot); ok {
+			facing = facingLabel(deg)
+		}
 		// The NWS surf zone report is matched on the spot itself (not the
 		// offshore sample point): zones cover the coastal strip.
 		zone, hasZone := zones.ZoneForPoint(spot.Lat, spot.Lon)
@@ -651,7 +736,10 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 			HasReport:       hasReport,
 			Zone:            zone,
 			HasZone:         hasZone,
-			ForecastSummary: generateForecastSummary(forecastData),
+			ForecastSummary: summary,
+			Conditions:      conditions,
+			HasConditions:   len(conditions) > 0,
+			Facing:          facing,
 		}
 		renderTemplate(c, tmpl, "spot.html", data)
 	}

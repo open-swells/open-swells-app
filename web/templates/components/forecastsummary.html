@@ -54,7 +54,7 @@
             {{$current := index .Summary 0}}
             <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
                 <span class="text-[9px] font-semibold uppercase text-[#7f8187]">Current outlook</span>
-                <span class="px-2 py-0.5 border text-[9px] font-semibold uppercase" style="color: {{if eq $current.Condition "good"}}#6fcf97{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor;">{{$current.Condition}}</span>
+                <span class="px-2 py-0.5 border text-[9px] font-semibold uppercase" style="color: {{if eq $current.Condition "epic"}}#b48cff{{else if eq $current.Condition "good"}}#45c4b0{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor;">{{$current.Condition}}</span>
             </div>
         {{else}}
             <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
@@ -106,7 +106,7 @@
             {{$current := index .Summary 0}}
             <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
                 <span class="text-[9px] font-semibold uppercase text-[#7f8187]">Current outlook</span>
-                <span class="px-2 py-0.5 border text-[9px] font-semibold uppercase" style="color: {{if eq $current.Condition "good"}}#6fcf97{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor;">{{$current.Condition}}</span>
+                <span class="px-2 py-0.5 border text-[9px] font-semibold uppercase" style="color: {{if eq $current.Condition "epic"}}#b48cff{{else if eq $current.Condition "good"}}#45c4b0{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor;">{{$current.Condition}}</span>
             </div>
         {{else}}
             <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
