@@ -39,7 +39,7 @@
            Tailwind utility classes so the buttons hold their size and
            layout everywhere, including mobile. */
         .buoy-popup { width: min(230px, calc(100vw - 56px)); }
-        .buoy-popup-name { margin: 0 16px 4px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
+        .buoy-popup-name { margin: 0 28px 4px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
         .buoy-popup-id { margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b8d93; }
         .buoy-popup-actions { display: flex; gap: 6px; }
         .buoy-popup-actions .toolbar-button { height: 40px; flex: 1; justify-content: center; }
@@ -77,14 +77,20 @@
         .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #3b3d42 !important; }
         .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #3b3d42 !important; }
         .maplibregl-popup-close-button {
-            top: 4px; right: 4px;
-            width: 22px; height: 22px;
+            top: 2px; right: 2px;
+            width: 34px; height: 34px;
             display: flex; align-items: center; justify-content: center;
-            color: #8b8d93; font-size: 15px; line-height: 1;
+            color: #8b8d93; font-size: 20px; line-height: 1;
             border-radius: 0;
         }
         .maplibregl-popup-close-button:hover { color: #fff; background: #2a2c30; }
         input[type="range"] { accent-color: #5e6ad2; }
+        /* iOS Safari auto-zooms the page when a focused input's font-size
+           is under 16px; keep the search at 16px on touch devices so
+           focusing it never zooms */
+        @media (pointer: coarse) {
+            #searchInput { font-size: 16px; }
+        }
         /* MapLibre positions the outer .buoy-marker with an inline transform
            every frame, so the visual dot lives on an inner element — never
            put transforms or transitions on the outer one. */
