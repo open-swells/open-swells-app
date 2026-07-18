@@ -138,18 +138,25 @@ func waveScore(ft float64) float64 {
 func windQuality(speedKts, windDir, seaward float64) float64 {
 	// -1 = straight offshore, +1 = straight onshore
 	onshore := math.Cos(angDiff(windDir, seaward) * math.Pi / 180)
-	f := 1.0
-	switch {
-	case speedKts < 4: // glassy regardless of direction
-		f = 1.03
-	case onshore <= 0:
-		bonus := -onshore * 0.12 * math.Min(speedKts/10, 1)
-		strong := math.Max(0, speedKts-16) * 0.015
-		f = 1 + bonus - strong
-	default:
-		f = 1 - onshore*math.Min(math.Max((speedKts-3)/22, 0), 1)*0.8
+	if speedKts < 4 { // glassy regardless of direction
+		return 1.03
 	}
-	return math.Min(1.15, math.Max(0.15, f))
+	// Wind past ~7 kts tears surf apart quickly; by ~21 kts straight
+	// onshore it's blown out no matter how big the swell is. The
+	// directional weight fades the penalty from full (onshore) through
+	// a bit over half (cross-shore chop) to none (straight offshore).
+	ramp := math.Min(math.Max((speedKts-3)/18, 0), 1) * 0.95
+	weight := 0.55 * (1 + onshore) // cross-shore -> 0.55, offshore -> 0
+	if onshore > 0 {
+		weight = 0.55 + 0.45*onshore // -> 1 straight onshore
+	}
+	f := 1 - ramp*weight
+	if onshore < 0 {
+		// offshore grooming bonus, fading into a paddling penalty once
+		// a hard offshore starts blowing the tops off
+		f += -onshore * (0.12*math.Min(speedKts/10, 1) - math.Max(0, speedKts-14)*0.025)
+	}
+	return math.Min(1.15, math.Max(0.1, f))
 }
 
 func ratingFor(score float64) string {

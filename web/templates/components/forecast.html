@@ -72,6 +72,19 @@
             let windSamples = []; // [{t: Date, s: m/s, d: from-degrees}]
             let windState = 'loading'; // 'loading' | 'ready' | 'none'
 
+            // wind at an arbitrary moment, interpolated between the
+            // 3-hourly samples (null outside the sampled range)
+            function windAtTime(tMs) {
+                if (windSamples.length < 2) return null;
+                if (tMs < windSamples[0].t.getTime() || tMs > windSamples[windSamples.length - 1].t.getTime()) return null;
+                const i = windSamples.findIndex(w => w.t.getTime() >= tMs);
+                if (i <= 0) return { s: windSamples[0].s, d: windSamples[0].d };
+                const a = windSamples[i - 1], b = windSamples[i];
+                const f = (tMs - a.t.getTime()) / (b.t.getTime() - a.t.getTime());
+                const diff = ((b.d - a.d + 540) % 360) - 180;
+                return { s: a.s + (b.s - a.s) * f, d: (a.d + diff * f + 360) % 360 };
+            }
+
             async function loadWindForecast() {
                 try {
                     const response = await fetch('/api/wind/' + encodeURIComponent(WIND_STATION));
@@ -148,14 +161,28 @@
             const dayStats = {}; // key -> {avgFt, cond}, feeds the day log line
             const CONDITION_COLORS = { epic: '#b48cff', good: '#45c4b0', fair: '#e2b86b', poor: '#e06c75' };
 
-            // mirrors determineCondition in main.go; spot pages override
-            // per-day with the surf-condition classifier's ratings
-            const condOverride = window.CONDITION_DAY_RATINGS || {};
+            // Hourly surf-condition classifier output, injected by the spot
+            // page (buoy pages have none). Rendered as a lane in the 16-day
+            // strip and in the hourly detail chart, on their shared x scales.
+            const CONDS = (window.SPOT_CONDITIONS || []).map(c => ({ ...c, t: new Date(c.t) }));
+
+            // a day rates as its best hour; without classifier data, fall
+            // back to mirroring determineCondition in main.go
+            const condDayBest = {}; // local date key -> best HourlyCondition
+            for (const c of CONDS) {
+                const key = dateKeyOf(c.t);
+                if (!condDayBest[key] || c.score > condDayBest[key].score) condDayBest[key] = c;
+            }
             function conditionFor(key, avgFt) {
-                if (condOverride[key]) return condOverride[key];
+                if (condDayBest[key]) return condDayBest[key].rating;
                 if (avgFt < 0.5) return 'poor';
                 if (avgFt < 1.5) return 'fair';
                 return 'good';
+            }
+            if (CONDS.length) {
+                document.querySelectorAll('.swell-legend .cond-key').forEach(el => el.hidden = false);
+                const title = document.querySelector('.strip-title');
+                if (title) title.textContent = 'Swell · wind · conditions · 16 day outlook';
             }
 
             const cardDayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
@@ -237,7 +264,11 @@
                 // lane geometry: swell on top, wind beneath, labels at bottom
                 const swTop = 14, swBase = 78;
                 const wdTop = swBase + 16, wdBase = wdTop + 40;
-                const gridBase = showWindLane ? wdBase : swBase;
+                // conditions lane at the bottom, on the same day grid
+                const condPts = CONDS.filter(c => c.t >= domainStart && c.t < domainEnd);
+                const showCondLane = condPts.length > 1;
+                const cdTop = (showWindLane ? wdBase : swBase) + 16, cdBase = cdTop + 28;
+                const gridBase = showCondLane ? cdBase : (showWindLane ? wdBase : swBase);
                 const height = gridBase + 16;
 
                 const maxFt = d3.max(stripPts, p => p.ft) || 1;
@@ -272,7 +303,10 @@
                             .text(stripDayFmt(day));
                     }
                 });
-                for (const baseline of showWindLane ? [swBase, wdBase] : [swBase]) {
+                const baselines = [swBase];
+                if (showWindLane) baselines.push(wdBase);
+                if (showCondLane) baselines.push(cdBase);
+                for (const baseline of baselines) {
                     svg.append('line')
                         .attr('x1', 0).attr('x2', width)
                         .attr('y1', baseline).attr('y2', baseline)
@@ -334,12 +368,30 @@
                         .text(`${(windPeak.s * 2.237).toFixed(0)} mph`);
                 }
 
+                // conditions lane: one bar per hour, height = score,
+                // color = rating, on the same time scale as the lanes above
+                if (showCondLane) {
+                    stripMono(svg.append('text'), 8, '#6f7177')
+                        .attr('x', 2).attr('y', cdTop - 5)
+                        .text('CONDITIONS');
+                    const hourW = x(new Date(domainStart.getTime() + 3600e3)) - x(domainStart);
+                    const bw = Math.max(1.25, hourW - 1);
+                    const yc = d3.scaleLinear().domain([0, 100]).range([cdBase, cdTop]);
+                    svg.append('g').selectAll('rect').data(condPts).join('rect')
+                        .attr('x', c => x(c.t) - bw / 2)
+                        .attr('width', bw)
+                        .attr('y', c => yc(Math.max(c.score, 6)))
+                        .attr('height', c => cdBase - yc(Math.max(c.score, 6)))
+                        .attr('fill', c => CONDITION_COLORS[c.rating]);
+                }
+
                 const crosshair = svg.append('line')
                     .attr('y1', swTop - 6).attr('y2', gridBase)
                     .attr('stroke', '#6f7177').attr('stroke-dasharray', '3,3').attr('display', 'none');
 
                 const bisect = d3.bisector(p => p.t).center;
                 const windBisect = d3.bisector(w => w.t).center;
+                const condBisect = d3.bisector(c => c.t).center;
                 svg.append('rect')
                     .attr('width', width).attr('height', height)
                     .attr('fill', 'none').attr('pointer-events', 'all')
@@ -353,6 +405,9 @@
                         if (hasWind) {
                             const w = windPts[windBisect(windPts, t)];
                             text += ` · ${(w.s * 2.237).toFixed(0)} mph`;
+                        }
+                        if (showCondLane) {
+                            text += ` · ${condPts[condBisect(condPts, t)].rating}`;
                         }
                         stripReadout.textContent = text;
                         stripReadout.style.color = '#c8ceff';
@@ -439,6 +494,7 @@
                 svg.selectAll(".vertical-line").remove();
                 svg.selectAll(".overlay").remove();
                 svg.selectAll(".wind-lane").remove();
+                svg.selectAll(".cond-lane").remove();
 
                 // wind samples for the selected day, as fractional hours so
                 // they share the swell chart's x scale
@@ -450,13 +506,39 @@
                         .filter(w => w.t.getTime() >= dayStart && w.t.getTime() < dayStart + 24 * 3600e3)
                         .map(w => ({ hour: (w.t.getTime() - dayStart) / 3600e3, s: w.s, d: w.d }))
                         .filter(w => w.hour <= 23);
+                    // the run's 3-hourly samples rarely land on local
+                    // midnight; pad the day's ends with interpolated points
+                    // so the wind lane spans the day like the swell lanes do
+                    if (windDayPts.length) {
+                        for (const hour of [0, 23]) {
+                            if (!windDayPts.some(w => w.hour === hour)) {
+                                const w = windAtTime(dayStart + hour * 3600e3);
+                                if (w) windDayPts.push({ hour, s: w.s, d: w.d });
+                            }
+                        }
+                        windDayPts.sort((a, b) => a.hour - b.hour);
+                    }
                     if (windDayPts.length < 2) windDayPts = [];
                 }
 
                 // the wind lane keeps its slot while loading so the chart
                 // doesn't jump when the data lands
                 const showWind = windState !== 'none';
-                const chartBottom = showWind ? height + windGap + windLaneH : height;
+                const windBottom = showWind ? height + windGap + windLaneH : height;
+
+                // classifier hours for the selected day, as fractional hours
+                // on the swell chart's x scale
+                let condDayPts = [];
+                if (CONDS.length && currentDate) {
+                    const cparts = currentDate.split('-');
+                    const condDayStart = new Date(cparts[0], cparts[1] - 1, cparts[2]).getTime();
+                    condDayPts = CONDS
+                        .filter(c => c.t.getTime() >= condDayStart && c.t.getTime() < condDayStart + 24 * 3600e3)
+                        .map(c => ({ ...c, hour: (c.t.getTime() - condDayStart) / 3600e3 }))
+                        .filter(c => c.hour <= 23);
+                }
+                const condGap = 20, condLaneH = 40;
+                const chartBottom = condDayPts.length ? windBottom + condGap + condLaneH : windBottom;
                 d3.select(svg.node().ownerSVGElement)
                     .attr("width", width + margin.left + margin.right)
                     .attr("height", chartBottom + margin.top + margin.bottom)
@@ -489,7 +571,7 @@
 
                 if (showWind) {
                     const lane = svg.append("g").attr("class", "wind-lane");
-                    const wdTop = height + windGap, wdBase = chartBottom, wdMid = (wdTop + wdBase) / 2;
+                    const wdTop = height + windGap, wdBase = windBottom, wdMid = (wdTop + wdBase) / 2;
                     lane.append("line")
                         .attr("x1", 0).attr("x2", width)
                         .attr("y1", height).attr("y2", height)
@@ -545,6 +627,43 @@
                     }
                 }
 
+                // surf-condition lane: hourly rating bars under the wind
+                // lane, sharing the x axis with everything above
+                if (condDayPts.length) {
+                    const lane = svg.append("g").attr("class", "cond-lane");
+                    const cdTop = windBottom + condGap, cdBase = chartBottom;
+                    lane.append("line")
+                        .attr("x1", 0).attr("x2", width)
+                        .attr("y1", windBottom).attr("y2", windBottom)
+                        .attr("stroke", '#34363b');
+                    const dayBest = condDayPts.reduce((a, b) => (b.score > a.score ? b : a));
+                    lane.append("text")
+                        .attr("x", 0).attr("y", windBottom + 13)
+                        .attr("fill", '#6f7177').attr("font-size", 8)
+                        .text('SURF CONDITIONS');
+                    lane.append("text")
+                        .attr("x", width).attr("y", windBottom + 13)
+                        .attr("text-anchor", 'end')
+                        .attr("fill", CONDITION_COLORS[dayBest.rating]).attr("font-size", 8)
+                        .attr("font-weight", 600)
+                        .text(`BEST ${String(dayBest.hour).padStart(2, '0')}:00 · ${dayBest.rating.toUpperCase()}`);
+                    const yc = d3.scaleLinear().domain([0, 100]).range([cdBase, cdTop]);
+                    // bars center on their hour like the lanes above; the
+                    // first and last are cropped at the plot edge (a half
+                    // bar) rather than shifted into their neighbor
+                    const bw = Math.max(2, x(1) - x(0) - 3);
+                    const barX = c => Math.max(0, x(c.hour) - bw / 2);
+                    const barW = c => Math.min(width, x(c.hour) + bw / 2) - barX(c);
+                    lane.selectAll(".cond-bar").data(condDayPts).join("rect")
+                        .attr("class", "cond-bar")
+                        .attr("x", barX)
+                        .attr("width", barW)
+                        .attr("y", c => yc(Math.max(c.score, 5)))
+                        .attr("height", c => cdBase - yc(Math.max(c.score, 5)))
+                        .attr("rx", 1.5)
+                        .attr("fill", c => CONDITION_COLORS[c.rating]);
+                }
+
                 const tooltip = d3.select("#tooltip");
                 const verticalLine = svg.append("line").attr("class", "vertical-line").attr("y1", 0).attr("y2", chartBottom).attr("stroke", chartColors.verticalLine).attr("stroke-width", 1).attr("stroke-dasharray", "5,5").style("opacity", 0);
                 svg.append("rect").attr("class", "overlay").attr("width", width).attr("height", chartBottom).style("fill", "none").style("pointer-events", "all");
@@ -562,6 +681,11 @@
                         const w = windDayPts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
                         windRow = `<br><span style="color: #e2b86b;">${createArrowHTML(w.d, '#e2b86b')} wind ${(w.s * 2.237).toFixed(0)} mph ${cardinal(w.d)}</span>`;
                     }
+                    let condRow = '';
+                    if (condDayPts.length) {
+                        const c = condDayPts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
+                        condRow = `<br><span style="color: ${CONDITION_COLORS[c.rating]};">&#9632; ${c.rating} &middot; score ${c.score}</span>`;
+                    }
                     const swellRow = (deg, color, hgt, per) =>
                         `<span style="color: ${color};">${createArrowHTML(deg, color)} ${(hgt * 3.28084).toFixed(1)}ft at ${per}s &middot; ${cardinal(deg)}</span>`;
                     tooltip.style("visibility", "visible").style("top", (event.pageY + 15) + "px").style("left", (event.pageX + 15) + "px")
@@ -569,7 +693,7 @@
                             ${swellRow(closestData.PrimaryDegrees, chartColors.linePrimary, closestData.PrimaryWaveHeight, closestData.PrimaryPeriod)}<br>
                             ${swellRow(closestData.SecondaryDegrees, chartColors.lineSecondary, closestData.SecondaryWaveHeight, closestData.SecondaryPeriod)}<br>
                             ${swellRow(closestData.TertiaryDegrees, chartColors.lineTertiary, closestData.TertiaryWaveHeight, closestData.TertiaryPeriod)}<br>
-                            ${swellRow(closestData.QuaternaryDegrees, chartColors.lineQuaternary, closestData.QuaternaryWaveHeight, closestData.QuaternaryPeriod)}${windRow}`);
+                            ${swellRow(closestData.QuaternaryDegrees, chartColors.lineQuaternary, closestData.QuaternaryWaveHeight, closestData.QuaternaryPeriod)}${windRow}${condRow}`);
                 });
 
                 svg.on("mouseleave", () => {
@@ -669,8 +793,12 @@
         @keyframes windPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.75; } }
         .swell-legend { display: flex; flex-wrap: wrap; gap: 5px 12px; color: #8b8d93; font-size: 8px; text-transform: uppercase; }
         .swell-legend span { display: inline-flex; align-items: center; gap: 4px; }
+        .swell-legend span[hidden] { display: none; }
         /* legend markers are triangles, same as the chart's direction marks */
         .swell-legend i { width: 8px; height: 7px; display: inline-block; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+        /* rating swatches are squares, same as the condition lane's bars */
+        .swell-legend i.sq { clip-path: none; height: 8px; border-radius: 2px; }
+        .swell-legend .cond-key:first-of-type { margin-left: 8px; }
         #tooltip {
             z-index: 20;
             padding: 7px 9px;
@@ -683,6 +811,15 @@
             line-height: 1.65;
             box-shadow: 0 8px 24px rgba(0,0,0,.35);
         }
+        /* phones: the day-card row scrolls anyway, so give each card
+           room to be readable under a thumb */
+        @media (max-width: 767px) {
+            #forecastContainer { grid-auto-columns: minmax(68px, 1fr); }
+            .forecastcard { padding: 9px 4px; }
+            .forecastcard .fc-day { font-size: 10px; }
+            .forecastcard .fc-height { font-size: 13px; margin-top: 4px; }
+            .forecastcard .fc-cond { font-size: 9px; margin-top: 3px; }
+        }
         @media (max-width: 520px) {
             .swell-detail { padding-inline: 6px; }
             .swell-legend { gap: 4px 8px; }
@@ -693,7 +830,7 @@
          band in the strip; the day cards beneath are an independent,
          horizontally scrollable row built from the same local-day grouping. -->
     <div class="swell-strip">
-        <div class="flex items-center justify-between px-3 pt-2">
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5 px-3 pt-2">
             <span class="strip-title text-[10px] font-semibold uppercase text-[#8b8d93]">Swell &amp; wind &middot; 16 day outlook</span>
             <span id="stripReadout" class="text-[10px] text-[#8b8d93]">Select a day for hourly detail</span>
         </div>
@@ -703,11 +840,15 @@
     <div class="swell-detail">
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
             <div class="swell-detail-heading text-[9px] font-semibold uppercase tracking-wide text-[#7f8187]">Hourly swell · height & direction</div>
-            <div class="swell-legend" aria-label="Swell component legend">
+            <div class="swell-legend" aria-label="Swell component and condition legend">
                 <span><i style="background:#8f9bff"></i>Primary</span>
                 <span><i style="background:#e2b86b"></i>Secondary</span>
                 <span><i style="background:#6fcf97"></i>Tertiary</span>
                 <span><i style="background:#b89cff"></i>Fourth</span>
+                <span class="cond-key" hidden><i class="sq" style="background:#e06c75"></i>Poor</span>
+                <span class="cond-key" hidden><i class="sq" style="background:#e2b86b"></i>Fair</span>
+                <span class="cond-key" hidden><i class="sq" style="background:#45c4b0"></i>Good</span>
+                <span class="cond-key" hidden><i class="sq" style="background:#b48cff"></i>Epic</span>
             </div>
         </div>
         <!-- log line: the selected day, then that day at a glance -->

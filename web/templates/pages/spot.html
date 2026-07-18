@@ -67,8 +67,11 @@
 
         {{if .HasZone}}
         <style>
+            /* compact inline chips: each only as wide as its text, sharing
+               a row on desktop and wrapping on narrow screens */
+            .zone-headlines { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
             .zone-headline {
-                margin: 0 0 8px; padding: 4px 8px;
+                padding: 3px 8px;
                 border: 1px solid #e2b86b; color: #e2b86b;
                 font-size: 10px; font-weight: 600; text-transform: uppercase;
             }
@@ -93,7 +96,7 @@
             .zone-remarks { color: #a7a9ae; font-size: 11px; margin-top: 4px; line-height: 1.45; }
         </style>
         <div class="mb-1">
-            {{range .Zone.Headlines}}<div class="zone-headline">{{.}}</div>{{end}}
+            {{if .Zone.Headlines}}<div class="zone-headlines">{{range .Zone.Headlines}}<div class="zone-headline">{{.}}</div>{{end}}</div>{{end}}
             <details class="zone-details">
                 <summary>
                     <span class="truncate">NWS surf zone report &middot; {{.Zone.ZoneName}} ({{.Zone.ZoneID}})</span>
@@ -119,9 +122,9 @@
         {{if .HasForecast}}
             {{if gt (len .ForecastSummary) 0}}
                 {{$current := index .ForecastSummary 0}}
-                <div class="flex items-center justify-between mb-2">
-                    <div class="text-[10px] font-semibold uppercase text-[#8b8d93]">Current report {{if .HasReport}}<span class="normal-case font-normal">&middot; model, valid {{.Report.Valid}}</span>{{end}}</div>
-                    <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mb-2">
+                    <div class="min-w-0 text-[10px] font-semibold uppercase text-[#8b8d93]">Current report {{if .HasReport}}<span class="normal-case font-normal">&middot; model, valid {{.Report.Valid}}</span>{{end}}</div>
+                    <div class="flex items-center gap-2 shrink-0">
                     <span class="text-[10px] text-[#8b8d93]">Current outlook</span>
                     <span class="px-2 py-1 text-[10px] font-semibold uppercase border"
                           style="color: {{if eq $current.Condition "epic"}}#b48cff{{else if eq $current.Condition "good"}}#45c4b0{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor; background: color-mix(in srgb, currentColor 10%, transparent);">
@@ -214,126 +217,12 @@
             </div>
             {{end}}
             {{if .HasConditions}}
-            <style>
-                .cond-panel { margin-top: 12px; background: #202125; border: 1px solid #34363b; }
-                .cond-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; padding: 8px 12px 0; }
-                .cond-title { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; text-transform: uppercase; color: #8b8d93; }
-                .cond-legend { display: flex; gap: 12px; font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #8b8d93; }
-                .cond-legend span { display: inline-flex; align-items: center; gap: 4px; }
-                .cond-legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
-                .cond-scroll { overflow-x: auto; padding: 10px 12px 8px; scrollbar-width: thin; scrollbar-color: #45474d transparent; }
-                .cond-days { display: flex; gap: 14px; width: max-content; }
-                .cond-day { flex: none; }
-                .cond-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
-                .cond-day-label { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #8b8d93; white-space: nowrap; }
-                .cond-day-best { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 600; text-transform: uppercase; }
-                .cond-bars { position: relative; display: grid; grid-template-columns: repeat(24, 4px); gap: 2px; align-items: end; height: 46px; border-bottom: 1px solid #3b3d42; }
-                .cond-bar { width: 4px; border-radius: 2px 2px 0 0; min-height: 3px; }
-                .cond-bar.now { outline: 1px solid #fff; outline-offset: 1px; }
-                .cond-hours { position: relative; height: 12px; }
-                .cond-hours span { position: absolute; top: 2px; transform: translateX(-50%); font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #6f7177; }
-                #cond-tooltip { position: absolute; z-index: 20; visibility: hidden; pointer-events: none; padding: 7px 9px; background: #18191c; border: 1px solid #45474d; color: #e6e6e6; font-family: 'JetBrains Mono', monospace; font-size: 9px; line-height: 1.65; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
-            </style>
-            <div class="cond-panel">
-                <div class="cond-head">
-                    <span class="cond-title">Surf conditions &middot; hourly</span>
-                    <div class="cond-legend" aria-label="Condition rating legend">
-                        <span><i style="background:#e06c75"></i>Poor</span>
-                        <span><i style="background:#e2b86b"></i>Fair</span>
-                        <span><i style="background:#45c4b0"></i>Good</span>
-                        <span><i style="background:#b48cff"></i>Epic</span>
-                    </div>
-                </div>
-                <div class="cond-scroll"><div id="condDays" class="cond-days"></div></div>
-            </div>
-            <div id="cond-tooltip"></div>
             <script>
-                (() => {
-                    // Hourly classifier output: t (epoch ms UTC), score 0-100,
-                    // rating, ft (effective swell face), wmph/wdir wind.
-                    const CONDS = {{json .Conditions}};
-                    const COLORS = { poor: '#e06c75', fair: '#e2b86b', good: '#45c4b0', epic: '#b48cff' };
-                    const CARDINALS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
-                    const cardinal = d => CARDINALS[Math.round((((d % 360) + 360) % 360) / 22.5) % 16];
-                    const host = document.getElementById('condDays');
-                    const tooltip = document.getElementById('cond-tooltip');
-                    if (!host || !CONDS.length) return;
-
-                    // Group into the browser's local days, matching the
-                    // forecast chart's day cards.
-                    const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'numeric', day: 'numeric' });
-                    const hourFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric' });
-                    // key matches the forecast chart's local-day grouping
-                    const localKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                    const days = new Map();
-                    for (const c of CONDS) {
-                        const key = localKey(new Date(c.t));
-                        if (!days.has(key)) days.set(key, []);
-                        days.get(key).push(c);
-                    }
-
-                    // the forecast day cards color themselves from this
-                    window.CONDITION_DAY_RATINGS = {};
-                    for (const [key, cells] of days) {
-                        window.CONDITION_DAY_RATINGS[key] = cells.reduce((a, b) => (b.score > a.score ? b : a)).rating;
-                    }
-
-                    const nowHourKey = (() => {
-                        const n = new Date();
-                        return `${n.getFullYear()}-${n.getMonth()}-${n.getDate()}-${n.getHours()}`;
-                    })();
-
-                    for (const cells of days.values()) {
-                        const day = document.createElement('div');
-                        day.className = 'cond-day';
-                        const best = cells.reduce((a, b) => (b.score > a.score ? b : a));
-                        const d0 = new Date(cells[0].t);
-                        day.innerHTML =
-                            `<div class="cond-day-head">` +
-                            `<span class="cond-day-label">${dayFmt.format(d0)}</span>` +
-                            `<span class="cond-day-best" style="color:${COLORS[best.rating]}">${best.rating}</span>` +
-                            `</div>`;
-                        const bars = document.createElement('div');
-                        bars.className = 'cond-bars';
-                        for (const c of cells) {
-                            const d = new Date(c.t);
-                            const bar = document.createElement('div');
-                            bar.className = 'cond-bar';
-                            bar.style.gridColumn = d.getHours() + 1;
-                            bar.style.height = `${Math.max(3, Math.round(c.score * 0.44))}px`;
-                            bar.style.background = COLORS[c.rating];
-                            const wind = c.haswind ? `, wind ${c.wmph} mph ${cardinal(c.wdir)}` : '';
-                            bar.setAttribute('aria-label', `${hourFmt.format(d)}: ${c.rating} (${c.score}), ${c.ft} ft${wind}`);
-                            if (`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}` === nowHourKey) bar.classList.add('now');
-                            bar.addEventListener('mouseenter', (ev) => {
-                                tooltip.innerHTML =
-                                    `<strong>${hourFmt.format(d)}</strong> &middot; ` +
-                                    `<span style="color:${COLORS[c.rating]}">${c.rating.toUpperCase()} ${c.score}</span><br>` +
-                                    `swell ${c.ft} ft effective` +
-                                    (c.haswind ? `<br>wind ${c.wmph} mph ${cardinal(c.wdir)}` : '');
-                                tooltip.style.visibility = 'visible';
-                            });
-                            bar.addEventListener('mousemove', (ev) => {
-                                const flip = ev.pageX > window.innerWidth - 180;
-                                tooltip.style.left = flip ? `${ev.pageX - 170}px` : `${ev.pageX + 14}px`;
-                                tooltip.style.top = `${ev.pageY + 14}px`;
-                            });
-                            bar.addEventListener('mouseleave', () => { tooltip.style.visibility = 'hidden'; });
-                            bars.appendChild(bar);
-                        }
-                        day.appendChild(bars);
-                        const hours = document.createElement('div');
-                        hours.className = 'cond-hours';
-                        for (const h of [0, 6, 12, 18]) {
-                            const tick = document.createElement('span');
-                            tick.style.left = `${h * 6 + 2}px`; // 4px bar + 2px gap columns
-                            tick.textContent = String(h).padStart(2, '0');
-                            hours.appendChild(tick);
-                        }
-                        day.appendChild(hours);
-                        host.appendChild(day);
-                    }
-                })();
+                // Hourly surf-condition classifier output (t = epoch ms UTC,
+                // score 0-100, rating, ft effective swell, wmph/wdir wind).
+                // The forecast component renders it as lanes aligned with the
+                // swell and wind timelines.
+                window.SPOT_CONDITIONS = {{json .Conditions}};
             </script>
             {{end}}
             {{template "forecast" .}}

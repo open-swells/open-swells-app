@@ -18,7 +18,11 @@ func TestClassifyHourRatings(t *testing.T) {
 		want    string
 	}{
 		{"solid groundswell, offshore wind", groundswell, 4, 90, true, "epic"},
-		{"solid groundswell, strong onshore", groundswell, 11, 270, true, "fair"},
+		{"solid groundswell, moderate onshore", groundswell, 6, 270, true, "fair"},
+		{"solid groundswell, strong onshore blows it out", groundswell, 11, 270, true, "poor"},
+		// the El Porto case: overhead swell is still junk in a 20 mph seabreeze
+		{"4ft swell, 20 mph onshore", []SwellComponent{{HeightM: 1.2, PeriodS: 14, DirDeg: 265}}, 9, 270, true, "poor"},
+		{"4ft swell, 20 mph cross-shore", []SwellComponent{{HeightM: 1.2, PeriodS: 14, DirDeg: 265}}, 9, 0, true, "fair"},
 		{"knee-high windswell, light wind", []SwellComponent{{HeightM: 0.5, PeriodS: 6, DirDeg: 280}}, 1.5, 200, true, "poor"},
 		{"blocked swell from behind the point", []SwellComponent{{HeightM: 2.0, PeriodS: 15, DirDeg: 60}}, 1.5, 90, true, "poor"},
 		{"mid-size swell, glassy", []SwellComponent{{HeightM: 1.4, PeriodS: 12, DirDeg: 260}}, 1, 0, true, "good"},
