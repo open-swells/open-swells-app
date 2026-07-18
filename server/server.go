@@ -173,6 +173,13 @@ var (
 
 const nomadsBase = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod"
 
+var directionMap = map[string]float64{
+	"N": 0, "NNE": 22.5, "NE": 45, "ENE": 67.5,
+	"E": 90, "ESE": 112.5, "SE": 135, "SSE": 157.5,
+	"S": 180, "SSW": 202.5, "SW": 225, "WSW": 247.5,
+	"W": 270, "WNW": 292.5, "NW": 315, "NNW": 337.5,
+}
+
 // rowTime resolves a bulletin "day hour" pair against the model cycle time.
 // Bulletins only carry day-of-month, so a day earlier than the cycle's means
 // the forecast has rolled into the next month.
@@ -924,6 +931,7 @@ func run() {
 		// deployments while they switch their forecast rsync destination.
 		forecastDir = getenvDefault("STATIC_DIR", "./data/forecast")
 	}
+	go runForecastCacheWarmer(context.Background(), forecastDir)
 	port := getenvDefault("PORT", "8081")
 
 	db := openDatabase(dbPath)

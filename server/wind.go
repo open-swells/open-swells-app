@@ -47,8 +47,8 @@ func windGridPoints(path string) ([]windPoint, error) {
 	}
 
 	windGridMu.Lock()
+	defer windGridMu.Unlock()
 	cached, ok := windGridCache[path]
-	windGridMu.Unlock()
 	if ok && cached.modTime == info.ModTime().UnixNano() {
 		return cached.points, nil
 	}
@@ -81,9 +81,7 @@ func windGridPoints(path string) ([]windPoint, error) {
 		})
 	}
 
-	windGridMu.Lock()
 	windGridCache[path] = windGridEntry{modTime: info.ModTime().UnixNano(), points: points}
-	windGridMu.Unlock()
 	return points, nil
 }
 

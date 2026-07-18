@@ -13,8 +13,8 @@ package main
 //     when its .spec mtime is recent.
 //
 // Stations that vanish are marked inactive rather than deleted so names on
-// existing favorites keep resolving. The static list in buoys.go is only
-// the first-run seed.
+// existing favorites keep resolving. On a new database the startup refresh
+// populates the table directly from NDBC.
 
 import (
 	"database/sql"
@@ -50,6 +50,13 @@ var stationsClient = &http.Client{Timeout: 60 * time.Second}
 
 var stationStore *StationStore
 
+type BuoyLocation struct {
+	StationID string  `json:"stationId"`
+	Name      string  `json:"name"`
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
 type stationRecord struct {
 	BuoyLocation
 	Active   bool
@@ -68,38 +75,10 @@ func NewStationStore(db *sql.DB) *StationStore {
 	return &StationStore{db: db, byID: map[string]stationRecord{}}
 }
 
-// Load populates the in-memory maps from the buoys table, seeding the table
-// from the static list on first run so the map works before (or without)
-// a successful NDBC refresh.
+// Load populates the in-memory maps from the buoys table. RunRefresher performs
+// an immediate NDBC refresh at startup and then refreshes the list daily.
 func (s *StationStore) Load() error {
-	n, err := s.loadFromDB()
-	if err != nil {
-		return err
-	}
-	if n > 0 {
-		return nil
-	}
-
-	now := time.Now().UTC().Format(time.RFC3339)
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	for _, b := range BuoyLocations {
-		if _, err := tx.Exec(
-			`INSERT INTO buoys (station_id, name, latitude, longitude, active, last_seen, updated_at)
-			 VALUES (?, ?, ?, ?, 1, ?, ?)`,
-			b.StationID, b.Name, b.Latitude, b.Longitude, now, now,
-		); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	log.Printf("seeded buoys table with %d stations from the static list", len(BuoyLocations))
-	_, err = s.loadFromDB()
+	_, err := s.loadFromDB()
 	return err
 }
 

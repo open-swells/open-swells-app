@@ -140,8 +140,8 @@ func swellGridPoints(path string) ([]swellPoint, error) {
 	}
 
 	swellGridMu.Lock()
+	defer swellGridMu.Unlock()
 	cached, ok := swellGridCache[path]
-	swellGridMu.Unlock()
 	if ok && cached.modTime == info.ModTime().UnixNano() {
 		return cached.points, nil
 	}
@@ -191,9 +191,7 @@ func swellGridPoints(path string) ([]swellPoint, error) {
 		points = append(points, pt)
 	}
 
-	swellGridMu.Lock()
 	swellGridCache[path] = swellGridEntry{modTime: info.ModTime().UnixNano(), points: points}
-	swellGridMu.Unlock()
 	return points, nil
 }
 
@@ -248,8 +246,8 @@ func nwpsGridPoints(path string) ([]nwpsPoint, error) {
 	}
 
 	nwpsGridMu.Lock()
+	defer nwpsGridMu.Unlock()
 	cached, ok := nwpsGridCache[path]
-	nwpsGridMu.Unlock()
 	if ok && cached.modTime == info.ModTime().UnixNano() {
 		return cached.points, nil
 	}
@@ -286,9 +284,7 @@ func nwpsGridPoints(path string) ([]nwpsPoint, error) {
 		})
 	}
 
-	nwpsGridMu.Lock()
 	nwpsGridCache[path] = nwpsGridEntry{modTime: info.ModTime().UnixNano(), points: points}
-	nwpsGridMu.Unlock()
 	return points, nil
 }
 
