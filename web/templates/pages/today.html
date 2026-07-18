@@ -222,6 +222,15 @@
             .timeline-track { height: 32px; }
             .timeline-track::before, .timeline-tick, .timeline-progress { bottom: 8px; }
             .timeline-playhead { bottom: 5px; }
+            /* the search box shares its row with the toolbar icons, so
+               anchor the results dropdown to the viewport instead and let
+               it span the full width */
+            #searchResults {
+                position: fixed;
+                left: 0.75rem; right: 0.75rem;
+                top: calc(0.75rem + 2.25rem + 0.25rem); /* header top + h-9 + gap */
+                max-height: min(340px, calc(100dvh - 8rem));
+            }
         }
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */

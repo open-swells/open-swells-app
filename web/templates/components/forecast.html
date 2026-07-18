@@ -180,7 +180,6 @@
                 return 'good';
             }
             if (CONDS.length) {
-                document.querySelectorAll('.swell-legend .cond-key').forEach(el => el.hidden = false);
                 const title = document.querySelector('.strip-title');
                 if (title) title.textContent = 'Swell · wind · conditions · 16 day outlook';
             }
@@ -688,12 +687,24 @@
                     }
                     const swellRow = (deg, color, hgt, per) =>
                         `<span style="color: ${color};">${createArrowHTML(deg, color)} ${(hgt * 3.28084).toFixed(1)}ft at ${per}s &middot; ${cardinal(deg)}</span>`;
-                    tooltip.style("visibility", "visible").style("top", (event.pageY + 15) + "px").style("left", (event.pageX + 15) + "px")
-                        .html(`<strong>${formattedHour}</strong><br>
-                            ${swellRow(closestData.PrimaryDegrees, chartColors.linePrimary, closestData.PrimaryWaveHeight, closestData.PrimaryPeriod)}<br>
-                            ${swellRow(closestData.SecondaryDegrees, chartColors.lineSecondary, closestData.SecondaryWaveHeight, closestData.SecondaryPeriod)}<br>
-                            ${swellRow(closestData.TertiaryDegrees, chartColors.lineTertiary, closestData.TertiaryWaveHeight, closestData.TertiaryPeriod)}<br>
-                            ${swellRow(closestData.QuaternaryDegrees, chartColors.lineQuaternary, closestData.QuaternaryWaveHeight, closestData.QuaternaryPeriod)}${windRow}${condRow}`);
+                    // only trains that exist at this hour get a row
+                    const swellRows = [
+                        [closestData.PrimaryDegrees, chartColors.linePrimary, closestData.PrimaryWaveHeight, closestData.PrimaryPeriod],
+                        [closestData.SecondaryDegrees, chartColors.lineSecondary, closestData.SecondaryWaveHeight, closestData.SecondaryPeriod],
+                        [closestData.TertiaryDegrees, chartColors.lineTertiary, closestData.TertiaryWaveHeight, closestData.TertiaryPeriod],
+                        [closestData.QuaternaryDegrees, chartColors.lineQuaternary, closestData.QuaternaryWaveHeight, closestData.QuaternaryPeriod],
+                    ].filter(([, , hgt]) => parseFloat(hgt) > 0)
+                        .map(([deg, color, hgt, per]) => swellRow(deg, color, hgt, per))
+                        .join('<br>');
+                    tooltip.style("visibility", "visible")
+                        .html(`<strong>${formattedHour}</strong>${swellRows ? '<br>' + swellRows : ''}${windRow}${condRow}`);
+                    // flip to the cursor's left when the tooltip would be
+                    // squeezed against the right edge (measure after setting
+                    // content so the width is the natural, unwrapped one)
+                    const ttW = tooltip.node().offsetWidth;
+                    const flipX = event.pageX + 15 + ttW > document.documentElement.clientWidth - 8;
+                    tooltip.style("left", (flipX ? event.pageX - ttW - 15 : event.pageX + 15) + "px")
+                        .style("top", (event.pageY + 15) + "px");
                 });
 
                 svg.on("mouseleave", () => {
@@ -774,7 +785,7 @@
             background: #202125;
             border: 1px solid #34363b;
         }
-        .swell-detail-heading, .swell-legend, #day-summary { font-family: 'JetBrains Mono', monospace; }
+        .swell-detail-heading, #day-summary { font-family: 'JetBrains Mono', monospace; }
         /* the day log line: the popup's one loud element */
         #date-header { font-size: 14px; font-weight: 600; color: #fff; }
         #date-header .hdr-date { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; color: #8b8d93; margin-left: 2px; }
@@ -791,14 +802,6 @@
         /* pulse for the wind lane's loading placeholder */
         .wind-loading { animation: windPulse 1.4s ease-in-out infinite; }
         @keyframes windPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.75; } }
-        .swell-legend { display: flex; flex-wrap: wrap; gap: 5px 12px; color: #8b8d93; font-size: 8px; text-transform: uppercase; }
-        .swell-legend span { display: inline-flex; align-items: center; gap: 4px; }
-        .swell-legend span[hidden] { display: none; }
-        /* legend markers are triangles, same as the chart's direction marks */
-        .swell-legend i { width: 8px; height: 7px; display: inline-block; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-        /* rating swatches are squares, same as the condition lane's bars */
-        .swell-legend i.sq { clip-path: none; height: 8px; border-radius: 2px; }
-        .swell-legend .cond-key:first-of-type { margin-left: 8px; }
         #tooltip {
             z-index: 20;
             padding: 7px 9px;
@@ -822,7 +825,6 @@
         }
         @media (max-width: 520px) {
             .swell-detail { padding-inline: 6px; }
-            .swell-legend { gap: 4px 8px; }
         }
     </style>
 
@@ -838,18 +840,8 @@
     </div>
     <div id="forecastContainer"></div>
     <div class="swell-detail">
-        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
+        <div class="px-1">
             <div class="swell-detail-heading text-[9px] font-semibold uppercase tracking-wide text-[#7f8187]">Hourly swell · height & direction</div>
-            <div class="swell-legend" aria-label="Swell component and condition legend">
-                <span><i style="background:#8f9bff"></i>Primary</span>
-                <span><i style="background:#e2b86b"></i>Secondary</span>
-                <span><i style="background:#6fcf97"></i>Tertiary</span>
-                <span><i style="background:#b89cff"></i>Fourth</span>
-                <span class="cond-key" hidden><i class="sq" style="background:#e06c75"></i>Poor</span>
-                <span class="cond-key" hidden><i class="sq" style="background:#e2b86b"></i>Fair</span>
-                <span class="cond-key" hidden><i class="sq" style="background:#45c4b0"></i>Good</span>
-                <span class="cond-key" hidden><i class="sq" style="background:#b48cff"></i>Epic</span>
-            </div>
         </div>
         <!-- log line: the selected day, then that day at a glance -->
         <div class="flex flex-wrap items-baseline justify-between gap-x-4 px-1 mt-2 mb-1">
