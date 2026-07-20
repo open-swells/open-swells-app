@@ -480,7 +480,12 @@ func spotForecast(staticDir string, lat, lon float64) (ForecastData, []hourSwell
 		}
 		p, ok := nearestSwell(points, lat, lon)
 		if !ok {
-			return ForecastData{}, nil // no wave grid near this spot at all
+			if len(samples) == 0 {
+				return ForecastData{}, nil // no wave grid near this spot at all
+			}
+			// A later frame can occasionally omit a coastal cell. Keep the
+			// valid leading run instead of discarding the entire forecast.
+			break
 		}
 		if len(samples) > 0 && hour != samples[len(samples)-1].hour+3 {
 			break
