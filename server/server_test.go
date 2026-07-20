@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	webstatic "github.com/open-swells/open-swells-app/web/static"
 )
 
 const sampleBull = `  Location : 46221      (33.86N 118.63W)
@@ -248,6 +250,32 @@ func TestLoadTemplates(t *testing.T) {
 		if !bytes.Contains(unavailableFavorite.Bytes(), []byte(want)) {
 			t.Errorf("unavailable favorite summary is missing %q", want)
 		}
+	}
+}
+
+func TestEmbeddedFirebaseAuthAsset(t *testing.T) {
+	if len(webstatic.FirebaseAuthJS) == 0 {
+		t.Fatal("embedded Firebase auth asset is empty")
+	}
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/assets/firebase-auth.js", func(c *gin.Context) {
+		c.Data(http.StatusOK, "application/javascript; charset=utf-8", webstatic.FirebaseAuthJS)
+	})
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/firebase-auth.js", nil)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("asset status = %d, want %d", recorder.Code, http.StatusOK)
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "application/javascript; charset=utf-8" {
+		t.Fatalf("asset Content-Type = %q", got)
+	}
+	if !bytes.Contains(recorder.Body.Bytes(), []byte("window.openSwellsAuth")) {
+		t.Fatal("asset response is missing the Firebase auth bootstrap")
 	}
 }
 

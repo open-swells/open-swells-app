@@ -103,6 +103,21 @@ if command -v curl >/dev/null 2>&1; then
     echo "Service is running, but /healthz did not return 200. Check logs with:"
     echo "  journalctl -u $APP_NAME -f"
   fi
+
+  echo
+  echo "Checking embedded Firebase auth asset ..."
+  AUTH_ASSET_URL="http://127.0.0.1:$PORT/assets/firebase-auth.js"
+  AUTH_CONTENT_TYPE="$(curl -fsS -o /dev/null -w '%{content_type}' "$AUTH_ASSET_URL")" || {
+    echo "Firebase auth asset is unavailable at $AUTH_ASSET_URL." >&2
+    exit 1
+  }
+  case "$AUTH_CONTENT_TYPE" in
+    application/javascript*|text/javascript*) ;;
+    *)
+      echo "Firebase auth asset has unexpected Content-Type: $AUTH_CONTENT_TYPE" >&2
+      exit 1
+      ;;
+  esac
 fi
 REMOTE_SCRIPT
 

@@ -29,6 +29,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-resty/resty/v2"
 	_ "github.com/mattn/go-sqlite3"
+	webstatic "github.com/open-swells/open-swells-app/web/static"
 	"golang.org/x/sync/singleflight"
 	"google.golang.org/api/option"
 )
@@ -1086,7 +1087,6 @@ func run() {
 
 	cache := NewCache(3 * time.Hour)
 	templateDir := getenvDefault("TEMPLATE_DIR", "./web/templates")
-	webStaticDir := getenvDefault("WEB_STATIC_DIR", "./web/static")
 	tmpl := loadTemplates(templateDir)
 
 	router.ForwardedByClientIP = true
@@ -1128,7 +1128,7 @@ func run() {
 	})
 	router.GET("/assets/firebase-auth.js", staticLimiter.middleware(clientIPKey), func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=3600")
-		c.File(filepath.Join(webStaticDir, "firebase-auth.js"))
+		c.Data(http.StatusOK, "application/javascript; charset=utf-8", webstatic.FirebaseAuthJS)
 	})
 	router.GET("/static/*filepath", staticLimiter.middleware(clientIPKey), staticHandler(forecastDir))
 	// Dynamic pages and APIs share a per-client ceiling. Expensive and
