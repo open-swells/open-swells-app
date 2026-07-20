@@ -5,10 +5,35 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/open-swells-app
-ExecStart=/root/open-swells-app/open-swells-app
+User=openswells
+Group=openswells
+WorkingDirectory=/opt/open-swells-app
+ExecStart=/opt/open-swells-app/open-swells-app
+EnvironmentFile=-/etc/open-swells/open-swells-app.env
+StateDirectory=open-swells
+UMask=0027
 Restart=always
 RestartSec=5
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/open-swells
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target

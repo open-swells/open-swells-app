@@ -33,6 +33,14 @@ Configuration (all optional except Firebase credentials):
 | `TEMPLATE_DIR` | `./web/templates` | Go HTML page and component templates |
 | `TRUSTED_PROXIES` | `127.0.0.1,::1` | Comma-separated reverse proxy IPs |
 | `GIN_MODE` | `release` | Set `debug` for verbose gin output |
+| `RATE_LIMIT_RPM` / `RATE_LIMIT_BURST` | `120` / `30` | Per-client limit for dynamic pages and APIs |
+| `STATIC_RATE_LIMIT_RPM` / `STATIC_RATE_LIMIT_BURST` | `600` / `100` | Per-client limit for generated static data |
+| `EXPENSIVE_RATE_LIMIT_RPM` / `EXPENSIVE_RATE_LIMIT_BURST` | `12` / `4` | Per-client limit for forecast and upstream-backed routes |
+| `SUMMARY_RATE_LIMIT_RPM` / `SUMMARY_RATE_LIMIT_BURST` | `6` / `2` | Per-client limit for forecast-summary generation |
+| `USER_RATE_LIMIT_RPM` / `USER_RATE_LIMIT_BURST` | `30` / `10` | Per-user limit for authenticated routes |
+| `RATE_LIMIT_MAX_CLIENTS` | `10000` | Maximum in-memory client buckets |
+| `EXPENSIVE_MAX_CONCURRENT` | `16` | Maximum simultaneous upstream/forecast requests |
+| `SUMMARY_MAX_CONCURRENT` | `4` | Maximum simultaneous forecast-summary builds |
 
 `GET /healthz` returns 200 when the database is reachable and the contour
 data is fresh (<24h), 503 otherwise — point uptime monitoring at it.
@@ -50,11 +58,36 @@ derived from the verified token.
 
 ### Deploying to Linux
 
-`ops/deploy.sh` deploys the app to `/root/open-swells-app` over SSH, builds it on
+`ops/deploy.sh` deploys the app to `/opt/open-swells-app` over SSH, builds it on
 the server, and restarts the existing `open-swells-app` systemd service. The
 tracked `ops/systemd/open-swells-app.service` file is provided for initial
 server setup;
 routine deployments do not install or modify the service definition.
+
+One-time server setup (run as root):
+
+```sh
+useradd --system --home-dir /var/lib/open-swells --shell /usr/sbin/nologin openswells
+install -d -o root -g openswells -m 0750 /etc/open-swells
+install -d -o openswells -g openswells -m 0750 /var/lib/open-swells /var/lib/open-swells/forecast
+install -o root -g openswells -m 0640 /path/to/firebase.json /etc/open-swells/firebase.json
+install -o root -g root -m 0644 ops/systemd/open-swells-app.service /etc/systemd/system/open-swells-app.service
+```
+
+Create `/etc/open-swells/open-swells-app.env` with mode `0640`, owned by
+`root:openswells`:
+
+```sh
+PORT=8081
+DB_PATH=/var/lib/open-swells/main.db
+FORECAST_DIR=/var/lib/open-swells/forecast
+FIREBASE_CREDENTIALS=/etc/open-swells/firebase.json
+TRUSTED_PROXIES=127.0.0.1,::1
+```
+
+Then run `systemctl daemon-reload` and deploy. The forecast producer should
+write to `/var/lib/open-swells/forecast`; the application account needs write
+access there because it creates cached `.gz` siblings.
 
 Add the server IP to `.env`:
 
@@ -71,12 +104,13 @@ Then run:
 Optional overrides:
 
 ```sh
-DEPLOY_USER=root DEPLOY_DIR=/root/open-swells-app APP_NAME=open-swells-app ./ops/deploy.sh
+DEPLOY_USER=root DEPLOY_DIR=/opt/open-swells-app APP_NAME=open-swells-app APP_USER=openswells ./ops/deploy.sh
 ```
 
-The server must have Go installed. The server's `.env`, Firebase credentials,
-and SQLite database files are excluded from deployment syncs and remain
-unchanged.
+The server must have Go installed and must build with Go 1.26.5 or newer (the
+module enforces this; Go's automatic toolchain download may need outbound
+access). Server configuration, Firebase credentials, SQLite state, and
+forecast data live outside the deploy directory and remain unchanged.
 
 ### Resources and Tools
 - [htmx](https://htmx.org/)

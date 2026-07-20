@@ -185,9 +185,14 @@ var (
 	ndbcClient    = &http.Client{Timeout: 15 * time.Second}
 	forecastGroup singleflight.Group
 	stationIDRe   = regexp.MustCompile(`^[A-Za-z0-9]{3,10}$`)
+	favoriteMu    sync.Mutex
 )
 
 const nomadsBase = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod"
+
+const maxFavoritesPerUser = 50
+
+var errFavoriteLimit = errors.New("favorite limit reached")
 
 var directionMap = map[string]float64{
 	"N": 0, "NNE": 22.5, "NE": 45, "ENE": 67.5,
@@ -494,6 +499,14 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 		http.Error(w, "failed to load favorites", http.StatusInternalServerError)
 		return
 	}
+	// Bound the work even if an older database predates the write-time cap.
+	if len(buoyIDs) > maxFavoritesPerUser {
+		buoyIDs = buoyIDs[:maxFavoritesPerUser]
+	}
+	remaining := maxFavoritesPerUser - len(buoyIDs)
+	if len(spotIDs) > remaining {
+		spotIDs = spotIDs[:remaining]
+	}
 	spots := make([]SpotFavorite, 0, len(spotIDs))
 	for _, spotID := range spotIDs {
 		if spot, ok := spotStore.Get(spotID); ok {
@@ -642,6 +655,25 @@ func openDatabase(path string) *sql.DB {
 }
 
 func insertUserBuoy(db *sql.DB, uid, buoyID string) error {
+	favoriteMu.Lock()
+	defer favoriteMu.Unlock()
+
+	var exists bool
+	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM user_buoys WHERE uid = ? AND station_id = ?)`, uid, buoyID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	var count int
+	if err := db.QueryRow(`SELECT
+		(SELECT COUNT(*) FROM user_buoys WHERE uid = ?) +
+		(SELECT COUNT(*) FROM user_spots WHERE uid = ?)`, uid, uid).Scan(&count); err != nil {
+		return err
+	}
+	if count >= maxFavoritesPerUser {
+		return errFavoriteLimit
+	}
 	if _, err := db.Exec(`INSERT OR IGNORE INTO users (uid) VALUES (?)`, uid); err != nil {
 		return err
 	}
@@ -673,6 +705,25 @@ func getBuoysForUser(db *sql.DB, uid string) ([]string, error) {
 }
 
 func insertUserSpot(db *sql.DB, uid, spotID string) error {
+	favoriteMu.Lock()
+	defer favoriteMu.Unlock()
+
+	var exists bool
+	if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM user_spots WHERE uid = ? AND spot_id = ?)`, uid, spotID).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	var count int
+	if err := db.QueryRow(`SELECT
+		(SELECT COUNT(*) FROM user_buoys WHERE uid = ?) +
+		(SELECT COUNT(*) FROM user_spots WHERE uid = ?)`, uid, uid).Scan(&count); err != nil {
+		return err
+	}
+	if count >= maxFavoritesPerUser {
+		return errFavoriteLimit
+	}
 	if _, err := db.Exec(`INSERT OR IGNORE INTO users (uid) VALUES (?)`, uid); err != nil {
 		return err
 	}
@@ -1031,7 +1082,7 @@ func run() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := gin.New()
-	router.Use(gin.Logger(), gin.Recovery())
+	router.Use(gin.Logger(), gin.Recovery(), securityHeaders())
 
 	cache := NewCache(3 * time.Hour)
 	tmpl := loadTemplates(getenvDefault("TEMPLATE_DIR", "./web/templates"))
@@ -1041,18 +1092,49 @@ func run() {
 	if err := router.SetTrustedProxies(trustedProxies); err != nil {
 		log.Fatalf("failed to set proxies: %v", err)
 	}
+	maxRateEntries := getenvPositiveInt("RATE_LIMIT_MAX_CLIENTS", 10000)
+	publicLimiter := newKeyedRateLimiter(
+		getenvPositiveInt("RATE_LIMIT_RPM", 120),
+		getenvPositiveInt("RATE_LIMIT_BURST", 30),
+		maxRateEntries,
+	)
+	staticLimiter := newKeyedRateLimiter(
+		getenvPositiveInt("STATIC_RATE_LIMIT_RPM", 600),
+		getenvPositiveInt("STATIC_RATE_LIMIT_BURST", 100),
+		maxRateEntries,
+	)
+	expensiveLimiter := newKeyedRateLimiter(
+		getenvPositiveInt("EXPENSIVE_RATE_LIMIT_RPM", 12),
+		getenvPositiveInt("EXPENSIVE_RATE_LIMIT_BURST", 4),
+		maxRateEntries,
+	)
+	summaryIPLimiter := newKeyedRateLimiter(
+		getenvPositiveInt("SUMMARY_RATE_LIMIT_RPM", 6),
+		getenvPositiveInt("SUMMARY_RATE_LIMIT_BURST", 2),
+		maxRateEntries,
+	)
+	userLimiter := newKeyedRateLimiter(
+		getenvPositiveInt("USER_RATE_LIMIT_RPM", 30),
+		getenvPositiveInt("USER_RATE_LIMIT_BURST", 10),
+		maxRateEntries,
+	)
+	expensiveConcurrency := concurrencyLimit(getenvPositiveInt("EXPENSIVE_MAX_CONCURRENT", 16))
+	summaryConcurrency := concurrencyLimit(getenvPositiveInt("SUMMARY_MAX_CONCURRENT", 4))
 
 	router.GET("/favicon.ico", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
-	router.GET("/static/*filepath", staticHandler(forecastDir))
+	router.GET("/static/*filepath", staticLimiter.middleware(clientIPKey), staticHandler(forecastDir))
+	// Dynamic pages and APIs share a per-client ceiling. Expensive and
+	// authenticated routes below have additional, tighter buckets.
+	router.Use(publicLimiter.middleware(clientIPKey))
 	router.GET("/healthz", healthHandler(db, forecastDir, surfZoneStore))
 	router.GET("/api/buoys", stationStore.handleList)
-	router.GET("/api/wind/:stationId", windForecastHandler(forecastDir))
+	router.GET("/api/wind/:stationId", expensiveLimiter.middleware(clientIPKey), expensiveConcurrency, windForecastHandler(forecastDir))
 	router.GET("/api/beaches", surfZoneStore.handleList)
 	router.GET("/api/beach/:zoneId", surfZoneStore.handleZone)
 	router.GET("/api/spots", spotStore.handleList)
-	router.GET("/spot/:id", spotPageHandler(tmpl, forecastDir, surfZoneStore))
+	router.GET("/spot/:id", expensiveLimiter.middleware(clientIPKey), expensiveConcurrency, spotPageHandler(tmpl, forecastDir, surfZoneStore))
 
 	router.GET("/", func(c *gin.Context) {
 		renderTemplate(c, tmpl, "landing.html", LandingPageData{
@@ -1099,7 +1181,7 @@ func run() {
 		renderTemplate(c, tmpl, "beach.html", f)
 	})
 
-	router.GET("/forecast/:stationId", func(c *gin.Context) {
+	router.GET("/forecast/:stationId", expensiveLimiter.middleware(clientIPKey), expensiveConcurrency, func(c *gin.Context) {
 		stationId := c.Param("stationId")
 		if !validBuoyID(stationId) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Unknown station"})
@@ -1161,11 +1243,11 @@ func run() {
 		renderTemplate(c, tmpl, templateName, ReportData{WindReport: windreport, SwellReport: swellreport})
 	}
 
-	router.GET("/report/:stationId", func(c *gin.Context) {
+	router.GET("/report/:stationId", expensiveLimiter.middleware(clientIPKey), expensiveConcurrency, func(c *gin.Context) {
 		reportHandler(c, "report")
 	})
 
-	router.GET("/forecast-summary", requireAuth(), func(c *gin.Context) {
+	router.GET("/forecast-summary", requireAuth(), summaryIPLimiter.middleware(clientIPKey), userLimiter.middleware(authenticatedUserKey), summaryConcurrency, func(c *gin.Context) {
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db, forecastDir, c.Query("detailed") == "1")
 	})
@@ -1189,18 +1271,24 @@ func run() {
 	}
 
 	api := router.Group("/api")
-	api.GET("/realtime/:stationId", func(c *gin.Context) {
+	api.GET("/realtime/:stationId", expensiveLimiter.middleware(clientIPKey), expensiveConcurrency, func(c *gin.Context) {
 		realtimeHandler(c, ".spec")
 	})
-	api.GET("/realtime/wind/:stationId", func(c *gin.Context) {
+	api.GET("/realtime/wind/:stationId", expensiveLimiter.middleware(clientIPKey), expensiveConcurrency, func(c *gin.Context) {
 		realtimeHandler(c, ".txt")
 	})
 
 	api.POST("/auth", func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
 		var req struct {
 			IDToken string `json:"idToken"`
 		}
-		if err := c.BindJSON(&req); err != nil {
+		if err := c.ShouldBindJSON(&req); err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Request body too large"})
+				return
+			}
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 			return
 		}
@@ -1223,7 +1311,7 @@ func run() {
 		})
 	})
 
-	favorites := api.Group("/favorites", requireAuth())
+	favorites := api.Group("/favorites", requireAuth(), userLimiter.middleware(authenticatedUserKey))
 	favorites.GET("", func(c *gin.Context) {
 		uid := c.GetString("uid")
 		buoys, err := getBuoysForUser(db, uid)
@@ -1247,6 +1335,10 @@ func run() {
 			return
 		}
 		if err := insertUserBuoy(db, c.GetString("uid"), buoyID); err != nil {
+			if errors.Is(err, errFavoriteLimit) {
+				c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Favorites are limited to %d locations", maxFavoritesPerUser)})
+				return
+			}
 			log.Printf("Failed to insert user buoy: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add favorite"})
 			return
@@ -1264,7 +1356,7 @@ func run() {
 
 	// Spot favorites live in their own group: gin can't mix a static
 	// "spots" segment with the ":buoyID" wildcard above.
-	spotFavorites := api.Group("/spot-favorites", requireAuth())
+	spotFavorites := api.Group("/spot-favorites", requireAuth(), userLimiter.middleware(authenticatedUserKey))
 	spotFavorites.POST("/:spotID", func(c *gin.Context) {
 		spotID := c.Param("spotID")
 		if _, ok := spotStore.Get(spotID); !ok {
@@ -1272,6 +1364,10 @@ func run() {
 			return
 		}
 		if err := insertUserSpot(db, c.GetString("uid"), spotID); err != nil {
+			if errors.Is(err, errFavoriteLimit) {
+				c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Favorites are limited to %d locations", maxFavoritesPerUser)})
+				return
+			}
 			log.Printf("Failed to insert user spot: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add favorite"})
 			return
@@ -1291,6 +1387,10 @@ func run() {
 		Addr:              ":" + port,
 		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       20 * time.Second,
+		WriteTimeout:      90 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    16 << 10,
 	}
 
 	go func() {
