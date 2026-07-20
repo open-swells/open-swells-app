@@ -142,15 +142,15 @@
                 .compass .ring { fill: none; stroke: #3b3d42; stroke-width: 1; }
                 .compass .tick { stroke: #45474d; stroke-width: 1; }
                 .compass .needle { fill: #8f9bff; transform-box: view-box; transform-origin: 50% 50%; }
-                /* phones: keep all three cards on one row, stacking each
-                   card's compass above its numbers to fit the narrow column */
+                /* Give each mobile card enough width to keep its compass and
+                   height/period together; direction stays on the line below. */
                 @media (max-width: 719px) {
-                    .report-cards { gap: 6px; }
+                    .report-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
                     .report-card { padding: 10px 8px; }
                     .report-card h2 { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                    .report-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+                    .report-row { gap: 8px; }
                     .compass { width: 32px; height: 32px; }
-                    .report-value .main { font-size: 12px; white-space: normal; }
+                    .report-value .main { font-size: 11px; }
                 }
             </style>
             <div class="report-cards">
