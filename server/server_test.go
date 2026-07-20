@@ -185,6 +185,13 @@ func TestLoadTemplates(t *testing.T) {
 	if bytes.Contains(spotPage.Bytes(), []byte("Current outlook")) {
 		t.Error("spot page still renders the detached current outlook tag")
 	}
+	if !bytes.Contains(spotPage.Bytes(), []byte("travelBearing(d.PrimaryDegrees)")) ||
+		!bytes.Contains(spotPage.Bytes(), []byte("travelBearing(direction)")) {
+		t.Error("hourly forecast arrows do not convert marine from-directions to travel bearings")
+	}
+	if bytes.Contains(spotPage.Bytes(), []byte("PrimaryDegrees - 135")) {
+		t.Error("hourly forecast still applies the incorrect swell-arrow rotation offset")
+	}
 	summaryData := struct {
 		Buoys    []BuoyWithSummary
 		Spots    []SpotFavorite
