@@ -43,7 +43,7 @@ rsync -az --delete \
   --exclude '.agents/' \
   --exclude '.codex/' \
   --exclude '.env' \
-  --exclude 'static/' \
+  --exclude '/static/' \
   --exclude 'data/forecast/' \
   --exclude '*.db' \
   --exclude '*.db-wal' \
