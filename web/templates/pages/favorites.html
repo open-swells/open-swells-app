@@ -122,19 +122,10 @@
         </div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js"></script>
+    <script src="/assets/firebase-auth.js"></script>
     <script>
-        const firebaseConfig = {
-            apiKey: "AIzaSyBKZUgrKoU8MxXIm9H0mGubjfL8TANdH5g",
-            authDomain: "open-swells-89714.firebaseapp.com",
-            projectId: "open-swells-89714",
-            storageBucket: "open-swells-89714.appspot.com",
-            messagingSenderId: "764680526760",
-            appId: "1:764680526760:web:77bf8034f0f8df259b1b9d"
-        };
-        firebase.initializeApp(firebaseConfig);
-
         const initialSearchView = {{if .SearchView}}true{{else}}false{{end}};
         let userBuoys = [];
         let userSpots = [];
@@ -146,11 +137,7 @@
         })[char]);
 
         async function authFetch(url, options = {}) {
-            const user = firebase.auth().currentUser;
-            if (!user) throw new Error('Not signed in');
-            const token = await user.getIdToken();
-            options.headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
-            return fetch(url, options);
+            return openSwellsAuth.authFetch(url, options);
         }
 
         function openLocationSearch(updateHistory = true) {
@@ -214,7 +201,7 @@
         }
 
         async function loadFavorites() {
-            const user = firebase.auth().currentUser;
+            const user = openSwellsAuth.auth.currentUser;
             const grid = document.getElementById('favoritesGrid');
             document.getElementById('signedOutState').classList.toggle('hidden', !!user);
             grid.style.display = user ? 'block' : 'none';
@@ -412,7 +399,7 @@
         }
 
         async function addFavorite(type, id) {
-            if (!firebase.auth().currentUser) return openSignIn();
+            if (!openSwellsAuth.auth.currentUser) return openSignIn();
             const url = type === 'buoy' ? `/api/favorites/${encodeURIComponent(id)}` : `/api/spot-favorites/${encodeURIComponent(id)}`;
             try {
                 const response = await authFetch(url, { method: 'POST' });
@@ -441,20 +428,20 @@
         function openSpot(id) { window.location.assign(`/spot/${encodeURIComponent(id)}`); }
         function openSignIn() { const modal = document.getElementById('signInModal'); modal.classList.remove('hidden'); modal.classList.add('flex'); }
         function closeSignIn() { const modal = document.getElementById('signInModal'); modal.classList.add('hidden'); modal.classList.remove('flex'); }
-        function googleSignIn() { firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).then(closeSignIn).catch(console.error); }
+        function googleSignIn() { openSwellsAuth.signIn().then(closeSignIn).catch(console.error); }
 
         document.getElementById('locationSearch').addEventListener('input', renderSearchResults);
         document.getElementById('searchResults').addEventListener('click', event => {
             const button = event.target.closest('[data-add-type]');
             if (button && !button.disabled) addFavorite(button.dataset.addType, button.dataset.addId);
         });
-        document.getElementById('signOutBtn').addEventListener('click', () => firebase.auth().signOut());
+        document.getElementById('signOutBtn').addEventListener('click', () => openSwellsAuth.signOut());
         document.getElementById('signInModal').addEventListener('click', event => { if (event.target.id === 'signInModal') closeSignIn(); });
         document.getElementById('searchModal').addEventListener('click', event => { if (event.target.id === 'searchModal') closeLocationSearch(); });
         document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeSignIn(); closeLocationSearch(); } });
         window.addEventListener('popstate', () => location.pathname.endsWith('/search') ? openLocationSearch(false) : closeLocationSearch(false));
 
-        firebase.auth().onAuthStateChanged(user => {
+        openSwellsAuth.auth.onAuthStateChanged(user => {
             const button = document.getElementById('signInBtn');
             const menu = document.getElementById('userMenu');
             if (user) {

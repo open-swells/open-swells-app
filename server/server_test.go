@@ -125,8 +125,25 @@ func TestLoadTemplates(t *testing.T) {
 			t.Errorf("template %q not found", name)
 		}
 	}
-	if err := tmpl.ExecuteTemplate(io.Discard, "favorites.html", gin.H{"SearchView": false}); err != nil {
+	var favorites bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&favorites, "favorites.html", gin.H{"SearchView": false}); err != nil {
 		t.Fatalf("favorites template failed to render: %v", err)
+	}
+	if !bytes.Contains(favorites.Bytes(), []byte("firebasejs/12.16.0/firebase-auth-compat.js")) ||
+		!bytes.Contains(favorites.Bytes(), []byte("/assets/firebase-auth.js")) {
+		t.Error("favorites page is missing the shared Firebase auth SDK")
+	}
+	for _, legacy := range [][]byte{[]byte("firebasejs/9."), []byte("firebasejs/11."), []byte("signInWithPopup(new firebase.auth.GoogleAuthProvider())")} {
+		if bytes.Contains(favorites.Bytes(), legacy) {
+			t.Errorf("favorites page still contains legacy Firebase code %q", legacy)
+		}
+	}
+	var mapPage bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&mapPage, "today.html", MapPageData{}); err != nil {
+		t.Fatalf("map template failed to render: %v", err)
+	}
+	if !bytes.Contains(mapPage.Bytes(), []byte("updateUIForSignedInUser(user);")) {
+		t.Error("map auth-state listener does not update the account button")
 	}
 	var landing bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&landing, "landing.html", LandingPageData{SpotCount: 5878, BuoyCount: 178}); err != nil {

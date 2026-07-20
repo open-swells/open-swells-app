@@ -631,36 +631,9 @@
     </body>
 
 
-        <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-        <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
-
-        <!-- firebase sign in script --> 
-        <script type="module">
-            // Add SDKs for Firebase products that you want to use
-            // https://firebase.google.com/docs/web/setup#available-libraries
-            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-      import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
-      // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-        const firebaseConfig = {
-          apiKey: "AIzaSyBKZUgrKoU8MxXIm9H0mGubjfL8TANdH5g",
-          authDomain: "open-swells-89714.firebaseapp.com",
-          projectId: "open-swells-89714",
-          storageBucket: "open-swells-89714.appspot.com",
-          messagingSenderId: "764680526760",
-          appId: "1:764680526760:web:77bf8034f0f8df259b1b9d",
-          measurementId: "G-BJTLM29FYZ"
-        };
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-
-        firebase.auth().onAuthStateChanged(updateUIForSignedInUser);
-
-        </script>
+        <script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js"></script>
+        <script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js"></script>
+        <script src="/assets/firebase-auth.js"></script>
         <script> 
             let userBuoys = [];
             let userSpots = [];
@@ -669,13 +642,7 @@
             // All per-user API calls authenticate with the Firebase ID token;
             // the server derives the uid from the verified token.
             async function authFetch(url, options = {}) {
-                const user = firebase.auth().currentUser;
-                if (!user) {
-                    throw new Error('Not signed in');
-                }
-                const token = await user.getIdToken();
-                options.headers = { ...(options.headers || {}), 'Authorization': `Bearer ${token}` };
-                return fetch(url, options);
+                return openSwellsAuth.authFetch(url, options);
             }
 
             async function loadForecastSummary() {
@@ -730,7 +697,8 @@
             }
             // Wait for Firebase authentication
             document.addEventListener('DOMContentLoaded', () => {
-                firebase.auth().onAuthStateChanged(async (user) => {
+                openSwellsAuth.auth.onAuthStateChanged(async (user) => {
+                    updateUIForSignedInUser(user);
                     if (user) {
                         await loadForecastSummary();
                         await loadUserBuoys();
@@ -745,10 +713,9 @@
             });
 
             function googleSignIn() {
-                const provider = new firebase.auth.GoogleAuthProvider();
-                firebase.auth().signInWithPopup(provider)
+                openSwellsAuth.signIn()
                     .then(result => {
-                        updateUIForSignedInUser(result.user);
+                        if (result && result.user) updateUIForSignedInUser(result.user);
                     })
                     .catch(error => console.error('Sign-in error:', error));
             }
@@ -758,8 +725,16 @@
                 if (user) {
                     // User is signed in
                     signInBtn.classList.add('is-user');
-                    signInBtn.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="md:w-8 md:h-8 w-6 h-6 rounded-full">`;
-                    // signInBtn.onclick = () => firebase.auth().signOut().then(() => updateUIForSignedInUser(null));
+                    signInBtn.replaceChildren();
+                    if (user.photoURL) {
+                        const profileImage = document.createElement('img');
+                        profileImage.src = user.photoURL;
+                        profileImage.alt = 'Profile';
+                        profileImage.className = 'md:w-8 md:h-8 w-6 h-6 rounded-full';
+                        signInBtn.appendChild(profileImage);
+                    } else {
+                        signInBtn.textContent = 'Account';
+                    }
                     signInBtn.onclick = () => document.getElementById('userPopup').classList.remove('hidden');
                     document.getElementById('userName').textContent = user.displayName;
                     document.getElementById('userEmail').textContent = user.email;
@@ -783,7 +758,7 @@
             });
 
             document.getElementById('signOutBtn').addEventListener('click', function() {
-                firebase.auth().signOut().then(() => {
+                openSwellsAuth.signOut().then(() => {
                     updateUIForSignedInUser(null);
                     document.getElementById('userPopup').classList.add('hidden');
                     userBuoys = [];
@@ -1628,7 +1603,7 @@
 
 
             async function addBuoyToFavorites(stationId) {
-                const user = firebase.auth().currentUser;
+                const user = openSwellsAuth.auth.currentUser;
                 if (!user) {
                     alert('Please sign in to add favorites');
                     return;
@@ -1732,7 +1707,7 @@
                 console.log(`Toggling favorite for station ID: ${stationId}`);
                 console.log("user buoys here: ", userBuoys);
                 console.log("station id here: ", stationId);
-                const user = firebase.auth().currentUser;
+                const user = openSwellsAuth.auth.currentUser;
                 if (!user) {
                     alert('Please sign in to manage favorites');
                     return;
@@ -1774,7 +1749,7 @@
             }
 
             async function toggleSpotFavorite(spotId) {
-                const user = firebase.auth().currentUser;
+                const user = openSwellsAuth.auth.currentUser;
                 if (!user) {
                     alert('Please sign in to manage favorites');
                     return;

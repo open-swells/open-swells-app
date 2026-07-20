@@ -56,6 +56,18 @@ Per-user endpoints (`/api/favorites`, `/forecast-summary`) require a
 Firebase ID token in the `Authorization: Bearer` header; the uid is always
 derived from the verified token.
 
+Google sign-in uses the current site origin as Firebase's `authDomain`. The
+app transparently proxies `/__/auth/` to the project's Firebase Hosting auth
+helper, which keeps mobile redirect state first-party in browsers that block
+third-party storage. Before deploying a new hostname:
+
+1. Add the exact hostname under Firebase Console → Authentication → Settings
+   → Authorized domains.
+2. Add `https://YOUR_DOMAIN/__/auth/handler` as an authorized redirect URI for
+   the web client's Google OAuth credentials in Google Cloud Console.
+3. Keep `/__/auth/` routed to this Go application in the reverse proxy; do not
+   redirect or rewrite that path.
+
 ### Deploying to Linux
 
 `ops/deploy.sh` deploys the app to `/opt/open-swells-app` over SSH, builds it on

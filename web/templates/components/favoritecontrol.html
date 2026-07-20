@@ -1,20 +1,11 @@
 {{define "favoritecontrol"}}
-<script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.16.0/firebase-auth-compat.js"></script>
+<script src="/assets/firebase-auth.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const button = document.querySelector('[data-forecast-favorite]');
         if (!button || window.self !== window.top) return;
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBKZUgrKoU8MxXIm9H0mGubjfL8TANdH5g",
-            authDomain: "open-swells-89714.firebaseapp.com",
-            projectId: "open-swells-89714",
-            storageBucket: "open-swells-89714.appspot.com",
-            messagingSenderId: "764680526760",
-            appId: "1:764680526760:web:77bf8034f0f8df259b1b9d"
-        };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 
         const kind = button.dataset.favoriteType;
         const id = button.dataset.favoriteId;
@@ -28,11 +19,7 @@
         }
 
         async function authFetch(url, options = {}) {
-            const user = firebase.auth().currentUser;
-            if (!user) throw new Error('Not signed in');
-            const token = await user.getIdToken();
-            options.headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
-            return fetch(url, options);
+            return openSwellsAuth.authFetch(url, options);
         }
 
         async function refresh() {
@@ -44,9 +31,9 @@
         }
 
         button.addEventListener('click', async () => {
-            if (!firebase.auth().currentUser) {
+            if (!openSwellsAuth.auth.currentUser) {
                 try {
-                    await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+                    await openSwellsAuth.signIn();
                 } catch (error) {
                     console.error('Sign-in failed:', error);
                 }
@@ -65,7 +52,7 @@
             }
         });
 
-        firebase.auth().onAuthStateChanged(user => {
+        openSwellsAuth.auth.onAuthStateChanged(user => {
             if (!user) {
                 saved = false;
                 render();

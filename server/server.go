@@ -1085,7 +1085,9 @@ func run() {
 	router.Use(gin.Logger(), gin.Recovery(), securityHeaders())
 
 	cache := NewCache(3 * time.Hour)
-	tmpl := loadTemplates(getenvDefault("TEMPLATE_DIR", "./web/templates"))
+	templateDir := getenvDefault("TEMPLATE_DIR", "./web/templates")
+	webStaticDir := getenvDefault("WEB_STATIC_DIR", "./web/static")
+	tmpl := loadTemplates(templateDir)
 
 	router.ForwardedByClientIP = true
 	trustedProxies := strings.Split(getenvDefault("TRUSTED_PROXIES", "127.0.0.1,::1"), ",")
@@ -1124,10 +1126,16 @@ func run() {
 	router.GET("/favicon.ico", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
+	router.GET("/assets/firebase-auth.js", staticLimiter.middleware(clientIPKey), func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=3600")
+		c.File(filepath.Join(webStaticDir, "firebase-auth.js"))
+	})
 	router.GET("/static/*filepath", staticLimiter.middleware(clientIPKey), staticHandler(forecastDir))
 	// Dynamic pages and APIs share a per-client ceiling. Expensive and
 	// authenticated routes below have additional, tighter buckets.
 	router.Use(publicLimiter.middleware(clientIPKey))
+	router.Any("/__/auth/*filepath", firebaseAuthProxy())
+	router.GET("/__/firebase/init.json", firebaseAuthProxy())
 	router.GET("/healthz", healthHandler(db, forecastDir, surfZoneStore))
 	router.GET("/api/buoys", stationStore.handleList)
 	router.GET("/api/wind/:stationId", expensiveLimiter.middleware(clientIPKey), expensiveConcurrency, windForecastHandler(forecastDir))

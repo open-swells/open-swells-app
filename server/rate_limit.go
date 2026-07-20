@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -105,6 +106,12 @@ func authenticatedUserKey(c *gin.Context) string {
 
 func securityHeaders() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Firebase's same-origin helper must be passed through transparently;
+		// Firebase supplies the response policy for its iframe/handler pages.
+		if strings.HasPrefix(c.Request.URL.Path, "/__/auth/") || c.Request.URL.Path == "/__/firebase/init.json" {
+			c.Next()
+			return
+		}
 		c.Header("Content-Security-Policy", "base-uri 'self'; object-src 'none'; frame-ancestors 'self'")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Header("X-Content-Type-Options", "nosniff")
