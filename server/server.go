@@ -78,13 +78,14 @@ type LandingPageData struct {
 }
 
 type BuoyPageData struct {
-	ForecastData    ForecastData
-	SwellReport     SwellReport
-	WindReport      WindReport
-	BuoyName        string
-	HasSwellError   bool
-	HasWindError    bool
-	ForecastSummary []ForecastSummary
+	ForecastData     ForecastData
+	SwellReport      SwellReport
+	WindReport       WindReport
+	BuoyName         string
+	HasSwellError    bool
+	HasWindError     bool
+	HasForecastError bool
+	ForecastSummary  []ForecastSummary
 }
 
 type ForecastSummary struct {
@@ -533,7 +534,7 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 			if err != nil {
 				log.Printf("Error fetching data for buoy %s: %v", buoyID, err)
 				entry.HasError = true
-				entry.ErrorMsg = "Data unavailable"
+				entry.ErrorMsg = "Forecast not available"
 			} else {
 				entry.Summary = generateForecastSummary(forecastData)
 				entry.Buoy.Forecast = forecastData
@@ -1119,19 +1120,22 @@ func run() {
 
 		forecastdata, forecastErr := getForecast(cache, stationId)
 		if forecastErr != nil {
-			log.Printf("Error: failed to get forecast data for buoy %s: %v", stationId, forecastErr)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get forecast data"})
-			return
+			// Current NDBC observations and the GFS-Wave station bulletin are
+			// independent. Keep the useful report when NOMADS has no bulletin
+			// for a mapped station instead of replacing the page with a 500.
+			log.Printf("Warning: forecast unavailable for buoy %s: %v", stationId, forecastErr)
+			forecastdata = ForecastData{}
 		}
 
 		returndata := BuoyPageData{
-			ForecastData:    forecastdata,
-			SwellReport:     swellreport,
-			WindReport:      windreport,
-			BuoyName:        stationStore.DisplayName(stationId),
-			HasSwellError:   swellErr != nil,
-			HasWindError:    windErr != nil,
-			ForecastSummary: generateForecastSummary(forecastdata),
+			ForecastData:     forecastdata,
+			SwellReport:      swellreport,
+			WindReport:       windreport,
+			BuoyName:         stationStore.DisplayName(stationId),
+			HasSwellError:    swellErr != nil,
+			HasWindError:     windErr != nil,
+			HasForecastError: forecastErr != nil,
+			ForecastSummary:  generateForecastSummary(forecastdata),
 		}
 		renderTemplate(c, tmpl, "buoy.html", returndata)
 	})

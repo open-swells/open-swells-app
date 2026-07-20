@@ -244,6 +244,14 @@
                     el.style.color = CONDITION_COLORS[current.cond];
                     el.style.borderColor = 'currentColor';
                 });
+                document.querySelectorAll('[data-current-condition-card]').forEach(card => {
+                    if (!current) return;
+                    card.style.setProperty('--condition-color', CONDITION_COLORS[current.cond]);
+                    const condition = card.querySelector('[data-current-condition]');
+                    const height = card.querySelector('[data-current-height]');
+                    if (condition) condition.textContent = current.cond;
+                    if (height) height.textContent = `${current.avgFt.toFixed(1)}ft`;
+                });
             }
             buildDayCards();
 

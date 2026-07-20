@@ -27,10 +27,20 @@
             #forecast-table th { color: #8b8d93; font-size: 10px; font-weight: 600; padding: 10px 14px !important; }
             #forecast-table td { padding: 8px 14px !important; white-space: nowrap; }
             #tooltip { border-radius: 4px !important; background: #18191c !important; border-color: #45474d !important; }
+            .popup-only { display: none; }
             body.embedded .standalone-only { display: none !important; }
+            body.embedded .popup-only { display: inline-flex; }
             body.embedded .station-shell { padding-top: 14px; }
-            .page-favorite-button {
+            .page-header-action {
                 width: 32px; height: 32px; display: inline-flex; flex: none; align-items: center; justify-content: center;
+                background: #202125; cursor: pointer;
+            }
+            .page-open-button {
+                border: 1px solid #3b3d42; color: #c6c7ca;
+            }
+            .page-open-button:hover { background: #2a2c30; color: white; }
+            .page-open-button svg { width: 15px; height: 15px; }
+            .page-favorite-button {
                 border: 1px solid #406b53; background: #202125; color: #6fcf97;
                 font-size: 18px; line-height: 1; cursor: pointer;
             }
@@ -63,7 +73,12 @@
                 <div class="mono text-[10px] text-[#8b8d93] mt-1">{{if .Region}}{{.Region}} &middot; {{end}}GFS-WAVE MODEL FORECAST{{if .Facing}} &middot; FACES {{.Facing}}{{end}}</div>
             </div>
 
-            <button type="button" class="page-favorite-button" data-forecast-favorite data-favorite-type="spot" data-favorite-id="{{.SwellReport.StationId}}" aria-label="Add to favorites">+</button>
+            <div class="flex items-center gap-2 flex-none">
+                <a class="page-header-action page-open-button popup-only" href="/spot/{{.SwellReport.StationId}}" target="_top" aria-label="Open full forecast" title="Open full forecast">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                </a>
+                <button type="button" class="page-header-action page-favorite-button" data-forecast-favorite data-favorite-type="spot" data-favorite-id="{{.SwellReport.StationId}}" aria-label="Add to favorites">+</button>
+            </div>
         </div>
 
         {{if .HasZone}}
@@ -121,22 +136,10 @@
         </div>
         {{end}}
         {{if .HasForecast}}
-            {{if gt (len .ForecastSummary) 0}}
-                {{$current := index .ForecastSummary 0}}
-                <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mb-2">
-                    <div class="min-w-0 text-[10px] font-semibold uppercase text-[#8b8d93]">Current report {{if .HasReport}}<span class="normal-case font-normal">&middot; model, valid <span data-local-time="{{.Report.ValidUnixMs}}">{{.Report.Valid}}</span></span>{{end}}</div>
-                    <div class="flex items-center gap-2 shrink-0">
-                    <span class="text-[10px] text-[#8b8d93]">Current outlook</span>
-                    <span data-current-outlook class="px-2 py-1 text-[10px] font-semibold uppercase border"
-                          style="color: {{if eq $current.Condition "epic"}}#b48cff{{else if eq $current.Condition "good"}}#45c4b0{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor; background: color-mix(in srgb, currentColor 10%, transparent);">
-                        {{$current.Condition}}
-                    </span>
-                    </div>
-                </div>
-            {{end}}
+            <div class="mb-2 min-w-0 text-[10px] font-semibold uppercase text-[#8b8d93]">Current report {{if .HasReport}}<span class="normal-case font-normal">&middot; model, valid <span data-local-time="{{.Report.ValidUnixMs}}">{{.Report.Valid}}</span></span>{{end}}</div>
             {{if .HasReport}}
             <style>
-                .report-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+                .report-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
                 .report-card { min-width: 0; padding: 12px; background: #202125; border: 1px solid #34363b; transition: border-color 120ms ease; }
                 .report-card:hover { border-color: #45474d; }
                 .report-card h2 { margin: 0 0 10px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #8b8d93; }
@@ -148,6 +151,17 @@
                 .compass .ring { fill: none; stroke: #3b3d42; stroke-width: 1; }
                 .compass .tick { stroke: #45474d; stroke-width: 1; }
                 .compass .needle { fill: #8f9bff; transform-box: view-box; transform-origin: 50% 50%; }
+                .condition-card {
+                    border-color: var(--condition-color);
+                    background: color-mix(in srgb, var(--condition-color) 9%, #202125);
+                }
+                .condition-card:hover { border-color: var(--condition-color); }
+                .condition-card h2 { color: var(--condition-color); }
+                .condition-summary { min-height: 40px; display: flex; flex-direction: column; justify-content: center; }
+                .condition-summary-main { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+                .condition-rating { color: var(--condition-color); font-size: 15px; font-weight: 700; text-transform: uppercase; }
+                .condition-height { color: #f0f0f1; font-size: 14px; font-weight: 600; }
+                .condition-summary-sub { margin-top: 3px; color: #8b8d93; font-size: 10px; }
                 /* Give each mobile card enough width to keep its compass and
                    height/period together; direction stays on the line below. */
                 @media (max-width: 719px) {
@@ -160,6 +174,21 @@
                 }
             </style>
             <div class="report-cards">
+                {{if gt (len .ForecastSummary) 0}}
+                {{$current := index .ForecastSummary 0}}
+                <div class="report-card condition-card" data-current-condition-card
+                     style="--condition-color: {{if eq $current.Condition "epic"}}#b48cff{{else if eq $current.Condition "good"}}#45c4b0{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}};">
+                    <h2>Current conditions</h2>
+                    <div class="condition-summary">
+                        <div class="condition-summary-main">
+                            <span class="condition-rating" data-current-condition>{{$current.Condition}}</span>
+                            <span class="condition-height" data-current-height>{{$current.WaveHeight}}</span>
+                        </div>
+                        <div class="condition-summary-sub">Wave height</div>
+                    </div>
+                </div>
+                {{end}}
+
                 <div class="report-card">
                     <h2>{{if .Report.SwellHeight}}Seas &middot; nearshore{{else}}Primary swell{{end}}</h2>
                     <div class="report-row">

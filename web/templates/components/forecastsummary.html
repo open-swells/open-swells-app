@@ -15,6 +15,7 @@
     .link-button:hover { color: #fff; background: #26272b; border-color: #34363b; }
     .open-button { color: #fff; background: #5e6ad2; border-color: #737ee3; box-shadow: 0 3px 10px rgba(94, 106, 210, .2); }
     .open-button:hover { background: #6d78de; border-color: #8f9bff; }
+    .full-forecast-link { width: 30px; padding: 0; }
     .action-icon { width: 13px; height: 13px; flex: none; }
     .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: #e06c75; background: #281f22; border: 1px solid #553137; font-size: 18px; line-height: 1; cursor: pointer; }
     .remove-button:hover { color: #ff9299; background: #382429; border-color: #8f4952; }
@@ -55,7 +56,20 @@
     .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
     .location-badge-buoy { color: #8e97e8; }
     .location-badge-beach { color: #f0a05a; }
+    .favorite-condition-card {
+        padding: 7px 8px; border: 1px solid var(--condition-color);
+        background: color-mix(in srgb, var(--condition-color) 9%, #202125);
+    }
+    .favorite-condition-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--condition-color); }
+    .favorite-condition-main { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; white-space: nowrap; }
+    .favorite-condition-rating { color: var(--condition-color); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .favorite-condition-height { color: #f0f0f1; font-size: 11px; font-weight: 600; }
+    .spot-stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
     .compact-condition { margin-top: 12px; padding-top: 9px; border-top: 1px solid #34363b; display: flex; align-items: center; justify-content: space-between; }
+    .forecast-unavailable { justify-content: center; text-align: center; color: #8b8d93; }
+    .forecast-unavailable strong { display: block; color: #d6d7da; font-size: 12px; font-weight: 600; }
+    .forecast-unavailable span { display: block; margin-top: 5px; font-size: 10px; line-height: 1.45; }
+    .unavailable-label { color: #a7a9ae; }
     .favorites-compact .favorite-row { padding: 12px; background: #202125; border: 1px solid #34363b; }
     .favorites-compact .favorite-row + .favorite-row { margin-top: 8px; }
     .favorites-compact .favorite-name { font-size: 12px; }
@@ -63,6 +77,7 @@
     .favorites-compact .stat-value { font-size: 11px; }
     @media (max-width: 900px) {
         .favorites-detailed .favorite-row { grid-template-columns: minmax(0, 1fr); }
+        .favorites-detailed .spot-stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         .favorite-outlook { border-left: 0; padding-left: 0; border-top: 1px solid #26272b; padding-top: 12px; }
     }
     @media (max-width: 640px) {
@@ -71,9 +86,14 @@
         .favorites-detailed .stat-label { font-size: 8px; white-space: nowrap; }
         .favorites-detailed .stat-value { font-size: 11px; }
         .favorites-detailed .stat-sub { font-size: 9px; }
+        .favorites-detailed .spot-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
         .outlook-scroll { display: block; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
         .outlook-scroll > * { min-width: 480px; }
         [data-buoy-outlook] .outlook-scroll > * { min-width: 960px; }
+    }
+    @media (max-width: 400px) {
+        .favorites-compact .favorite-head { flex-wrap: wrap; }
+        .favorites-compact .favorite-actions { margin-left: auto; }
     }
 </style>
 <div class="{{if .Detailed}}favorites-detailed{{else}}favorites-compact{{end}}">
@@ -100,6 +120,9 @@
                     <button onclick="openForecast('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
                     {{else}}
                     <button onclick="showFavoriteOnMap('buoy', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
+                    <a href="/forecast/{{.ID}}" target="_top" class="link-button full-forecast-link" title="Open full forecast" aria-label="Open full forecast for {{.Name}}">
+                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                    </a>
                     {{end}}
                     <button onclick="toggleFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">−</button>
                 </div>
@@ -111,7 +134,11 @@
                 <div><div class="stat-label">Temperature</div><div class="stat-value">{{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}&deg;C air{{else}}--{{end}}</div><div class="stat-sub">Water {{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;C{{else}}--{{end}}</div></div>
             </div>
         </div>
-        {{if and $.Detailed (gt (len .Summary) 1)}}
+        {{if and $.Detailed .HasError}}
+        <div class="favorite-outlook forecast-unavailable" role="status">
+            <div><strong>{{.ErrorMsg}}</strong><span>Current buoy observations are still shown.</span></div>
+        </div>
+        {{else if and $.Detailed (gt (len .Summary) 1)}}
         <div class="favorite-outlook" data-buoy-outlook data-station="{{.ID}}" data-hourly-heights="{{range .Forecast.Forecast}}{{.PrimaryWaveHeight}} {{end}}" data-hourly-times="{{range .Forecast.Forecast}}{{.Time.UnixMilli}} {{end}}">
             <div class="outlook-head"><span class="outlook-label">16-day swell &amp; wind</span><span class="outlook-note" data-swell-note></span></div>
             <div class="outlook-scroll">
@@ -120,6 +147,8 @@
                 <div class="lane-labels" data-lane-labels></div>
             </div>
         </div>
+        {{else if and (not $.Detailed) .HasError}}
+        <div class="compact-condition"><span class="stat-label">Outlook</span><span class="text-[9px] font-semibold uppercase unavailable-label">{{.ErrorMsg}}</span></div>
         {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}
         <div class="compact-condition"><span class="stat-label">Current swell</span><span class="text-[9px] font-semibold uppercase" style="color: #8f9bff;">{{$current.WaveHeight}}</span></div>
         {{end}}
@@ -133,7 +162,6 @@
                 <div class="min-w-0">
                     <div class="flex items-baseline gap-3 min-w-0">
                         <h3 class="favorite-name truncate">{{.Name}}</h3>
-                        {{if gt (len .Summary) 0}}{{$current := index .Summary 0}}<span class="favorite-now" style="color: {{template "condcolor" $current.Condition}};">{{$current.Condition}} &middot; {{$current.WaveHeight}}</span>{{end}}
                     </div>
                     <div class="location-meta"><span class="location-badge location-badge-beach" style="margin-right: 6px;">Beach</span>{{if .Region}}{{.Region}}{{end}}</div>
                 </div>
@@ -142,11 +170,25 @@
                     <button onclick="openSpot('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
                     {{else}}
                     <button onclick="showFavoriteOnMap('spot', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
+                    <a href="/spot/{{.ID}}" target="_top" class="link-button full-forecast-link" title="Open full forecast" aria-label="Open full forecast for {{.Name}}">
+                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                    </a>
                     {{end}}
                     <button onclick="toggleSpotFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">−</button>
                 </div>
             </div>
-            <div class="stat-row">
+            <div class="stat-row spot-stat-row">
+                {{if gt (len .Summary) 0}}
+                {{$current := index .Summary 0}}
+                <div class="favorite-condition-card" data-favorite-condition-card
+                     style="--condition-color: {{template "condcolor" $current.Condition}};">
+                    <div class="favorite-condition-label">Current conditions</div>
+                    <div class="favorite-condition-main">
+                        <span class="favorite-condition-rating">{{$current.Condition}}</span>
+                        <span class="favorite-condition-height">{{$current.WaveHeight}}</span>
+                    </div>
+                </div>
+                {{end}}
                 <div><div class="stat-label">Primary swell</div><div class="stat-value">{{if .Primary}}{{.Primary}}{{else}}--{{end}}</div><div class="stat-sub">{{if .PrimarySub}}{{.PrimarySub}}&deg;{{else}}Direction --{{end}}</div></div>
                 <div><div class="stat-label">Secondary swell</div><div class="stat-value">{{if .Secondary}}{{.Secondary}}{{else}}--{{end}}</div><div class="stat-sub">{{if .SecondarySub}}{{.SecondarySub}}&deg;{{else}}Direction --{{end}}</div></div>
                 <div><div class="stat-label">Wind</div><div class="stat-value">{{if .HasWind}}{{.WindSpeed}} mph{{else}}--{{end}}</div><div class="stat-sub">{{if .HasWind}}{{.WindDir}}&deg;{{else}}Unavailable{{end}}</div></div>
@@ -169,8 +211,6 @@
                 </div>
             </div>
         </div>
-        {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}
-        <div class="compact-condition"><span class="stat-label">Current conditions</span><span class="text-[9px] font-semibold uppercase" style="color: {{template "condcolor" $current.Condition}};">{{$current.WaveHeight}} &middot; {{$current.Condition}}</span></div>
         {{end}}
     </article>
     {{end}}

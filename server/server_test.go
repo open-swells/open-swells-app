@@ -135,6 +135,37 @@ func TestLoadTemplates(t *testing.T) {
 	if !bytes.Contains(landing.Bytes(), []byte("5,878 surf spots")) {
 		t.Error("landing template is missing the formatted spot count")
 	}
+	var unavailableBuoy bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&unavailableBuoy, "buoy.html", BuoyPageData{
+		BuoyName: "Test Buoy", SwellReport: SwellReport{StationId: "46268"}, HasForecastError: true,
+	}); err != nil {
+		t.Fatalf("unavailable buoy template failed to render: %v", err)
+	}
+	if !bytes.Contains(unavailableBuoy.Bytes(), []byte("Forecast not available")) {
+		t.Error("unavailable buoy page is missing its forecast status")
+	}
+	if bytes.Contains(unavailableBuoy.Bytes(), []byte("let data =")) {
+		t.Error("unavailable buoy page unexpectedly initialized the forecast chart")
+	}
+	var spotPage bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&spotPage, "spot.html", SpotPageData{
+		SpotName: "Test Spot", HasForecast: true, HasReport: true,
+		Report: SpotReport{PrimaryHeight: "3.0", PrimaryPeriod: "12", PrimaryDegrees: "225"},
+		ForecastData: ForecastData{Date: "2026072000", Forecast: []ForecastRow{{
+			Date: "20 00", Time: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), PrimaryWaveHeight: "0.9",
+		}}},
+		ForecastSummary: []ForecastSummary{{Condition: "good", WaveHeight: "3.2ft"}},
+	}); err != nil {
+		t.Fatalf("spot template failed to render: %v", err)
+	}
+	for _, want := range []string{"Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #45c4b0"} {
+		if !bytes.Contains(spotPage.Bytes(), []byte(want)) {
+			t.Errorf("spot condition summary is missing %q", want)
+		}
+	}
+	if bytes.Contains(spotPage.Bytes(), []byte("Current outlook")) {
+		t.Error("spot page still renders the detached current outlook tag")
+	}
 	summaryData := struct {
 		Buoys    []BuoyWithSummary
 		Spots    []SpotFavorite
@@ -160,7 +191,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-hourly-heights=\"1.25 ", "day-tick", "12 mph", "270&deg;"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-hourly-heights=\"1.25 ", "day-tick", "12 mph", "270&deg;", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}
@@ -175,6 +206,31 @@ func TestLoadTemplates(t *testing.T) {
 	}
 	if !bytes.Contains(compact.Bytes(), []byte("Show on map")) {
 		t.Error("compact forecast summary is missing its map action")
+	}
+	for _, want := range []string{"href=\"/forecast/46221\"", "href=\"/spot/el-porto\"", "Open full forecast"} {
+		if !bytes.Contains(compact.Bytes(), []byte(want)) {
+			t.Errorf("compact forecast summary is missing %q", want)
+		}
+	}
+	if !bytes.Contains(compact.Bytes(), []byte("data-favorite-condition-card")) {
+		t.Error("compact forecast summary is missing the spot condition card")
+	}
+
+	unavailableSummary := summaryData
+	unavailableSummary.Buoys = []BuoyWithSummary{{
+		Buoy:        Buoy{ID: "46268", Name: "Test Buoy"},
+		SwellReport: SwellReport{PrimaryWaveHeight: "1.2", PrimaryPeriod: "12"},
+		HasError:    true, ErrorMsg: "Forecast not available",
+	}}
+	unavailableSummary.Detailed = true
+	var unavailableFavorite bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&unavailableFavorite, "forecastsummary", unavailableSummary); err != nil {
+		t.Fatalf("unavailable favorite summary failed to render: %v", err)
+	}
+	for _, want := range []string{"1.2ft @ 12s", "Forecast not available", "Current buoy observations are still shown."} {
+		if !bytes.Contains(unavailableFavorite.Bytes(), []byte(want)) {
+			t.Errorf("unavailable favorite summary is missing %q", want)
+		}
 	}
 }
 
