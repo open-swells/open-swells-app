@@ -38,6 +38,10 @@
         @media (max-width: 760px) {
             .brand-word { display: none; }
         }
+        /* iOS Safari auto-zooms focused inputs whose font size is below 16px. */
+        @media (pointer: coarse) {
+            #locationSearch { font-size: 16px; }
+        }
         @media (max-width: 1399px) {
             .view-switch { width: 138px; }
             .view-switch a { width: 65px; }
