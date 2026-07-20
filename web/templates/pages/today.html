@@ -73,7 +73,15 @@
         }
         .search-badge-buoy { color: #8e97e8; }
         .search-badge-beach { color: #f0a05a; }
-        #favoritesView { width: min(460px, calc(100vw - 24px)); bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)); transform: translateX(calc(100% + 24px)); transition: transform 180ms ease; }
+        #favoritesView {
+            width: min(460px, calc(100vw - 24px));
+            min-height: 0;
+            bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr);
+            transform: translateX(calc(100% + 24px));
+            transition: transform 180ms ease;
+        }
         #favoritesView.is-open { transform: translateX(0); }
         #drawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
         #drawerBackdrop.is-open { opacity: 1; pointer-events: auto; }
@@ -267,9 +275,15 @@
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
         .bottom-controls { bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important; }
-        /* The favorites list must scroll on touch devices */
+        /* A definite minmax(0, 1fr) drawer row plus min-height: 0 here is
+           required for nested momentum scrolling in iOS Safari. Without it,
+           Safari sizes this child to its content and sends the swipe to the
+           fixed, transformed drawer instead of scrolling the list. */
         #buoy-containers {
-            overflow-y: auto;
+            min-height: 0;
+            max-height: 100%;
+            overflow-x: hidden;
+            overflow-y: scroll;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
             touch-action: pan-y;
