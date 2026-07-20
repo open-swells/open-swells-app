@@ -47,6 +47,7 @@
         .drawer-tool { min-width: 0; height: 42px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #a7a9ae; font-size: 11px; }
         .drawer-tool + .drawer-tool { border-left: 1px solid #34363b; }
         .drawer-tool:hover { color: #fff; background: #24252a; }
+        .compact-only { display: none; }
         /* Buoy popup card. Styled with plain CSS rather than runtime
            Tailwind utility classes so the buttons hold their size and
            layout everywhere, including mobile. */
@@ -237,7 +238,12 @@
             .timeline-track::before, .timeline-tick, .timeline-progress { bottom: 8px; }
             .timeline-playhead { bottom: 5px; }
         }
-        @media (max-width: 639px) {
+        /* The full left cluster needs about 580px and the centered switch
+           begins 81px left of center. A 1400px cutoff leaves a safe gutter
+           between them and changes the search, switch, and tools together. */
+        @media (max-width: 1399px) {
+            .desktop-only { display: none !important; }
+            .compact-only { display: inline-flex !important; }
             /* Collapsed search: the bar hides behind the top-left icon and
                opens as a centered overlay (same pattern as the favorites
                page's add-location modal), so the header row stops fighting
@@ -255,7 +261,8 @@
                 position: static; width: 100%; max-width: 540px; margin-top: 4px;
                 max-height: min(55dvh, 380px);
             }
-            nav[aria-label="Primary view"] { top: 0.75rem; }
+            nav[aria-label="Primary view"] { top: 0.75rem; width: 138px; }
+            nav[aria-label="Primary view"] a { width: 65px; }
         }
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
@@ -287,7 +294,7 @@
         </div>
 
         <!-- Primary view switch -->
-        <nav class="surface view-switch absolute top-14 2xl:top-3 left-1/2 -translate-x-1/2 z-30 flex items-center" aria-label="Primary view">
+        <nav class="surface view-switch absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center" aria-label="Primary view">
             <a href="/map" aria-current="page" class="flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Map</a>
             <a href="/favorites" class="flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Favorites</a>
         </nav>
@@ -302,14 +309,14 @@
                 </h1>
             </div>
 
-            <!-- Search trigger (mobile only): the inline bar is hidden below
-                 sm and reopens as a centered overlay -->
-            <button id="mobileSearchBtn" class="surface w-9 h-9 flex sm:hidden items-center justify-center text-[#c6c7ca] shrink-0" onclick="openMobileSearch()" aria-label="Search stations">
+            <!-- Compact search trigger: below the full-header threshold the
+                 inline bar reopens as a centered overlay -->
+            <button id="mobileSearchBtn" class="compact-only surface w-9 h-9 items-center justify-center text-[#c6c7ca] shrink-0" onclick="openMobileSearch()" aria-label="Search stations">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             </button>
 
             <!-- Search -->
-            <div id="searchBox" class="searchbox relative w-full max-w-[540px]">
+            <div id="searchBox" class="searchbox relative w-full max-w-[440px]">
                 <div class="surface relative h-9 flex items-center focus-within:border-[#5e6ad2]">
                     <svg class="absolute left-3 pointer-events-none text-[#8b8d93]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                     <input
@@ -326,10 +333,10 @@
 
             <!-- Icons -->
             <div class="icons surface top-menu relative ml-auto flex items-center min-w-fit">
-                <button id="showFavoritesBtn" class="toolbar-button favorites-menu-button hidden sm:inline-flex" onclick="toggleFavorites()" aria-expanded="false" title="Favorites">
+                <button id="showFavoritesBtn" class="desktop-only toolbar-button favorites-menu-button" onclick="toggleFavorites()" aria-expanded="false" title="Favorites">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg><span class="hidden sm:inline">Favorites</span><span id="favoritesMenuCount" class="favorites-menu-count hidden">0</span>
                 </button>
-                <a href="/about" class="icon-button hidden md:inline-flex" title="About">
+                <a href="/about" class="desktop-only icon-button" title="About">
                     <svg xmlns="http://www.w3.org/2000/svg" 
                          viewBox="0 0 24 24" fill="none" stroke="currentColor" 
                                                          width="20" height="20" class="md:w-6 md:h-6">
@@ -340,7 +347,7 @@
                                  M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </a>
-                <a href="https://github.com/open-swells/open-swells-app" class="icon-button hidden md:inline-flex" title="GitHub">
+                <a href="https://github.com/open-swells/open-swells-app" class="desktop-only icon-button" title="GitHub">
                     <svg xmlns="http://www.w3.org/2000/svg" 
                          viewBox="0 0 24 24" fill="currentColor"
                                              width="20" height="20" class="md:w-6 md:h-6">
@@ -357,10 +364,10 @@
                                  c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
                     </svg>
                 </a>
-                <a href="#" id="signInBtn" class="toolbar-button profile-control hidden sm:inline-flex border-0 bg-transparent">
+                <a href="#" id="signInBtn" class="desktop-only toolbar-button profile-control border-0 bg-transparent">
                     Sign In
                 </a>
-                <button id="mobilePanelBtn" class="icon-button sm:hidden" onclick="toggleFavorites()" aria-expanded="false" aria-label="Open favorites and menu">
+                <button id="mobilePanelBtn" class="compact-only icon-button" onclick="toggleFavorites()" aria-expanded="false" aria-label="Open favorites and menu">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
 
@@ -1762,7 +1769,7 @@
 
             const searchInput = document.getElementById('searchInput');
 
-            // Mobile search overlay: below the sm breakpoint the inline bar
+            // Compact search overlay: below the full-header breakpoint the inline bar
             // is CSS-hidden and this class turns it into a centered modal.
             function openMobileSearch() {
                 document.getElementById('searchBox').classList.add('mobile-open');
@@ -1778,6 +1785,9 @@
             }
             document.getElementById('searchBox').addEventListener('click', (e) => {
                 if (e.target.id === 'searchBox') closeMobileSearch();
+            });
+            window.addEventListener('resize', () => {
+                if (window.matchMedia('(min-width: 1400px)').matches) closeMobileSearch();
             });
 
             // Search covers buoys and surf spots; each result is tagged with
@@ -1804,7 +1814,8 @@
                 if (e.key === '/' && document.activeElement !== searchInput &&
                     !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
                     e.preventDefault();
-                    searchInput.focus();
+                    if (window.matchMedia('(max-width: 1399px)').matches) openMobileSearch();
+                    else searchInput.focus();
                 } else if (e.key === 'Escape') {
                     closeMobileSearch();
                     if (document.activeElement === searchInput) {
