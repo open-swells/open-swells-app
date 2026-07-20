@@ -35,12 +35,19 @@
         .icon-button:hover { color: #fff; background: #2a2c30; border-color: #3b3d42; }
         .toolbar-button { height: 32px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid #3b3d42; background: #202125; color: #d6d7da; font-size: 12px; font-weight: 500; }
         .toolbar-button:hover, .toolbar-button[aria-expanded="true"] { background: #2a2c30; color: #fff; }
+        .top-menu { min-height: 44px; padding: 5px; gap: 3px; }
+        .top-menu .toolbar-button { height: 34px; padding-inline: 11px; }
+        .favorites-menu-button { background: #24252a; border: 1px solid #3b3d42; }
+        .favorites-menu-button svg { color: #8f9bff; }
+        .favorites-menu-count { min-width: 17px; height: 17px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; background: #343650; color: #c8ceff; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
         /* Buoy popup card. Styled with plain CSS rather than runtime
            Tailwind utility classes so the buttons hold their size and
            layout everywhere, including mobile. */
         .buoy-popup { width: min(230px, calc(100vw - 56px)); }
         .buoy-popup-name { margin: 0 28px 4px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
         .buoy-popup-id { margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b8d93; }
+        .buoy-popup-meta { margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
+        .buoy-popup-meta .buoy-popup-id { margin-bottom: 0; }
         .buoy-popup-actions { display: flex; gap: 6px; }
         .buoy-popup-actions .toolbar-button { height: 40px; flex: 1; justify-content: center; }
         .favorite-btn {
@@ -261,6 +268,12 @@
             </div>
         </div>
 
+        <!-- Primary view switch -->
+        <nav class="surface absolute top-14 2xl:top-3 left-1/2 -translate-x-1/2 z-30 h-9 p-1 flex items-center" aria-label="Primary view">
+            <a href="/map" aria-current="page" class="h-7 min-w-[76px] px-3 flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Map</a>
+            <a href="/favorites" class="h-7 min-w-[76px] px-3 flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Favorites</a>
+        </nav>
+
         <!-- 2) Header "island" at the top -->
         <div class="header absolute top-3 left-3 right-3 z-20 flex items-center gap-2" >
 
@@ -288,9 +301,9 @@
             </div>
 
             <!-- Icons -->
-            <div class="icons surface relative ml-auto flex items-center min-w-fit px-1">
-                <button id="showFavoritesBtn" class="toolbar-button border-0 bg-transparent" onclick="toggleFavorites()" aria-expanded="false" title="Favorites">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg><span class="hidden sm:inline">Favorites</span>
+            <div class="icons surface top-menu relative ml-auto flex items-center min-w-fit">
+                <button id="showFavoritesBtn" class="toolbar-button favorites-menu-button" onclick="toggleFavorites()" aria-expanded="false" title="Favorites">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg><span class="hidden sm:inline">Favorites</span><span id="favoritesMenuCount" class="favorites-menu-count hidden">0</span>
                 </button>
                 <a href="/about" class="icon-button hidden md:inline-flex" title="About">
                     <svg xmlns="http://www.w3.org/2000/svg" 
@@ -604,12 +617,22 @@
                     userBuoys = favoritesData.buoys || [];
                     userSpots = favoritesData.spots || [];
 
+                    updateFavoritesMenuCount();
+
                     console.log('User buoys:', userBuoys, 'user spots:', userSpots);
                 } catch (error) {
                     console.error('Error loading user buoys:', error);
                     userBuoys = [];
                     userSpots = [];
+                    document.getElementById('favoritesMenuCount').classList.add('hidden');
                 }
+            }
+
+            function updateFavoritesMenuCount() {
+                const count = userBuoys.length + userSpots.length;
+                const countBadge = document.getElementById('favoritesMenuCount');
+                countBadge.textContent = count;
+                countBadge.classList.toggle('hidden', count === 0);
             }
             // Wait for Firebase authentication
             document.addEventListener('DOMContentLoaded', () => {
@@ -620,6 +643,7 @@
                         // Update all popup contents after loading user buoys
                     } else {
                         console.log('User not signed in.');
+                        document.getElementById('favoritesMenuCount').classList.add('hidden');
                         document.getElementById('buoy-containers').innerHTML =
                             '<p class="dark:text-white">Please sign in to view your favorite buoys.</p>';
                     }
@@ -666,6 +690,7 @@
                     document.getElementById('userPopup').classList.add('hidden');
                     userBuoys = [];
                     userSpots = [];
+                    document.getElementById('favoritesMenuCount').classList.add('hidden');
                 });
             });
 
@@ -1553,7 +1578,7 @@
                 return `
                 <div class="buoy-popup">
                     <div class="buoy-popup-name">${buoy.name}</div>
-                    <div class="buoy-popup-id">BUOY ${buoy.stationId}</div>
+                    <div class="buoy-popup-meta"><span class="search-badge search-badge-buoy">Buoy</span><span class="buoy-popup-id">${buoy.stationId}</span></div>
                     <div class="buoy-popup-actions">
                         <button
                             onclick="openForecast('${buoy.stationId}')"
@@ -1643,6 +1668,7 @@
                 }
 
                 // Refresh the favorites display and update popup content
+                updateFavoritesMenuCount();
                 await loadForecastSummary();
             }
 
@@ -1666,6 +1692,7 @@
                     console.error('Error:', error);
                     alert(`Failed to ${isFavorite ? 'remove' : 'add'} favorite`);
                 }
+                updateFavoritesMenuCount();
                 await loadForecastSummary();
             }
 
@@ -1925,7 +1952,7 @@
                 let html = `
                 <div class="buoy-popup">
                     <div class="buoy-popup-name">${zone.zoneName}</div>
-                    <div class="buoy-popup-id">SURF ZONE ${zone.zoneId} &middot; NWS ${zone.office}</div>`;
+                    <div class="buoy-popup-meta"><span class="search-badge search-badge-beach">Beach</span><span class="buoy-popup-id">${zone.zoneId} &middot; NWS ${zone.office}</span></div>`;
                 if (!detail) {
                     return html + '<div class="surf-popup-loading">Loading forecast&hellip;</div>' + actions + '</div>';
                 }
@@ -2012,7 +2039,7 @@
                 return `
                 <div class="buoy-popup">
                     <div class="buoy-popup-name">${esc(p.name)}</div>
-                    <div class="buoy-popup-id">${esc(p.region || 'SURF SPOT')}</div>
+                    <div class="buoy-popup-meta"><span class="search-badge search-badge-beach">Beach</span><span class="buoy-popup-id">${esc(p.region || 'SURF SPOT')}</span></div>
                     <div class="buoy-popup-actions">
                         <button class="toolbar-button" data-spot="${esc(p.id)}" data-name="${esc(p.name)}" data-region="${esc(p.region || '')}"
                             onclick="openSpot(this.dataset.spot, this.dataset.name, this.dataset.region)">Report &amp; forecast</button>
@@ -2020,6 +2047,25 @@
                             onclick="toggleSpotFavorite(this.dataset.spotId)"></button>
                     </div>
                 </div>`;
+            }
+
+            function showFavoriteOnMap(kind, id, lon, lat) {
+                closeFavorites();
+                if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
+                map.flyTo({ center: [lon, lat], zoom: kind === 'spot' ? 9.5 : 6, offset: [0, -90] });
+
+                if (kind === 'buoy') {
+                    const marker = popupMap.get(id);
+                    if (marker && marker.getPopup() && !marker.getPopup().isOpen()) marker.togglePopup();
+                    return;
+                }
+
+                const spot = spotData.find(item => item.id === id);
+                if (!spot) return;
+                new maplibregl.Popup({ offset: 10, maxWidth: '280px' })
+                    .setLngLat([lon, lat])
+                    .setHTML(spotPopupHTML(spot))
+                    .addTo(map);
             }
 
             function addSpotLayers(fc) {

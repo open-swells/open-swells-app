@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Favorites · OpenSwells</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Inter', sans-serif; background: #0f1012; color: #e6e6e6; }
+        button, input { font: inherit; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .surface { background: #18191c; border: 1px solid #34363b; }
+        .icon-button { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: #a7a9ae; border: 1px solid transparent; }
+        .icon-button:hover { color: #fff; background: #2a2c30; border-color: #3b3d42; }
+        .button { height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 1px solid #3b3d42; background: #202125; color: #d6d7da; font-size: 12px; font-weight: 500; }
+        .button:hover { background: #2a2c30; color: #fff; }
+        .button-primary { background: #5e6ad2; border-color: #6d78de; color: #fff; }
+        .button-primary:hover { background: #6d78de; }
+        #favoritesGrid { display: block; }
+        .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 64px; border-bottom: 1px solid #2b2d31; }
+        .search-row:last-child { border-bottom: 0; }
+        .add-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #45474d; background: #202125; color: #fff; font-size: 19px; line-height: 1; }
+        .add-button:hover { background: #34363b; }
+        .add-button.is-added { color: #6fcf97; border-color: #406b53; cursor: default; }
+        .location-badge { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+        .location-badge-buoy { color: #8e97e8; }
+        .location-badge-beach { color: #f0a05a; }
+        .skeleton { height: 132px; border: 1px solid #34363b; background: linear-gradient(90deg, #18191c 25%, #202125 50%, #18191c 75%); background-size: 200% 100%; animation: pulse 1.4s infinite; }
+        .skeleton + .skeleton { border-top: 0; }
+        @keyframes pulse { to { background-position: -200% 0; } }
+        @media (max-width: 760px) {
+            .brand-word { display: none; }
+        }
+        @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="sticky top-0 z-30 h-16 border-b border-[#26272b] bg-[#0f1012]/95 backdrop-blur">
+        <div class="relative max-w-6xl h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-2 text-sm font-semibold text-white">
+                <span class="text-[#8f9bff]">◒</span><span class="brand-word">OpenSwells</span>
+            </a>
+
+            <nav class="surface absolute left-1/2 -translate-x-1/2 h-9 p-1 flex items-center" aria-label="Primary view">
+                <a href="/map" class="h-7 min-w-[76px] px-3 flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Map</a>
+                <a href="/favorites" aria-current="page" class="h-7 min-w-[76px] px-3 flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Favorites</a>
+            </nav>
+
+            <div class="relative flex items-center">
+                <button id="signInBtn" class="button">Sign in</button>
+                <div id="userMenu" class="surface absolute top-full right-0 mt-2 w-60 hidden overflow-hidden">
+                    <div class="px-3 py-3 border-b border-[#34363b]">
+                        <div id="userName" class="text-xs font-medium text-white truncate"></div>
+                        <div id="userEmail" class="mt-0.5 text-[10px] text-[#8b8d93] truncate"></div>
+                    </div>
+                    <button id="signOutBtn" class="w-full px-3 py-2.5 text-left text-xs text-[#d6d7da] hover:bg-[#2a2c30]">Sign out</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1440px] mx-auto px-4 sm:px-6 py-5 sm:py-7">
+        <section>
+            <div class="mb-3 flex items-center justify-between gap-3">
+                <p id="favoriteCount" class="mono text-[10px] uppercase tracking-wide text-[#8b8d93]">Loading saved locations…</p>
+                <button class="button" onclick="openLocationSearch()">
+                    <span class="text-base leading-none">+</span> Add location
+                </button>
+            </div>
+            <div id="signedOutState" class="surface hidden py-14 px-6 text-center">
+                <div class="mx-auto w-9 h-9 border border-[#45474d] grid place-items-center text-[#8f9bff]">☆</div>
+                <h2 class="mt-4 text-sm font-semibold text-white">Sign in to see your outlook</h2>
+                <p class="mt-2 text-xs text-[#8b8d93]">Favorites stay synced to your OpenSwells account.</p>
+                <button class="button button-primary mt-5" onclick="googleSignIn()">Sign in with Google</button>
+            </div>
+            <div id="favoritesGrid">
+                <div class="skeleton"></div><div class="skeleton"></div>
+            </div>
+        </section>
+    </main>
+
+    <div id="searchModal" class="fixed inset-0 z-40 hidden bg-black/65 backdrop-blur-[5px] items-start justify-center pt-[10vh] sm:pt-[14vh] px-3" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
+        <div class="surface w-full max-w-2xl max-h-[76vh] flex flex-col shadow-2xl">
+            <div class="h-12 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
+                <div><h2 id="searchTitle" class="text-sm font-semibold text-white">Add location</h2><p class="text-[10px] text-[#8b8d93]">Buoys and surf spots</p></div>
+                <button class="icon-button" onclick="closeLocationSearch()" aria-label="Close search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
+            </div>
+            <label class="h-12 flex items-center border-b border-[#34363b] focus-within:bg-[#1c1d21] shrink-0">
+                <svg class="ml-4 shrink-0 text-[#8b8d93]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input id="locationSearch" type="search" autocomplete="off" class="w-full h-full px-3 bg-transparent outline-none text-[13px] text-white placeholder-[#6f7177]" placeholder="Search by beach, region, buoy name, or station ID">
+                <kbd class="mono mr-4 text-[9px] text-[#6f7177]">ESC</kbd>
+            </label>
+            <div class="h-9 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
+                <span class="text-[9px] font-semibold uppercase tracking-wide text-[#8b8d93]">Results</span>
+                <span id="resultCount" class="mono text-[9px] text-[#6f7177]">Loading directory…</span>
+            </div>
+            <div id="searchResults" class="px-4 overflow-y-auto overscroll-contain"></div>
+        </div>
+    </div>
+
+    <div id="signInModal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-[2px] items-start justify-center pt-[20vh] px-4" role="dialog" aria-modal="true" aria-labelledby="signInTitle">
+        <div class="surface w-full max-w-[320px]">
+            <div class="h-11 px-4 border-b border-[#34363b] flex items-center justify-between">
+                <h2 id="signInTitle" class="text-sm font-semibold text-white">Sign in</h2>
+                <button class="icon-button" onclick="closeSignIn()" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
+            </div>
+            <div class="p-4">
+                <button onclick="googleSignIn()" class="button w-full">Sign in with Google</button>
+                <p class="mt-3 text-[11px] leading-4 text-[#8b8d93]">Save locations and keep your forecast list available across devices.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKZUgrKoU8MxXIm9H0mGubjfL8TANdH5g",
+            authDomain: "open-swells-89714.firebaseapp.com",
+            projectId: "open-swells-89714",
+            storageBucket: "open-swells-89714.appspot.com",
+            messagingSenderId: "764680526760",
+            appId: "1:764680526760:web:77bf8034f0f8df259b1b9d"
+        };
+        firebase.initializeApp(firebaseConfig);
+
+        const initialSearchView = {{if .SearchView}}true{{else}}false{{end}};
+        let userBuoys = [];
+        let userSpots = [];
+        let directory = [];
+        let directoryLoaded = false;
+
+        const escapeHTML = (value) => String(value || '').replace(/[&<>'"]/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        })[char]);
+
+        async function authFetch(url, options = {}) {
+            const user = firebase.auth().currentUser;
+            if (!user) throw new Error('Not signed in');
+            const token = await user.getIdToken();
+            options.headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
+            return fetch(url, options);
+        }
+
+        function openLocationSearch(updateHistory = true) {
+            const modal = document.getElementById('searchModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+            if (updateHistory && location.pathname !== '/favorites/search') history.pushState({ search: true }, '', '/favorites/search');
+            loadDirectory();
+            setTimeout(() => document.getElementById('locationSearch').focus(), 0);
+        }
+
+        function closeLocationSearch(updateHistory = true) {
+            const modal = document.getElementById('searchModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = '';
+            if (updateHistory && location.pathname === '/favorites/search') history.pushState({}, '', '/favorites');
+        }
+
+        async function loadDirectory() {
+            if (directoryLoaded) return renderSearchResults();
+            try {
+                const [buoyResponse, spotResponse] = await Promise.all([fetch('/api/buoys'), fetch('/api/spots')]);
+                if (!buoyResponse.ok || !spotResponse.ok) throw new Error('Directory request failed');
+                const [buoys, spots] = await Promise.all([buoyResponse.json(), spotResponse.json()]);
+                directory = [
+                    ...buoys.map(item => ({ type: 'buoy', id: item.stationId, name: item.name, meta: item.stationId })),
+                    ...spots.map(item => ({ type: 'spot', id: item.id, name: item.name, meta: item.region || 'SURF SPOT' }))
+                ];
+                directoryLoaded = true;
+                renderSearchResults();
+            } catch (error) {
+                document.getElementById('resultCount').textContent = 'Unavailable';
+                document.getElementById('searchResults').innerHTML = '<div class="py-10 text-center text-xs text-[#8b8d93]">Could not load the location directory. Try again shortly.</div>';
+            }
+        }
+
+        function renderSearchResults() {
+            if (!directoryLoaded) return;
+            const query = document.getElementById('locationSearch').value.trim().toLowerCase();
+            const terms = query.split(/\s+/).filter(Boolean);
+            const matches = directory.filter(item => terms.every(term => `${item.name} ${item.meta} ${item.id}`.toLowerCase().includes(term))).slice(0, 40);
+            document.getElementById('resultCount').textContent = query ? `${matches.length}${matches.length === 40 ? '+' : ''} matches` : `${directory.length} locations`;
+            if (!matches.length) {
+                document.getElementById('searchResults').innerHTML = '<div class="py-10 text-center text-xs text-[#8b8d93]">No matching locations.</div>';
+                return;
+            }
+            document.getElementById('searchResults').innerHTML = matches.map(item => {
+                const added = item.type === 'buoy' ? userBuoys.includes(item.id) : userSpots.includes(item.id);
+                const kind = item.type === 'buoy' ? 'Buoy' : 'Beach';
+                const href = item.type === 'buoy' ? `/forecast/${encodeURIComponent(item.id)}` : `/spot/${encodeURIComponent(item.id)}`;
+                return `<div class="search-row items-center gap-4 py-3">
+                    <a href="${href}" class="min-w-0 group">
+                        <div class="flex items-center gap-2"><span class="location-badge ${item.type === 'buoy' ? 'location-badge-buoy' : 'location-badge-beach'}">${kind}</span><span class="mono text-[9px] text-[#6f7177] truncate">${escapeHTML(item.meta)}</span></div>
+                        <div class="mt-1 text-[13px] font-medium text-[#e6e6e6] group-hover:text-white truncate">${escapeHTML(item.name)}</div>
+                    </a>
+                    <button class="add-button ${added ? 'is-added' : ''}" ${added ? 'disabled' : ''} data-add-type="${item.type}" data-add-id="${escapeHTML(item.id)}" aria-label="${added ? 'Already in favorites' : `Add ${escapeHTML(item.name)} to favorites`}">${added ? '✓' : '+'}</button>
+                </div>`;
+            }).join('');
+        }
+
+        async function loadFavorites() {
+            const user = firebase.auth().currentUser;
+            const grid = document.getElementById('favoritesGrid');
+            document.getElementById('signedOutState').classList.toggle('hidden', !!user);
+            grid.style.display = user ? 'block' : 'none';
+            if (!user) {
+                grid.innerHTML = '';
+                document.getElementById('favoriteCount').textContent = 'Sign in to load saved locations';
+                return;
+            }
+            grid.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+            try {
+                const [favoritesResponse, summaryResponse] = await Promise.all([authFetch('/api/favorites'), authFetch('/forecast-summary?detailed=1')]);
+                if (!favoritesResponse.ok || !summaryResponse.ok) throw new Error('Favorites request failed');
+                const data = await favoritesResponse.json();
+                userBuoys = data.buoys || [];
+                userSpots = data.spots || [];
+                grid.innerHTML = await summaryResponse.text();
+                enhanceSummary(grid);
+                const count = userBuoys.length + userSpots.length;
+                document.getElementById('favoriteCount').textContent = `${count} saved ${count === 1 ? 'location' : 'locations'} · refreshed from the latest forecast`;
+                if (directoryLoaded) renderSearchResults();
+            } catch (error) {
+                grid.innerHTML = '<div class="surface py-12 px-5 text-center text-xs text-[#8b8d93]">Could not load your forecast outlook. Please try again.</div>';
+            }
+        }
+
+        // Server-rendered summary rows carry raw data attributes; this pass
+        // localizes hour labels, marks the current hour, and draws the buoy
+        // swell sparklines (scripts inside innerHTML never execute).
+        function enhanceSummary(root) {
+            const hourFmt = new Intl.DateTimeFormat([], { hour: 'numeric' });
+            root.querySelectorAll('[data-hour-strip]').forEach(strip => {
+                const candles = [...strip.querySelectorAll('.hour-candle')];
+                if (!candles.length) return;
+                const now = Date.now();
+                candles.forEach(candle => {
+                    const ts = Number(candle.dataset.ts);
+                    if (!ts) return;
+                    const condition = (candle.title.split('·')[1] || '').trim();
+                    candle.title = `${hourFmt.format(new Date(ts))} · ${condition}`;
+                    if (ts <= now && now < ts + 3600e3) candle.classList.add('is-now');
+                });
+                const scale = strip.parentElement.querySelector('.hour-scale');
+                if (scale) {
+                    const first = Number(candles[0].dataset.ts);
+                    const last = Number(candles[candles.length - 1].dataset.ts);
+                    if (first) scale.querySelector('[data-hour-start]').textContent = hourFmt.format(new Date(first));
+                    if (last) scale.querySelector('[data-hour-end]').textContent = hourFmt.format(new Date(last));
+                }
+            });
+            root.querySelectorAll('[data-buoy-outlook]').forEach(drawBuoyOutlook);
+        }
+
+        // One lane of the buoy outlook: values normalized into a 0–100 wide
+        // SVG so the lane stretches with the row, area fill optional.
+        function laneSVG(values, height, color, withArea) {
+            const w = 100, pad = 3;
+            const max = Math.max(...values), min = Math.min(0, ...values);
+            const span = (max - min) || 1;
+            const points = values.map((v, i) =>
+                `${(i / (values.length - 1)) * w},${(height - pad) - ((v - min) / span) * (height - 2 * pad)}`);
+            const area = withArea
+                ? `<polygon points="0,${height} ${points.join(' ')} ${w},${height}" fill="${color}" opacity="0.1"/>` : '';
+            return `<svg viewBox="0 0 ${w} ${height}" preserveAspectRatio="none" aria-hidden="true">${area}
+                <polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+            </svg>`;
+        }
+
+        // Buoy outlook: swell lane from the server-rendered daily heights,
+        // wind lane joined from /api/wind (same source the forecast page's
+        // strip uses); the wind lane stays hidden if the fetch fails.
+        async function drawBuoyOutlook(el) {
+            const heights = el.dataset.heights.trim().split(/\s+/).map(Number).filter(Number.isFinite);
+            if (heights.length < 2) return;
+            const swellLane = el.querySelector('[data-swell-lane]');
+            swellLane.innerHTML = laneSVG(heights, 56, '#8f9bff', true);
+            const note = el.querySelector('[data-swell-note]');
+            const minFt = Math.min(...heights), maxFt = Math.max(...heights);
+            if (note) note.textContent = `Swell ${minFt.toFixed(1)}–${maxFt.toFixed(1)} ft`;
+            const labels = (el.dataset.labels || '').split('|');
+            const labelRow = el.querySelector('[data-lane-labels]');
+            if (labelRow) {
+                const spanEl = text => { const s = document.createElement('span'); s.textContent = text; return s; };
+                labelRow.replaceChildren(
+                    spanEl(labels[0] || ''),
+                    spanEl(labels[Math.floor(labels.length / 2)] || ''),
+                    spanEl(labels[labels.length - 1] || ''));
+            }
+            const windLane = el.querySelector('[data-wind-lane]');
+            if (!windLane) return;
+            try {
+                const response = await fetch('/api/wind/' + encodeURIComponent(el.dataset.station));
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (!payload.samples || payload.samples.length < 2) return;
+                const mph = payload.samples.map(s => s.s * 2.23694);
+                windLane.innerHTML = laneSVG(mph, 30, '#6fcf97', false) +
+                    `<div class="hour-scale" style="margin-top: 2px;"><span>Wind</span><span>to ${Math.max(...mph).toFixed(0)} mph</span></div>`;
+                windLane.hidden = false;
+            } catch (error) {
+                console.warn('Wind forecast unavailable:', error);
+            }
+        }
+
+        async function addFavorite(type, id) {
+            if (!firebase.auth().currentUser) return openSignIn();
+            const url = type === 'buoy' ? `/api/favorites/${encodeURIComponent(id)}` : `/api/spot-favorites/${encodeURIComponent(id)}`;
+            try {
+                const response = await authFetch(url, { method: 'POST' });
+                if (!response.ok) throw new Error('Add failed');
+                if (type === 'buoy') userBuoys.push(id); else userSpots.push(id);
+                renderSearchResults();
+                loadFavorites();
+            } catch (error) {
+                alert('Could not add this location. Please try again.');
+            }
+        }
+
+        async function toggleFavorite(id) {
+            const response = await authFetch(`/api/favorites/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (response.ok) loadFavorites();
+        }
+
+        async function toggleSpotFavorite(id) {
+            const response = await authFetch(`/api/spot-favorites/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (response.ok) loadFavorites();
+        }
+
+        function openForecast(id) { window.location.assign(`/forecast/${encodeURIComponent(id)}`); }
+        function openSpot(id) { window.location.assign(`/spot/${encodeURIComponent(id)}`); }
+        function openSignIn() { const modal = document.getElementById('signInModal'); modal.classList.remove('hidden'); modal.classList.add('flex'); }
+        function closeSignIn() { const modal = document.getElementById('signInModal'); modal.classList.add('hidden'); modal.classList.remove('flex'); }
+        function googleSignIn() { firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).then(closeSignIn).catch(console.error); }
+
+        document.getElementById('locationSearch').addEventListener('input', renderSearchResults);
+        document.getElementById('searchResults').addEventListener('click', event => {
+            const button = event.target.closest('[data-add-type]');
+            if (button && !button.disabled) addFavorite(button.dataset.addType, button.dataset.addId);
+        });
+        document.getElementById('signOutBtn').addEventListener('click', () => firebase.auth().signOut());
+        document.getElementById('signInModal').addEventListener('click', event => { if (event.target.id === 'signInModal') closeSignIn(); });
+        document.getElementById('searchModal').addEventListener('click', event => { if (event.target.id === 'searchModal') closeLocationSearch(); });
+        document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeSignIn(); closeLocationSearch(); } });
+        window.addEventListener('popstate', () => location.pathname.endsWith('/search') ? openLocationSearch(false) : closeLocationSearch(false));
+
+        firebase.auth().onAuthStateChanged(user => {
+            const button = document.getElementById('signInBtn');
+            const menu = document.getElementById('userMenu');
+            if (user) {
+                button.innerHTML = user.photoURL ? `<img src="${escapeHTML(user.photoURL)}" alt="" class="w-6 h-6 rounded-full"><span class="hidden sm:inline">Account</span>` : 'Account';
+                button.onclick = () => menu.classList.toggle('hidden');
+                document.getElementById('userName').textContent = user.displayName || 'OpenSwells user';
+                document.getElementById('userEmail').textContent = user.email || '';
+            } else {
+                button.textContent = 'Sign in';
+                button.onclick = openSignIn;
+                menu.classList.add('hidden');
+                userBuoys = [];
+                userSpots = [];
+            }
+            loadFavorites();
+            if (directoryLoaded) renderSearchResults();
+        });
+
+        if (initialSearchView) openLocationSearch(false);
+    </script>
+</body>
+</html>

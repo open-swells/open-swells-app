@@ -560,14 +560,16 @@ func spotConditions(staticDir string, spot Spot, hours []hourSwells) []HourlyCon
 // since spots have no live observations to show.
 type SpotFavorite struct {
 	ID, Name, Region        string
+	Latitude, Longitude     float64
 	Summary                 []ForecastSummary
+	CurrentConditions       []ConditionCandle
 	Primary, PrimarySub     string
 	Secondary, SecondarySub string
 	HasError                bool
 }
 
 func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
-	entry := SpotFavorite{ID: spot.ID, Name: spot.Name, Region: spot.Region}
+	entry := SpotFavorite{ID: spot.ID, Name: spot.Name, Region: spot.Region, Latitude: spot.Lat, Longitude: spot.Lon}
 	lat, lon := spot.samplePoint()
 	forecastData, hours := spotForecast(staticDir, lat, lon)
 	if len(forecastData.Forecast) == 0 {
@@ -575,7 +577,9 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 		return entry
 	}
 	entry.Summary = generateForecastSummary(forecastData)
-	applyConditionSummary(entry.Summary, spotConditions(staticDir, spot, hours))
+	conditions := spotConditions(staticDir, spot, hours)
+	applyConditionSummary(entry.Summary, conditions)
+	entry.CurrentConditions = currentConditionCandles(conditions)
 
 	row := forecastData.Forecast[0]
 	format := func(h, p, d string) (string, string) {

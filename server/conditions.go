@@ -268,6 +268,36 @@ func applyConditionSummary(summary []ForecastSummary, conds []HourlyCondition) {
 	for i := range summary {
 		if score, ok := best[summary[i].Date]; ok {
 			summary[i].Condition = ratingFor(float64(score))
+			summary[i].Score = score
 		}
 	}
+}
+
+// currentConditionCandles picks the next 24 hourly entries from the
+// classifier series, starting at the current hour, so the favorites strip
+// is always a dense day-long window regardless of UTC day boundaries.
+// A run that predates now entirely falls back to the series start.
+func currentConditionCandles(conds []HourlyCondition) []ConditionCandle {
+	if len(conds) == 0 {
+		return nil
+	}
+	cutoff := time.Now().Add(-time.Hour).UnixMilli()
+	start := 0
+	for start < len(conds) && conds[start].UnixMs < cutoff {
+		start++
+	}
+	if start >= len(conds) {
+		start = 0
+	}
+	end := min(start+24, len(conds))
+	candles := make([]ConditionCandle, 0, end-start)
+	for _, condition := range conds[start:end] {
+		candles = append(candles, ConditionCandle{
+			Hour:      time.UnixMilli(condition.UnixMs).UTC().Format("15"),
+			UnixMs:    condition.UnixMs,
+			Score:     condition.Score,
+			Condition: condition.Rating,
+		})
+	}
+	return candles
 }

@@ -85,8 +85,18 @@ type BuoyPageData struct {
 type ForecastSummary struct {
 	Date       string
 	DateAbv    string
+	DayNum     string // day-of-month, for dense outlook strips
 	Condition  string
 	WaveHeight string
+	HeightFt   float64
+	Score      int
+}
+
+type ConditionCandle struct {
+	Hour      string
+	UnixMs    int64
+	Score     int
+	Condition string
 }
 
 type SwellReport struct {
@@ -421,11 +431,18 @@ func generateForecastSummary(forecastData ForecastData) []ForecastSummary {
 	var summary []ForecastSummary
 	for day, rows := range groupedForecast {
 		avgWaveHeight := calculateAverageWaveHeight(rows)
+		dayNum := day
+		if t, err := time.Parse("2006-01-02", day); err == nil {
+			dayNum = t.Format("2")
+		}
 		summary = append(summary, ForecastSummary{
 			Date:       day,
 			DateAbv:    formatDate(day),
+			DayNum:     dayNum,
 			Condition:  determineCondition(avgWaveHeight),
 			WaveHeight: fmt.Sprintf("%.1fft", avgWaveHeight*3.28084),
+			HeightFt:   avgWaveHeight * 3.28084,
+			Score:      int(waveScore(avgWaveHeight*3.28084) + 0.5),
 		})
 	}
 
@@ -437,6 +454,8 @@ func generateForecastSummary(forecastData ForecastData) []ForecastSummary {
 
 type BuoyWithSummary struct {
 	Buoy
+	Latitude     float64
+	Longitude    float64
 	Summary      []ForecastSummary
 	SwellReport  SwellReport
 	WindReport   WindReport
@@ -446,7 +465,7 @@ type BuoyWithSummary struct {
 	OfflineSince string // e.g. "Jul 3"; only set when Offline
 }
 
-func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache *Cache, uid string, db *sql.DB, staticDir string) {
+func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache *Cache, uid string, db *sql.DB, staticDir string, detailed bool) {
 	buoyIDs, err := getBuoysForUser(db, uid)
 	if err != nil {
 		log.Printf("Failed to get buoys for user: %v", err)
@@ -475,6 +494,10 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 
 			entry := BuoyWithSummary{
 				Buoy: Buoy{ID: buoyID, Name: stationStore.DisplayName(buoyID)},
+			}
+			if location, ok := stationStore.Location(buoyID); ok {
+				entry.Latitude = location.Latitude
+				entry.Longitude = location.Longitude
 			}
 			if since, offline := stationStore.OfflineSince(buoyID); offline {
 				entry.Offline = true
@@ -506,9 +529,10 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 	wg.Wait()
 
 	err = tmpl.ExecuteTemplate(w, "forecastsummary", struct {
-		Buoys []BuoyWithSummary
-		Spots []SpotFavorite
-	}{Buoys: buoys, Spots: spots})
+		Buoys    []BuoyWithSummary
+		Spots    []SpotFavorite
+		Detailed bool
+	}{Buoys: buoys, Spots: spots, Detailed: detailed})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -1023,6 +1047,14 @@ func run() {
 		renderTemplate(c, tmpl, "today.html", MapPageData{ForecastData: forecastdata})
 	})
 
+	renderFavoritesPage := func(c *gin.Context) {
+		renderTemplate(c, tmpl, "favorites.html", gin.H{
+			"SearchView": c.Request.URL.Path == "/favorites/search",
+		})
+	}
+	router.GET("/favorites", renderFavoritesPage)
+	router.GET("/favorites/search", renderFavoritesPage)
+
 	// Full-page beach forecast, shown standalone or inside the map's modal
 	// iframe (same pattern as /forecast/:stationId).
 	router.GET("/beach/:zoneId", func(c *gin.Context) {
@@ -1104,7 +1136,7 @@ func run() {
 
 	router.GET("/forecast-summary", requireAuth(), func(c *gin.Context) {
 		c.Header("Content-Type", "text/html; charset=utf-8")
-		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db, forecastDir)
+		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db, forecastDir, c.Query("detailed") == "1")
 	})
 
 	realtimeHandler := func(c *gin.Context, extension string) {

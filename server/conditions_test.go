@@ -102,4 +102,27 @@ func TestApplyConditionSummary(t *testing.T) {
 	if summary[0].Condition != "epic" {
 		t.Errorf("day condition should follow the best hour, got %s", summary[0].Condition)
 	}
+	if summary[0].Score != 85 {
+		t.Errorf("day score should follow the best hour, got %d", summary[0].Score)
+	}
+	// A series entirely in the past falls back to its start.
+	candles := currentConditionCandles(conds)
+	if len(candles) != 2 || candles[1].Score != 85 {
+		t.Errorf("unexpected current condition candles: %+v", candles)
+	}
+
+	// A series spanning now starts at the current hour and caps at 24.
+	nowHour := time.Now().UTC().Truncate(time.Hour)
+	var series []HourlyCondition
+	for i := -6; i < 40; i++ {
+		series = append(series, HourlyCondition{UnixMs: nowHour.Add(time.Duration(i) * time.Hour).UnixMilli(), Score: 50, Rating: "fair"})
+	}
+	windowed := currentConditionCandles(series)
+	if len(windowed) != 24 {
+		t.Fatalf("windowed candles length = %d, want 24", len(windowed))
+	}
+	first := windowed[0].UnixMs
+	if first < nowHour.Add(-time.Hour).UnixMilli() || first > nowHour.UnixMilli() {
+		t.Errorf("windowed candles should start at the current hour, got %d", first)
+	}
 }

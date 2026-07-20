@@ -1,134 +1,159 @@
+{{ define "condcolor" }}{{if eq . "epic"}}#b48cff{{else if eq . "good"}}#45c4b0{{else if eq . "fair"}}#e2b86b{{else}}#e06c75{{end}}{{ end }}
 {{ define "forecastsummary" }}
 <style>
-        :root {
-            --bg-color: #ffffff;
-            --text-color: #000000;
-            --card-bg-color: #ffffff;
-            --border-color: #000000;
-            --scrollbar-thumb-color: #888;
-            --scrollbar-track-color: #f1f1f1;
-        }
-        
-        .dark {
-            --scrollbar-thumb-color: #4b5563;
-            --scrollbar-track-color: #1e293b;
-        }
-        .favorite-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
-        .favorite-metric { min-height: 62px; padding: 8px; border: 1px solid #34363b; background: #18191c; }
-        .favorite-label { color: #7f8187; font-size: 9px; font-weight: 600; text-transform: uppercase; }
-        .favorite-value { margin-top: 7px; color: #f0f0f1; font-size: 12px; font-weight: 600; white-space: nowrap; }
-        .favorite-subvalue { color: #8b8d93; font-size: 9px; margin-top: 2px; }
-        .error-message {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100px;
-            color: #e53e3e;
-            font-size: 0.9em;
-            text-align: center;
-            padding: 1rem;
-        }
-    </style>
+    .favorite-row { padding: 18px 20px 16px; background: #17181b; border: 1px solid #2e3035; }
+    .favorites-detailed .favorite-row { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 16px 28px; align-items: stretch; }
+    .favorites-detailed .favorite-row + .favorite-row { margin-top: 14px; }
+    .favorite-left { min-width: 0; }
+    .favorite-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .favorite-name { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: #fff; }
+    .favorite-now { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+    .offline-flag { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #e2b86b; white-space: nowrap; }
+    .location-meta { margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: #75777e; }
+    .favorite-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+    .link-button { height: 26px; padding: 0 10px; font-size: 11px; color: #a7a9ae; background: transparent; border: 1px solid transparent; cursor: pointer; }
+    .link-button:hover { color: #fff; background: #26272b; border-color: #34363b; }
+    .remove-button { width: 26px; height: 26px; display: grid; place-items: center; font-size: 14px; line-height: 1; color: #6f7177; background: transparent; border: 1px solid transparent; cursor: pointer; }
+    .remove-button:hover { color: #f87171; background: #26272b; border-color: #34363b; }
+    .stat-row { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 16px; }
+    .stat-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
+    .stat-value { margin-top: 3px; font-size: 13px; font-weight: 600; color: #f0f0f1; white-space: nowrap; }
+    .stat-sub { margin-top: 1px; font-size: 10px; color: #8b8d93; white-space: nowrap; }
+    .hour-block { margin-top: 16px; }
+    .hour-strip { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 38px; align-items: end; border-bottom: 1px solid #2e3035; }
+    .hour-candle { position: relative; height: 100%; display: flex; align-items: flex-end; }
+    .hour-candle i { display: block; width: 100%; min-height: 2px; opacity: .85; }
+    .hour-candle.is-now i { opacity: 1; }
+    .hour-candle.is-now::after { content: ''; position: absolute; left: 50%; top: -7px; bottom: -1px; width: 1px; background: #c6ccff; }
+    .hour-scale { display: flex; justify-content: space-between; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: .04em; color: #6f7177; }
+    .favorite-outlook { min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #26272b; padding-left: 24px; }
+    .outlook-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .outlook-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
+    .outlook-note { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #6f7177; }
+    .day-ticks { flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; margin-top: 10px; }
+    .day-tick { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+    .day-tick-track { flex: 1; width: 100%; min-height: 40px; display: flex; align-items: flex-end; }
+    .day-tick-track i { display: block; width: 100%; min-height: 2px; opacity: .5; }
+    .day-tick:hover .day-tick-track i { opacity: 1; }
+    .day-tick span { font-family: 'JetBrains Mono', monospace; font-size: 7px; color: #6f7177; }
+    .lane-swell { height: 56px; margin-top: 10px; }
+    .lane-swell svg { display: block; width: 100%; height: 100%; }
+    .lane-wind { margin-top: 8px; }
+    .lane-wind svg { display: block; width: 100%; height: 30px; }
+    .lane-labels { display: flex; justify-content: space-between; margin-top: auto; padding-top: 5px; font-family: 'JetBrains Mono', monospace; font-size: 7px; text-transform: uppercase; color: #6f7177; }
+    .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .location-badge-buoy { color: #8e97e8; }
+    .location-badge-beach { color: #f0a05a; }
+    .compact-condition { margin-top: 12px; padding-top: 9px; border-top: 1px solid #34363b; display: flex; align-items: center; justify-content: space-between; }
+    .favorites-compact .favorite-row { padding: 12px; background: #202125; border: 1px solid #34363b; }
+    .favorites-compact .favorite-row + .favorite-row { margin-top: 8px; }
+    .favorites-compact .favorite-name { font-size: 12px; }
+    .favorites-compact .stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-top: 12px; }
+    .favorites-compact .stat-value { font-size: 11px; }
+    @media (max-width: 900px) {
+        .favorites-detailed .favorite-row { grid-template-columns: minmax(0, 1fr); }
+        .favorite-outlook { border-left: 0; padding-left: 0; border-top: 1px solid #26272b; padding-top: 12px; }
+    }
+    @media (max-width: 640px) {
+        .favorite-row { padding: 14px; }
+        .favorites-detailed .stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .day-tick span { display: none; }
+        .day-tick:nth-child(2n + 1) span { display: block; }
+    }
+</style>
+<div class="{{if .Detailed}}favorites-detailed{{else}}favorites-compact{{end}}">
 {{if and (eq (len .Buoys) 0) (eq (len .Spots) 0)}}
-<div class="text-center p-4 dark:text-white">
-    <p>No favorites found. Add buoys or beaches to see their forecast summaries.</p>
+<div class="border border-[#34363b] bg-[#18191c] py-14 px-5 text-center">
+    <p class="text-sm font-medium text-white">No favorites yet</p>
+    <p class="mt-1 text-[11px] text-[#8b8d93]">Add a buoy or beach to build your forecast list.</p>
 </div>
 {{else}}
     {{range .Buoys}}
-    <div class="buoy bg-[#202125] border border-[#34363b] mb-2 p-3">
-        <div class="buoy-name flex justify-between items-start gap-2 text-white">
-            <div class="min-w-0">
-                <div class="text-xs font-semibold leading-5 truncate">{{.Name}}</div>
-                <div class="flex items-center gap-2">
-                    <span class="font-mono text-[10px] text-[#8b8d93]">BUOY {{.ID}}</span>
-                    {{if .Offline}}<span class="font-mono text-[9px] font-semibold uppercase text-[#e2b86b] border border-current px-1 leading-4" title="No report received since {{.OfflineSince}}">Offline since {{.OfflineSince}}</span>{{end}}
+    <article class="favorite-row">
+        <div class="favorite-left">
+            <div class="favorite-head">
+                <div class="min-w-0">
+                    <div class="flex items-baseline gap-3 min-w-0">
+                        <h3 class="favorite-name truncate">{{.Name}}</h3>
+                        {{if gt (len .Summary) 0}}{{$current := index .Summary 0}}<span class="favorite-now" style="color: #8f9bff;">{{$current.WaveHeight}} swell</span>{{end}}
+                        {{if .Offline}}<span class="offline-flag">Offline since {{.OfflineSince}}</span>{{end}}
+                    </div>
+                    <div class="location-meta"><span class="location-badge location-badge-buoy" style="margin-right: 6px;">Buoy</span>{{.ID}}</div>
+                </div>
+                <div class="favorite-actions">
+                    {{if $.Detailed}}
+                    <button onclick="openForecast('{{.ID}}')" class="link-button">Open</button>
+                    {{else}}
+                    <button onclick="showFavoriteOnMap('buoy', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
+                    {{end}}
+                    <button onclick="toggleFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">&times;</button>
                 </div>
             </div>
-            <div class="flex justify-end gap-1 shrink-0">
-                <button onclick="openForecast('{{.ID}}')" class="h-7 px-2 border border-[#45474d] bg-[#292a2f] hover:bg-[#34363b] text-[10px] text-white">Open</button>
-                <button onclick="toggleFavorite('{{.ID}}')" class="h-8 w-8 border border-[#45474d] text-[#9b9da3] text-base leading-none hover:text-red-400" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">&times;</button>
+            <div class="stat-row">
+                <div><div class="stat-label">Primary swell</div><div class="stat-value">{{if .SwellReport.PrimaryWaveHeight}}{{.SwellReport.PrimaryWaveHeight}}ft @ {{.SwellReport.PrimaryPeriod}}s{{else}}--{{end}}</div><div class="stat-sub">{{if .SwellReport.PrimaryDegrees}}{{.SwellReport.PrimaryDegrees}}&deg;{{else}}Direction --{{end}}</div></div>
+                <div><div class="stat-label">Secondary swell</div><div class="stat-value">{{if .SwellReport.SecondaryWaveHeight}}{{.SwellReport.SecondaryWaveHeight}}ft @ {{.SwellReport.SecondaryPeriod}}s{{else}}--{{end}}</div><div class="stat-sub">{{if .SwellReport.SecondaryDegrees}}{{.SwellReport.SecondaryDegrees}}&deg;{{else}}Direction --{{end}}</div></div>
+                <div><div class="stat-label">Wind</div><div class="stat-value">{{if .WindReport.WindSpeed}}{{.WindReport.WindSpeed}} mph{{else}}--{{end}}</div><div class="stat-sub">Gust {{if .WindReport.WindGust}}{{.WindReport.WindGust}} mph{{else}}--{{end}}</div></div>
+                <div><div class="stat-label">Temperature</div><div class="stat-value">{{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}&deg; air{{else}}--{{end}}</div><div class="stat-sub">Water {{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;{{else}}--{{end}}</div></div>
             </div>
         </div>
-        
-        {{if gt (len .Summary) 0}}
-            {{$current := index .Summary 0}}
-            <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
-                <span class="text-[9px] font-semibold uppercase text-[#7f8187]">Current outlook</span>
-                <span class="px-2 py-0.5 border text-[9px] font-semibold uppercase" style="color: {{if eq $current.Condition "epic"}}#b48cff{{else if eq $current.Condition "good"}}#45c4b0{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor;">{{$current.Condition}}</span>
-            </div>
-        {{else}}
-            <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
-                <span class="text-[9px] font-semibold uppercase text-[#7f8187]">Current outlook</span>
-                <span class="text-[9px] text-[#8b8d93]">Unavailable</span>
-            </div>
+        {{if and $.Detailed (gt (len .Summary) 1)}}
+        <div class="favorite-outlook" data-buoy-outlook data-station="{{.ID}}" data-heights="{{range .Summary}}{{printf "%.2f" .HeightFt}} {{end}}" data-labels="{{range $i, $day := .Summary}}{{if $i}}|{{end}}{{$day.DateAbv}}{{end}}">
+            <div class="outlook-head"><span class="outlook-label">16-day swell &amp; wind</span><span class="outlook-note" data-swell-note></span></div>
+            <div class="lane-swell" data-swell-lane aria-label="16-day swell height trend"></div>
+            <div class="lane-wind" data-wind-lane aria-label="16-day wind speed trend" hidden></div>
+            <div class="lane-labels" data-lane-labels></div>
+        </div>
+        {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}
+        <div class="compact-condition"><span class="stat-label">Current swell</span><span class="text-[9px] font-semibold uppercase" style="color: #8f9bff;">{{$current.WaveHeight}}</span></div>
         {{end}}
-        <div class="favorite-metrics">
-                <div class="favorite-metric">
-                    <div class="favorite-label">Primary swell</div>
-                    <div class="favorite-value">{{if .SwellReport.PrimaryWaveHeight}}{{.SwellReport.PrimaryWaveHeight}}ft @ {{.SwellReport.PrimaryPeriod}}s{{else}}--{{end}}</div>
-                    <div class="favorite-subvalue">{{if .SwellReport.PrimaryDegrees}}{{.SwellReport.PrimaryDegrees}}&deg;{{else}}Direction --{{end}}</div>
-                </div>
-                <div class="favorite-metric">
-                    <div class="favorite-label">Secondary swell</div>
-                    <div class="favorite-value">{{if .SwellReport.SecondaryWaveHeight}}{{.SwellReport.SecondaryWaveHeight}}ft @ {{.SwellReport.SecondaryPeriod}}s{{else}}--{{end}}</div>
-                    <div class="favorite-subvalue">{{if .SwellReport.SecondaryDegrees}}{{.SwellReport.SecondaryDegrees}}&deg;{{else}}Direction --{{end}}</div>
-                </div>
-                <div class="favorite-metric">
-                    <div class="favorite-label">Wind</div>
-                    <div class="favorite-value">{{if .WindReport.WindSpeed}}{{.WindReport.WindSpeed}} mph{{else}}--{{end}}</div>
-                    <div class="favorite-subvalue">Gust {{if .WindReport.WindGust}}{{.WindReport.WindGust}} mph{{else}}--{{end}}</div>
-                </div>
-                <div class="favorite-metric">
-                    <div class="favorite-label">Temperature</div>
-                    <div class="favorite-value">{{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}&deg; air{{else}}--{{end}}</div>
-                    <div class="favorite-subvalue">Water {{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;{{else}}--{{end}}</div>
-                </div>
-        </div>
-    </div>
+    </article>
     {{end}}
-    {{range .Spots}}
-    <div class="buoy bg-[#202125] border border-[#34363b] mb-2 p-3">
-        <div class="buoy-name flex justify-between items-start gap-2 text-white">
-            <div class="min-w-0">
-                <div class="text-xs font-semibold leading-5 truncate">{{.Name}}</div>
-                <div class="flex items-center gap-2">
-                    <span class="font-mono text-[9px] font-semibold uppercase text-[#f0a05a] border border-current px-1 leading-4">Beach</span>
-                    {{if .Region}}<span class="font-mono text-[10px] text-[#8b8d93] truncate">{{.Region}}</span>{{end}}
-                </div>
-            </div>
-            <div class="flex justify-end gap-1 shrink-0">
-                <button onclick="openSpot('{{.ID}}', '{{.Name}}', '{{.Region}}')" class="h-7 px-2 border border-[#45474d] bg-[#292a2f] hover:bg-[#34363b] text-[10px] text-white">Open</button>
-                <button onclick="toggleSpotFavorite('{{.ID}}')" class="h-8 w-8 border border-[#45474d] text-[#9b9da3] text-base leading-none hover:text-red-400" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">&times;</button>
-            </div>
-        </div>
 
-        {{if gt (len .Summary) 0}}
-            {{$current := index .Summary 0}}
-            <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
-                <span class="text-[9px] font-semibold uppercase text-[#7f8187]">Current outlook</span>
-                <span class="px-2 py-0.5 border text-[9px] font-semibold uppercase" style="color: {{if eq $current.Condition "epic"}}#b48cff{{else if eq $current.Condition "good"}}#45c4b0{{else if eq $current.Condition "fair"}}#e2b86b{{else}}#e06c75{{end}}; border-color: currentColor;">{{$current.Condition}}</span>
-            </div>
-        {{else}}
-            <div class="flex items-center justify-between mt-3 pt-3 border-t border-[#34363b]">
-                <span class="text-[9px] font-semibold uppercase text-[#7f8187]">Current outlook</span>
-                <span class="text-[9px] text-[#8b8d93]">Unavailable</span>
-            </div>
-        {{end}}
-        {{if not .HasError}}
-        <div class="favorite-metrics">
-                <div class="favorite-metric">
-                    <div class="favorite-label">Primary swell</div>
-                    <div class="favorite-value">{{if .Primary}}{{.Primary}}{{else}}--{{end}}</div>
-                    <div class="favorite-subvalue">{{if .PrimarySub}}{{.PrimarySub}}&deg;{{else}}Direction --{{end}}</div>
+    {{range .Spots}}
+    <article class="favorite-row">
+        <div class="favorite-left">
+            <div class="favorite-head">
+                <div class="min-w-0">
+                    <div class="flex items-baseline gap-3 min-w-0">
+                        <h3 class="favorite-name truncate">{{.Name}}</h3>
+                        {{if gt (len .Summary) 0}}{{$current := index .Summary 0}}<span class="favorite-now" style="color: {{template "condcolor" $current.Condition}};">{{$current.Condition}} &middot; {{$current.WaveHeight}}</span>{{end}}
+                    </div>
+                    <div class="location-meta"><span class="location-badge location-badge-beach" style="margin-right: 6px;">Beach</span>{{if .Region}}{{.Region}}{{end}}</div>
                 </div>
-                <div class="favorite-metric">
-                    <div class="favorite-label">Secondary swell</div>
-                    <div class="favorite-value">{{if .Secondary}}{{.Secondary}}{{else}}--{{end}}</div>
-                    <div class="favorite-subvalue">{{if .SecondarySub}}{{.SecondarySub}}&deg;{{else}}Direction --{{end}}</div>
+                <div class="favorite-actions">
+                    {{if $.Detailed}}
+                    <button onclick="openSpot('{{.ID}}')" class="link-button">Open</button>
+                    {{else}}
+                    <button onclick="showFavoriteOnMap('spot', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
+                    {{end}}
+                    <button onclick="toggleSpotFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">&times;</button>
                 </div>
+            </div>
+            <div class="stat-row">
+                <div><div class="stat-label">Primary swell</div><div class="stat-value">{{if .Primary}}{{.Primary}}{{else}}--{{end}}</div><div class="stat-sub">{{if .PrimarySub}}{{.PrimarySub}}&deg;{{else}}Direction --{{end}}</div></div>
+                <div><div class="stat-label">Secondary swell</div><div class="stat-value">{{if .Secondary}}{{.Secondary}}{{else}}--{{end}}</div><div class="stat-sub">{{if .SecondarySub}}{{.SecondarySub}}&deg;{{else}}Direction --{{end}}</div></div>
+            </div>
+            {{if and $.Detailed (gt (len .CurrentConditions) 0)}}
+            <div class="hour-block">
+                <div class="hour-strip" data-hour-strip aria-label="Hourly conditions for the next 24 hours">
+                    {{range .CurrentConditions}}<div class="hour-candle" data-ts="{{.UnixMs}}" title="{{.Hour}}:00 &middot; {{.Condition}}"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div>{{end}}
+                </div>
+                <div class="hour-scale"><span data-hour-start></span><span>Next 24 hours</span><span data-hour-end></span></div>
+            </div>
+            {{end}}
         </div>
+        {{if and $.Detailed (gt (len .Summary) 0)}}
+        <div class="favorite-outlook">
+            <div class="outlook-head"><span class="outlook-label">16-day outlook</span><span class="outlook-note">Conditions</span></div>
+            <div class="day-ticks" aria-label="16-day conditions outlook">
+                {{range .Summary}}<div class="day-tick" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"><div class="day-tick-track"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div><span>{{.DayNum}}</span></div>{{end}}
+            </div>
+        </div>
+        {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}
+        <div class="compact-condition"><span class="stat-label">Current conditions</span><span class="text-[9px] font-semibold uppercase" style="color: {{template "condcolor" $current.Condition}};">{{$current.WaveHeight}} &middot; {{$current.Condition}}</span></div>
         {{end}}
-    </div>
+    </article>
     {{end}}
 {{end}}
+</div>
 {{ end }}

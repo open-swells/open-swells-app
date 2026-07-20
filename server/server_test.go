@@ -85,6 +85,12 @@ func TestGenerateForecastSummary(t *testing.T) {
 	if summary[0].Date != "2026-07-06" || summary[1].Date != "2026-08-01" {
 		t.Errorf("summary days wrong: %+v", summary)
 	}
+	if summary[0].Score <= 0 || summary[0].Score > 100 {
+		t.Errorf("summary condition score out of range: %+v", summary[0])
+	}
+	if summary[0].HeightFt <= 0 || summary[0].DayNum != "6" {
+		t.Errorf("summary is missing outlook fields: %+v", summary[0])
+	}
 }
 
 func TestRowTime(t *testing.T) {
@@ -102,10 +108,52 @@ func TestRowTime(t *testing.T) {
 
 func TestLoadTemplates(t *testing.T) {
 	tmpl := loadTemplates(filepath.Join("..", "web", "templates"))
-	for _, name := range []string{"landing.html", "about.html", "today.html", "buoy.html", "report", "forecastsummary"} {
+	for _, name := range []string{"landing.html", "about.html", "today.html", "favorites.html", "buoy.html", "report", "forecastsummary"} {
 		if tmpl.Lookup(name) == nil {
 			t.Errorf("template %q not found", name)
 		}
+	}
+	if err := tmpl.ExecuteTemplate(io.Discard, "favorites.html", gin.H{"SearchView": false}); err != nil {
+		t.Fatalf("favorites template failed to render: %v", err)
+	}
+	summaryData := struct {
+		Buoys    []BuoyWithSummary
+		Spots    []SpotFavorite
+		Detailed bool
+	}{
+		Buoys: []BuoyWithSummary{{
+			Buoy: Buoy{ID: "46221", Name: "Santa Monica Bay"},
+			Summary: []ForecastSummary{
+				{DateAbv: "Mon 7/20", DayNum: "20", WaveHeight: "3.2ft", HeightFt: 3.2, Condition: "good", Score: 57},
+				{DateAbv: "Tue 7/21", DayNum: "21", WaveHeight: "4.1ft", HeightFt: 4.1, Condition: "good", Score: 63},
+			},
+		}},
+		Spots: []SpotFavorite{{
+			ID: "el-porto", Name: "El Porto", Region: "Los Angeles",
+			Summary:           []ForecastSummary{{DateAbv: "Mon 7/20", DayNum: "20", WaveHeight: "3.2ft", HeightFt: 3.2, Condition: "fair", Score: 40}},
+			CurrentConditions: []ConditionCandle{{Hour: "06", UnixMs: 1753000000000, Score: 40, Condition: "fair"}},
+		}},
+		Detailed: true,
+	}
+	var detailed bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
+		t.Fatalf("forecast summary template failed to render: %v", err)
+	}
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "day-tick"} {
+		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
+			t.Errorf("detailed forecast summary is missing %q", want)
+		}
+	}
+	summaryData.Detailed = false
+	var compact bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&compact, "forecastsummary", summaryData); err != nil {
+		t.Fatalf("compact forecast summary template failed to render: %v", err)
+	}
+	if bytes.Contains(compact.Bytes(), []byte("data-swell-line")) || bytes.Contains(compact.Bytes(), []byte("data-hour-strip")) {
+		t.Error("compact forecast summary unexpectedly rendered detailed-only sections")
+	}
+	if !bytes.Contains(compact.Bytes(), []byte("Show on map")) {
+		t.Error("compact forecast summary is missing its map action")
 	}
 }
 
