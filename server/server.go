@@ -525,54 +525,77 @@ func openDatabase(path string) *sql.DB {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 
-	migrations := []string{
-		`CREATE TABLE IF NOT EXISTS users (uid TEXT PRIMARY KEY)`,
-		`CREATE TABLE IF NOT EXISTS user_buoys (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			uid TEXT NOT NULL,
-			buoy_id TEXT NOT NULL,
-			FOREIGN KEY (uid) REFERENCES users (uid) ON DELETE CASCADE
-		)`,
-		// Dedupe before the unique index so the migration succeeds on
-		// databases populated before the constraint existed.
-		`DELETE FROM user_buoys WHERE id NOT IN (
-			SELECT MIN(id) FROM user_buoys GROUP BY uid, buoy_id
-		)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_buoys_uid_buoy ON user_buoys (uid, buoy_id)`,
-		// Favorite surf spots (ids from data/spots.json), same shape as
-		// user_buoys.
-		`CREATE TABLE IF NOT EXISTS user_spots (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			uid TEXT NOT NULL,
-			spot_id TEXT NOT NULL,
-			FOREIGN KEY (uid) REFERENCES users (uid) ON DELETE CASCADE
-		)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS idx_user_spots_uid_spot ON user_spots (uid, spot_id)`,
-		// Station registry, refreshed daily from NDBC (see stations.go).
-		// Inactive rows are stations that stopped reporting; they are kept
-		// so favorites keep resolving to a name.
-		`CREATE TABLE IF NOT EXISTS buoys (
-			station_id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			latitude REAL NOT NULL,
-			longitude REAL NOT NULL,
-			active INTEGER NOT NULL DEFAULT 1,
-			last_seen TEXT NOT NULL,
-			updated_at TEXT NOT NULL
-		)`,
-		// Surf zone geometry from api.weather.gov, fetched once per zone
-		// (see surfzone.go). Zone boundaries are static in practice.
-		`CREATE TABLE IF NOT EXISTS surf_zones (
-			zone_id TEXT PRIMARY KEY,
-			latitude REAL NOT NULL,
-			longitude REAL NOT NULL,
-			geometry TEXT NOT NULL,
-			updated_at TEXT NOT NULL
-		)`,
+	// Versioned migrations, tracked with PRAGMA user_version. Each entry is
+	// one schema version: entry N upgrades a database at version N to N+1.
+	// To evolve the schema, append a new []string of statements — never edit
+	// an existing entry (released databases already ran it). Version 1 is
+	// mirrored in ops/migrations/001_initial.sql for hand rebuilds.
+	migrations := [][]string{
+		{ // version 0 -> 1: initial schema
+			`CREATE TABLE IF NOT EXISTS users (
+				uid        TEXT PRIMARY KEY,
+				created_at TEXT NOT NULL DEFAULT (datetime('now'))
+			) WITHOUT ROWID`,
+			// Favorites use natural composite keys: the pair IS the row, so
+			// the primary key doubles as the "favorites for user" index and
+			// duplicates are impossible by construction. station_id matches
+			// buoys.station_id but is not a foreign key on purpose: the buoys
+			// registry is refreshed from NDBC and a favorite must survive its
+			// station temporarily dropping out of the feed.
+			`CREATE TABLE IF NOT EXISTS user_buoys (
+				uid        TEXT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
+				station_id TEXT NOT NULL,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				PRIMARY KEY (uid, station_id)
+			) WITHOUT ROWID`,
+			// spot_id references data/spots.json (static per deploy), so
+			// there is no table to foreign-key against.
+			`CREATE TABLE IF NOT EXISTS user_spots (
+				uid        TEXT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
+				spot_id    TEXT NOT NULL,
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				PRIMARY KEY (uid, spot_id)
+			) WITHOUT ROWID`,
+			// Station registry, refreshed daily from NDBC (see stations.go).
+			// Inactive rows are stations that stopped reporting; they are
+			// kept so favorites keep resolving to a name.
+			`CREATE TABLE IF NOT EXISTS buoys (
+				station_id TEXT PRIMARY KEY,
+				name       TEXT NOT NULL,
+				latitude   REAL NOT NULL,
+				longitude  REAL NOT NULL,
+				active     INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+				last_seen  TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`,
+			// Cache of surf zone geometry from api.weather.gov, fetched once
+			// per zone (see surfzone.go). Rebuildable: safe to truncate.
+			`CREATE TABLE IF NOT EXISTS surf_zones (
+				zone_id    TEXT PRIMARY KEY,
+				latitude   REAL NOT NULL,
+				longitude  REAL NOT NULL,
+				geometry   TEXT NOT NULL,
+				updated_at TEXT NOT NULL
+			)`,
+		},
 	}
-	for _, m := range migrations {
-		if _, err := db.Exec(m); err != nil {
-			log.Fatalf("Failed to run migration: %v", err)
+
+	var version int
+	if err := db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		log.Fatalf("Failed to read schema version: %v", err)
+	}
+	if version > len(migrations) {
+		log.Fatalf("Database schema version %d is newer than this binary understands (%d)", version, len(migrations))
+	}
+	for v := version; v < len(migrations); v++ {
+		for _, m := range migrations[v] {
+			if _, err := db.Exec(m); err != nil {
+				log.Fatalf("Failed to migrate schema to version %d: %v", v+1, err)
+			}
+		}
+		// PRAGMA does not support placeholders; v is a loop constant.
+		if _, err := db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, v+1)); err != nil {
+			log.Fatalf("Failed to record schema version %d: %v", v+1, err)
 		}
 	}
 	return db
@@ -582,17 +605,17 @@ func insertUserBuoy(db *sql.DB, uid, buoyID string) error {
 	if _, err := db.Exec(`INSERT OR IGNORE INTO users (uid) VALUES (?)`, uid); err != nil {
 		return err
 	}
-	_, err := db.Exec(`INSERT OR IGNORE INTO user_buoys (uid, buoy_id) VALUES (?, ?)`, uid, buoyID)
+	_, err := db.Exec(`INSERT OR IGNORE INTO user_buoys (uid, station_id) VALUES (?, ?)`, uid, buoyID)
 	return err
 }
 
 func deleteUserBuoy(db *sql.DB, uid, buoyID string) error {
-	_, err := db.Exec(`DELETE FROM user_buoys WHERE uid = ? AND buoy_id = ?`, uid, buoyID)
+	_, err := db.Exec(`DELETE FROM user_buoys WHERE uid = ? AND station_id = ?`, uid, buoyID)
 	return err
 }
 
 func getBuoysForUser(db *sql.DB, uid string) ([]string, error) {
-	rows, err := db.Query(`SELECT buoy_id FROM user_buoys WHERE uid = ?`, uid)
+	rows, err := db.Query(`SELECT station_id FROM user_buoys WHERE uid = ? ORDER BY created_at, station_id`, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -623,7 +646,7 @@ func deleteUserSpot(db *sql.DB, uid, spotID string) error {
 }
 
 func getSpotsForUser(db *sql.DB, uid string) ([]string, error) {
-	rows, err := db.Query(`SELECT spot_id FROM user_spots WHERE uid = ?`, uid)
+	rows, err := db.Query(`SELECT spot_id FROM user_spots WHERE uid = ? ORDER BY created_at, spot_id`, uid)
 	if err != nil {
 		return nil, err
 	}
