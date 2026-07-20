@@ -325,11 +325,13 @@
         }
 
         async function toggleFavorite(id) {
+            if (!window.confirm('Remove this buoy from your favorites?')) return;
             const response = await authFetch(`/api/favorites/${encodeURIComponent(id)}`, { method: 'DELETE' });
             if (response.ok) loadFavorites();
         }
 
         async function toggleSpotFavorite(id) {
+            if (!window.confirm('Remove this beach from your favorites?')) return;
             const response = await authFetch(`/api/spot-favorites/${encodeURIComponent(id)}`, { method: 'DELETE' });
             if (response.ok) loadFavorites();
         }

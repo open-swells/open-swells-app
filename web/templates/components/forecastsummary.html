@@ -11,10 +11,13 @@
     .offline-flag { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #e2b86b; white-space: nowrap; }
     .location-meta { margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: #75777e; }
     .favorite-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-    .link-button { height: 26px; padding: 0 10px; font-size: 11px; color: #a7a9ae; background: transparent; border: 1px solid transparent; cursor: pointer; }
+    .link-button { height: 30px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 600; color: #d6d7da; background: #24252a; border: 1px solid #3b3d42; cursor: pointer; }
     .link-button:hover { color: #fff; background: #26272b; border-color: #34363b; }
-    .remove-button { width: 26px; height: 26px; display: grid; place-items: center; font-size: 14px; line-height: 1; color: #6f7177; background: transparent; border: 1px solid transparent; cursor: pointer; }
-    .remove-button:hover { color: #f87171; background: #26272b; border-color: #34363b; }
+    .open-button { color: #fff; background: #5e6ad2; border-color: #737ee3; box-shadow: 0 3px 10px rgba(94, 106, 210, .2); }
+    .open-button:hover { background: #6d78de; border-color: #8f9bff; }
+    .action-icon { width: 13px; height: 13px; flex: none; }
+    .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: #e06c75; background: #281f22; border: 1px solid #553137; cursor: pointer; }
+    .remove-button:hover { color: #ff9299; background: #382429; border-color: #8f4952; }
     .stat-row { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 16px; }
     .stat-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
     .stat-value { margin-top: 3px; font-size: 13px; font-weight: 600; color: #f0f0f1; white-space: nowrap; }
@@ -82,11 +85,11 @@
                 </div>
                 <div class="favorite-actions">
                     {{if $.Detailed}}
-                    <button onclick="openForecast('{{.ID}}')" class="link-button">Open</button>
+                    <button onclick="openForecast('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
                     {{else}}
                     <button onclick="showFavoriteOnMap('buoy', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
                     {{end}}
-                    <button onclick="toggleFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">&times;</button>
+                    <button onclick="toggleFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites"><svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button>
                 </div>
             </div>
             <div class="stat-row">
@@ -122,16 +125,17 @@
                 </div>
                 <div class="favorite-actions">
                     {{if $.Detailed}}
-                    <button onclick="openSpot('{{.ID}}')" class="link-button">Open</button>
+                    <button onclick="openSpot('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
                     {{else}}
                     <button onclick="showFavoriteOnMap('spot', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
                     {{end}}
-                    <button onclick="toggleSpotFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">&times;</button>
+                    <button onclick="toggleSpotFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites"><svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button>
                 </div>
             </div>
             <div class="stat-row">
                 <div><div class="stat-label">Primary swell</div><div class="stat-value">{{if .Primary}}{{.Primary}}{{else}}--{{end}}</div><div class="stat-sub">{{if .PrimarySub}}{{.PrimarySub}}&deg;{{else}}Direction --{{end}}</div></div>
                 <div><div class="stat-label">Secondary swell</div><div class="stat-value">{{if .Secondary}}{{.Secondary}}{{else}}--{{end}}</div><div class="stat-sub">{{if .SecondarySub}}{{.SecondarySub}}&deg;{{else}}Direction --{{end}}</div></div>
+                <div><div class="stat-label">Wind</div><div class="stat-value">{{if .HasWind}}{{.WindSpeed}} mph{{else}}--{{end}}</div><div class="stat-sub">{{if .HasWind}}{{.WindDir}}&deg;{{else}}Unavailable{{end}}</div></div>
             </div>
             {{if and $.Detailed (gt (len .CurrentConditions) 0)}}
             <div class="hour-block">

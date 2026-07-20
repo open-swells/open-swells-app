@@ -229,15 +229,29 @@
             .timeline-track { height: 32px; }
             .timeline-track::before, .timeline-tick, .timeline-progress { bottom: 8px; }
             .timeline-playhead { bottom: 5px; }
-            /* the search box shares its row with the toolbar icons, so
-               anchor the results dropdown to the viewport instead and let
-               it span the full width */
-            #searchResults {
-                position: fixed;
-                left: 0.75rem; right: 0.75rem;
-                top: calc(0.75rem + 2.25rem + 0.25rem); /* header top + h-9 + gap */
-                max-height: min(340px, calc(100dvh - 8rem));
+        }
+        @media (max-width: 639px) {
+            /* Collapsed search: the bar hides behind the top-left icon and
+               opens as a centered overlay (same pattern as the favorites
+               page's add-location modal), so the header row stops fighting
+               the view switch and profile cluster for width. */
+            #searchBox { display: none; }
+            #searchBox.mobile-open {
+                display: flex; position: fixed; inset: 0; z-index: 60;
+                flex-direction: column; align-items: center;
+                padding: 9vh 12px 0;
+                background: rgba(0, 0, 0, .65);
+                backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
             }
+            #searchBox.mobile-open > .surface { width: 100%; max-width: 540px; }
+            #searchBox.mobile-open #searchResults {
+                position: static; width: 100%; max-width: 540px; margin-top: 4px;
+                max-height: min(55dvh, 380px);
+            }
+            /* With the search collapsed there is room for the view switch
+               in the top row again */
+            nav[aria-label="Primary view"] { top: 0.75rem; }
+            nav[aria-label="Primary view"] a { min-width: 64px; }
         }
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
@@ -283,6 +297,12 @@
                     <a href="/" class="surface h-9 px-3 flex items-center gap-2"><span class="text-[#8f9bff]">◒</span> OpenSwells</a>
                 </h1>
             </div>
+
+            <!-- Search trigger (mobile only): the inline bar is hidden below
+                 sm and reopens as a centered overlay -->
+            <button id="mobileSearchBtn" class="surface w-9 h-9 flex sm:hidden items-center justify-center text-[#c6c7ca] shrink-0" onclick="openMobileSearch()" aria-label="Search stations">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            </button>
 
             <!-- Search -->
             <div id="searchBox" class="searchbox relative w-full max-w-[540px]">
@@ -1640,6 +1660,7 @@
                     return;
                 }
                 if (userBuoys && userBuoys.includes(stationId)) {
+                    if (!window.confirm('Remove this buoy from your favorites?')) return;
                     // Remove from favorites
                     try {
                         const response = await authFetch(`/api/favorites/${stationId}`, { method: 'DELETE' });
@@ -1679,6 +1700,7 @@
                     return;
                 }
                 const isFavorite = userSpots.includes(spotId);
+                if (isFavorite && !window.confirm('Remove this beach from your favorites?')) return;
                 try {
                     const response = await authFetch(`/api/spot-favorites/${encodeURIComponent(spotId)}`,
                         { method: isFavorite ? 'DELETE' : 'POST' });
@@ -1717,6 +1739,24 @@
 
             const searchInput = document.getElementById('searchInput');
 
+            // Mobile search overlay: below the sm breakpoint the inline bar
+            // is CSS-hidden and this class turns it into a centered modal.
+            function openMobileSearch() {
+                document.getElementById('searchBox').classList.add('mobile-open');
+                searchInput.focus();
+            }
+            function closeMobileSearch() {
+                const box = document.getElementById('searchBox');
+                if (!box.classList.contains('mobile-open')) return;
+                box.classList.remove('mobile-open');
+                searchInput.value = '';
+                document.getElementById('searchResults').innerHTML = '';
+                searchInput.blur();
+            }
+            document.getElementById('searchBox').addEventListener('click', (e) => {
+                if (e.target.id === 'searchBox') closeMobileSearch();
+            });
+
             // Search covers buoys and surf spots; each result is tagged with
             // its kind. Spots dominate by count (~6k), so buoys list first
             // and the total is capped.
@@ -1742,10 +1782,13 @@
                     !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
                     e.preventDefault();
                     searchInput.focus();
-                } else if (e.key === 'Escape' && document.activeElement === searchInput) {
-                    searchInput.value = '';
-                    document.getElementById('searchResults').innerHTML = '';
-                    searchInput.blur();
+                } else if (e.key === 'Escape') {
+                    closeMobileSearch();
+                    if (document.activeElement === searchInput) {
+                        searchInput.value = '';
+                        document.getElementById('searchResults').innerHTML = '';
+                        searchInput.blur();
+                    }
                 }
             });
 
@@ -1775,6 +1818,7 @@
                     div.onclick = function () {
                         searchResults.innerHTML = '';
                         searchInput.value = match.name;
+                        closeMobileSearch();
 
                         if (match.type === 'buoy') {
                             currentBuoy = match.buoy;

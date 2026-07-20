@@ -106,6 +106,18 @@ func TestRowTime(t *testing.T) {
 	}
 }
 
+func TestNDBCValue(t *testing.T) {
+	if got := ndbcValue("MM"); got != "" {
+		t.Errorf("MM sentinel = %q, want empty", got)
+	}
+	if got := ndbcValue("  mm "); got != "" {
+		t.Errorf("case-insensitive MM sentinel = %q, want empty", got)
+	}
+	if got := ndbcValue("12.4"); got != "12.4" {
+		t.Errorf("reported measurement changed to %q", got)
+	}
+}
+
 func TestLoadTemplates(t *testing.T) {
 	tmpl := loadTemplates(filepath.Join("..", "web", "templates"))
 	for _, name := range []string{"landing.html", "about.html", "today.html", "favorites.html", "buoy.html", "report", "forecastsummary"} {
@@ -129,7 +141,7 @@ func TestLoadTemplates(t *testing.T) {
 			},
 		}},
 		Spots: []SpotFavorite{{
-			ID: "el-porto", Name: "El Porto", Region: "Los Angeles",
+			ID: "el-porto", Name: "El Porto", Region: "Los Angeles", WindSpeed: "12", WindDir: "270", HasWind: true,
 			Summary:           []ForecastSummary{{DateAbv: "Mon 7/20", DayNum: "20", WaveHeight: "3.2ft", HeightFt: 3.2, Condition: "fair", Score: 40}},
 			CurrentConditions: []ConditionCandle{{Hour: "06", UnixMs: 1753000000000, Score: 40, Condition: "fair"}},
 		}},
@@ -139,7 +151,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "day-tick"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "day-tick", "12 mph", "270&deg;"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}

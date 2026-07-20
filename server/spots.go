@@ -565,6 +565,8 @@ type SpotFavorite struct {
 	CurrentConditions       []ConditionCandle
 	Primary, PrimarySub     string
 	Secondary, SecondarySub string
+	WindSpeed, WindDir      string
+	HasWind                 bool
 	HasError                bool
 }
 
@@ -580,6 +582,11 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 	conditions := spotConditions(staticDir, spot, hours)
 	applyConditionSummary(entry.Summary, conditions)
 	entry.CurrentConditions = currentConditionCandles(conditions)
+	if report, ok := spotReport(staticDir, lat, lon, forecastData); ok && report.HasWind {
+		entry.WindSpeed = report.WindSpeed
+		entry.WindDir = report.WindDir
+		entry.HasWind = true
+	}
 
 	row := forecastData.Forecast[0]
 	format := func(h, p, d string) (string, string) {

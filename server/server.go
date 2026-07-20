@@ -329,13 +329,23 @@ func getWindReport(stationId string) (WindReport, error) {
 	report := WindReport{
 		StationId: stationId,
 		Date:      parts[0] + " " + parts[1] + " " + parts[2] + " " + parts[3],
-		WindSpeed: parts[6],
-		WindGust:  parts[7],
-		WindDir:   parts[5],
-		AirTemp:   parts[13],
-		WaterTemp: parts[14],
+		WindSpeed: ndbcValue(parts[6]),
+		WindGust:  ndbcValue(parts[7]),
+		WindDir:   ndbcValue(parts[5]),
+		AirTemp:   ndbcValue(parts[13]),
+		WaterTemp: ndbcValue(parts[14]),
 	}
 	return report, nil
+}
+
+// NDBC uses MM for measurements that were not reported. Keep missing
+// values empty internally so every presentation can render its normal "--"
+// fallback without accidentally showing units after the sentinel.
+func ndbcValue(value string) string {
+	if strings.EqualFold(strings.TrimSpace(value), "MM") {
+		return ""
+	}
+	return value
 }
 
 // fetchForecast tries the most recent model cycles, newest first, and returns

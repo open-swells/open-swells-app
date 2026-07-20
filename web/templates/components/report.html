@@ -131,12 +131,13 @@
                     <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
                     <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
                     <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
-                    <path class="needle windsymbol" style="transform: rotate({{.WindReport.WindDir}}deg);"
+                    {{if .WindReport.WindDir}}<path class="needle windsymbol" style="transform: rotate({{.WindReport.WindDir}}deg);"
                           d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
+                    {{end}}
                 </svg>
                 <div class="report-value">
-                    <div class="main">{{.WindReport.WindSpeed}} mph</div>
-                    <div class="sub">Gust {{.WindReport.WindGust}} mph &middot; {{.WindReport.WindDir}}&deg;</div>
+                    <div class="main">{{if .WindReport.WindSpeed}}{{.WindReport.WindSpeed}} mph{{else}}--{{end}}</div>
+                    <div class="sub">Gust {{if .WindReport.WindGust}}{{.WindReport.WindGust}} mph{{else}}--{{end}}{{if .WindReport.WindDir}} &middot; {{.WindReport.WindDir}}&deg;{{end}}</div>
                 </div>
             </div>
         </div>
@@ -146,11 +147,11 @@
             <div class="report-row" style="gap: 20px;">
                 <div class="report-value">
                     <div class="sub" style="margin: 0 0 3px;">AIR</div>
-                    <div class="main">{{.WindReport.AirTemp}}&deg;F</div>
+                    <div class="main">{{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}&deg;F{{else}}--{{end}}</div>
                 </div>
                 <div class="report-value">
                     <div class="sub" style="margin: 0 0 3px;">WATER</div>
-                    <div class="main">{{.WindReport.WaterTemp}}&deg;F</div>
+                    <div class="main">{{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;F{{else}}--{{end}}</div>
                 </div>
             </div>
         </div>
