@@ -245,6 +245,11 @@
         // swell sparklines (scripts inside innerHTML never execute).
         function enhanceSummary(root) {
             const hourFmt = new Intl.DateTimeFormat([], { hour: 'numeric' });
+            const nowDate = new Date();
+            const localTodayKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}-${String(nowDate.getDate()).padStart(2, '0')}`;
+            root.querySelectorAll('.day-tick[data-date]').forEach(tick => {
+                if (tick.dataset.date < localTodayKey) tick.remove();
+            });
             root.querySelectorAll('[data-hour-strip]').forEach(strip => {
                 const sourceCandles = [...strip.querySelectorAll('.hour-candle')];
                 if (!sourceCandles.length) return;
@@ -304,18 +309,28 @@
             </svg>`;
         }
 
-        // Buoy outlook: swell lane from the server-rendered daily heights,
-        // wind lane joined from /api/wind (same source the forecast page's
-        // strip uses); the wind lane stays hidden if the fetch fails.
+        // Buoy outlook: the complete hourly bulletin drives the swell lane.
+        // Three-hourly source wind is interpolated onto that same timeline;
+        // the wind lane stays hidden if the fetch fails.
         async function drawBuoyOutlook(el) {
-            const heights = el.dataset.heights.trim().split(/\s+/).map(Number).filter(Number.isFinite);
+            const rawHeights = (el.dataset.hourlyHeights || '').trim().split(/\s+/).map(Number);
+            const rawTimes = (el.dataset.hourlyTimes || '').trim().split(/\s+/).map(Number);
+            const nowDate = new Date();
+            nowDate.setHours(0, 0, 0, 0);
+            const timeline = rawTimes.map((timestamp, index) => ({
+                timestamp,
+                height: rawHeights[index]
+            })).filter(point => point.timestamp >= nowDate.getTime() && Number.isFinite(point.height));
+            const heights = timeline.map(point => point.height * 3.28084);
             if (heights.length < 2) return;
             const swellLane = el.querySelector('[data-swell-lane]');
             swellLane.innerHTML = laneSVG(heights, 56, '#8f9bff', true);
             const note = el.querySelector('[data-swell-note]');
             const minFt = Math.min(...heights), maxFt = Math.max(...heights);
-            if (note) note.textContent = `Swell ${minFt.toFixed(1)}–${maxFt.toFixed(1)} ft`;
-            const labels = (el.dataset.labels || '').split('|');
+            const defaultNote = `Swell ${minFt.toFixed(1)}–${maxFt.toFixed(1)} ft`;
+            if (note) note.textContent = defaultNote;
+            const labelFmt = new Intl.DateTimeFormat([], { month: 'short', day: 'numeric', hour: 'numeric' });
+            const labels = timeline.map(point => labelFmt.format(new Date(point.timestamp)));
             const labelRow = el.querySelector('[data-lane-labels]');
             if (labelRow) {
                 const spanEl = text => { const s = document.createElement('span'); s.textContent = text; return s; };
@@ -325,15 +340,71 @@
                     spanEl(labels[labels.length - 1] || ''));
             }
             const windLane = el.querySelector('[data-wind-lane]');
+            const hoverLine = document.createElement('div');
+            hoverLine.className = 'outlook-hover-line';
+            let hourlyWindMph = [];
+            const updateHover = (lane, event) => {
+                const rect = lane.getBoundingClientRect();
+                const laneX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+                const fraction = rect.width ? laneX / rect.width : 0;
+                const index = Math.min(timeline.length - 1, Math.round(fraction * (timeline.length - 1)));
+                lane.appendChild(hoverLine);
+                hoverLine.style.left = `${Math.min(rect.width - 1, index / (timeline.length - 1) * rect.width)}px`;
+                hoverLine.style.top = lane === swellLane ? '0' : '8px';
+                hoverLine.style.height = lane === swellLane ? '56px' : '30px';
+                hoverLine.style.display = 'block';
+                if (note) {
+                    const wind = Number.isFinite(hourlyWindMph[index]) ? ` · wind ${hourlyWindMph[index].toFixed(0)} mph` : '';
+                    note.textContent = `${labels[index]} · ${heights[index].toFixed(1)} ft${wind}`;
+                }
+            };
+            const clearHover = () => {
+                hoverLine.style.display = 'none';
+                if (note) note.textContent = defaultNote;
+            };
+            swellLane.addEventListener('mousemove', event => updateHover(swellLane, event));
+            swellLane.addEventListener('mouseleave', clearHover);
+            if (windLane) {
+                windLane.addEventListener('mousemove', event => {
+                    if (event.target.closest('svg')) updateHover(windLane, event);
+                    else clearHover();
+                });
+                windLane.addEventListener('mouseleave', clearHover);
+            }
             if (!windLane) return;
             try {
                 const response = await fetch('/api/wind/' + encodeURIComponent(el.dataset.station));
                 if (!response.ok) return;
                 const payload = await response.json();
                 if (!payload.samples || payload.samples.length < 2) return;
-                const mph = payload.samples.map(s => s.s * 2.23694);
-                windLane.innerHTML = laneSVG(mph, 30, '#6fcf97', false) +
-                    `<div class="hour-scale" style="margin-top: 2px;"><span>Wind</span><span>to ${Math.max(...mph).toFixed(0)} mph</span></div>`;
+                const [datePart, timePart] = String(payload.start || '').split('_');
+                const windStart = datePart && timePart ? Date.UTC(
+                    Number(datePart.slice(0, 4)), Number(datePart.slice(4, 6)) - 1,
+                    Number(datePart.slice(6, 8)), Number(timePart.slice(0, 2))) : NaN;
+                if (!Number.isFinite(windStart)) return;
+                const windPoints = payload.samples.map(sample => ({
+                    timestamp: windStart + sample.h * 3600e3,
+                    speed: sample.s
+                })).sort((a, b) => a.timestamp - b.timestamp);
+                let windIndex = 1;
+                hourlyWindMph = timeline.map(point => {
+                    while (windIndex < windPoints.length && windPoints[windIndex].timestamp < point.timestamp) windIndex++;
+                    if (windIndex >= windPoints.length) return NaN;
+                    const before = windPoints[windIndex - 1], after = windPoints[windIndex];
+                    if (point.timestamp < before.timestamp) return NaN;
+                    const span = after.timestamp - before.timestamp;
+                    const fraction = span ? (point.timestamp - before.timestamp) / span : 0;
+                    return (before.speed + (after.speed - before.speed) * fraction) * 2.23694;
+                });
+                const mph = hourlyWindMph.filter(Number.isFinite);
+                if (mph.length < 2) return;
+                const peak = Math.max(...mph);
+                const peakIndex = hourlyWindMph.indexOf(peak);
+                const peakLeft = peakIndex / (timeline.length - 1) * 100;
+                const labelShift = peakLeft < 5 ? '0%' : peakLeft > 95 ? '-100%' : '-50%';
+                windLane.innerHTML = `<div class="wind-graph">${laneSVG(mph, 30, '#6fcf97', false)}
+                    <div class="wind-peak" style="left: ${peakLeft}%; --peak-label-shift: ${labelShift};"><span>${peak.toFixed(0)} mph</span></div>
+                </div>`;
                 windLane.hidden = false;
             } catch (error) {
                 console.warn('Wind forecast unavailable:', error);

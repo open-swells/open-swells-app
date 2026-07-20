@@ -103,6 +103,13 @@ func (s *SpotStore) Get(id string) (Spot, bool) {
 	return sp, ok
 }
 
+func (s *SpotStore) Count() int {
+	if s == nil {
+		return 0
+	}
+	return len(s.byID)
+}
+
 func (s *SpotStore) handleList(c *gin.Context) {
 	if s == nil {
 		c.JSON(http.StatusOK, []gin.H{})
@@ -607,7 +614,8 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 // closest to now, standing in for the live observations a buoy would have.
 // Heights are pre-converted to feet to match the buoy report cards.
 type SpotReport struct {
-	Valid                                              string // e.g. "Jul 17 03:00 UTC"
+	Valid                                              string // UTC fallback when JavaScript is unavailable
+	ValidUnixMs                                        int64
 	PrimaryHeight, PrimaryPeriod, PrimaryDegrees       string
 	SecondaryHeight, SecondaryPeriod, SecondaryDegrees string
 	HasSecondary                                       bool
@@ -642,6 +650,7 @@ func spotReport(staticDir string, lat, lon float64, forecastData ForecastData) (
 	}
 	row := forecastData.Forecast[best]
 	report.Valid = row.Time.Format("Jan 2 15:04 UTC")
+	report.ValidUnixMs = row.Time.UnixMilli()
 
 	toFeet := func(h string) string {
 		meters, err := strconv.ParseFloat(h, 64)

@@ -72,6 +72,11 @@ type MapPageData struct {
 	SwellReport  SwellReport
 }
 
+type LandingPageData struct {
+	SpotCount int
+	BuoyCount int
+}
+
 type BuoyPageData struct {
 	ForecastData    ForecastData
 	SwellReport     SwellReport
@@ -724,8 +729,9 @@ func validBuoyID(id string) bool {
 
 func loadTemplates(templateDir string) *template.Template {
 	tmpl := template.New("").Funcs(template.FuncMap{
-		"json":     jsonForTemplate,
-		"ripcolor": ripRiskColor,
+		"json":        jsonForTemplate,
+		"ripcolor":    ripRiskColor,
+		"formatcount": formatCount,
 		// NWS remark fields are often a literal "None." — not worth a row
 		"notnone": func(s string) bool {
 			t := strings.ToLower(strings.TrimRight(strings.TrimSpace(s), "."))
@@ -735,6 +741,14 @@ func loadTemplates(templateDir string) *template.Template {
 	template.Must(tmpl.ParseGlob(filepath.Join(templateDir, "components", "*.html")))
 	template.Must(tmpl.ParseGlob(filepath.Join(templateDir, "pages", "*.html")))
 	return tmpl
+}
+
+func formatCount(n int) string {
+	digits := strconv.Itoa(n)
+	for i := len(digits) - 3; i > 0; i -= 3 {
+		digits = digits[:i] + "," + digits[i:]
+	}
+	return digits
 }
 
 // ripRiskColor mirrors RIP_COLORS in the map page: green/amber/red keyed on
@@ -1040,7 +1054,10 @@ func run() {
 	router.GET("/spot/:id", spotPageHandler(tmpl, forecastDir, surfZoneStore))
 
 	router.GET("/", func(c *gin.Context) {
-		renderTemplate(c, tmpl, "landing.html", nil)
+		renderTemplate(c, tmpl, "landing.html", LandingPageData{
+			SpotCount: spotStore.Count(),
+			BuoyCount: stationStore.ActiveCount(),
+		})
 	})
 
 	router.GET("/about", func(c *gin.Context) {

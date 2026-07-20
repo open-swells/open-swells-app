@@ -127,7 +127,7 @@
                 Free 16-day swell forecast
             </div>
             <p class="mt-5 text-base text-[#a7a9ae] leading-relaxed max-w-xl mx-auto">
-                Global wave model forecasts and real-time buoy reports from 178 stations.
+                Global wave model forecasts for {{formatcount .SpotCount}} surf spots and real-time reports from {{formatcount .BuoyCount}} buoy stations.
                 Open source, no subscription.
             </p>
             <div class="mt-8 flex items-center justify-center gap-3">
@@ -143,8 +143,8 @@
         <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3 mt-16 max-w-3xl w-full">
             <div class="feature-card">
                 <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Coverage</div>
-                <h2 class="text-sm font-semibold text-white mb-1.5">178 stations</h2>
-                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">Monitor swell and weather activity across 178 buoy locations worldwide.</p>
+                <h2 class="text-sm font-semibold text-white mb-1.5">{{formatcount .SpotCount}} surf spots</h2>
+                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">Explore global model forecasts for every location in our spot directory, alongside {{formatcount .BuoyCount}} live buoy stations.</p>
             </div>
             <div class="feature-card">
                 <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Reports</div>

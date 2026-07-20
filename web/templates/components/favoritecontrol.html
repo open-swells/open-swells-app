@@ -1,0 +1,79 @@
+{{define "favoritecontrol"}}
+<script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-auth-compat.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const button = document.querySelector('[data-forecast-favorite]');
+        if (!button || window.self !== window.top) return;
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKZUgrKoU8MxXIm9H0mGubjfL8TANdH5g",
+            authDomain: "open-swells-89714.firebaseapp.com",
+            projectId: "open-swells-89714",
+            storageBucket: "open-swells-89714.appspot.com",
+            messagingSenderId: "764680526760",
+            appId: "1:764680526760:web:77bf8034f0f8df259b1b9d"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+
+        const kind = button.dataset.favoriteType;
+        const id = button.dataset.favoriteId;
+        let saved = false;
+
+        function render() {
+            button.textContent = saved ? '−' : '+';
+            button.classList.toggle('is-favorite', saved);
+            button.title = saved ? 'Remove from favorites' : 'Add to favorites';
+            button.setAttribute('aria-label', button.title);
+        }
+
+        async function authFetch(url, options = {}) {
+            const user = firebase.auth().currentUser;
+            if (!user) throw new Error('Not signed in');
+            const token = await user.getIdToken();
+            options.headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
+            return fetch(url, options);
+        }
+
+        async function refresh() {
+            const response = await authFetch('/api/favorites');
+            if (!response.ok) throw new Error('Could not load favorites');
+            const favorites = await response.json();
+            saved = kind === 'spot' ? (favorites.spots || []).includes(id) : (favorites.buoys || []).includes(id);
+            render();
+        }
+
+        button.addEventListener('click', async () => {
+            if (!firebase.auth().currentUser) {
+                try {
+                    await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+                } catch (error) {
+                    console.error('Sign-in failed:', error);
+                }
+                return;
+            }
+            if (saved && !window.confirm(`Remove this ${kind === 'spot' ? 'beach' : 'buoy'} from your favorites?`)) return;
+            const base = kind === 'spot' ? '/api/spot-favorites/' : '/api/favorites/';
+            try {
+                const response = await authFetch(base + encodeURIComponent(id), { method: saved ? 'DELETE' : 'POST' });
+                if (!response.ok) throw new Error('Favorite update failed');
+                saved = !saved;
+                render();
+            } catch (error) {
+                console.error(error);
+                alert('Could not update this favorite. Please try again.');
+            }
+        });
+
+        firebase.auth().onAuthStateChanged(user => {
+            if (!user) {
+                saved = false;
+                render();
+                return;
+            }
+            refresh().catch(error => console.error(error));
+        });
+        render();
+    });
+</script>
+{{end}}

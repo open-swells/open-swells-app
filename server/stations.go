@@ -124,6 +124,15 @@ func (s *StationStore) Has(id string) bool {
 	return ok
 }
 
+func (s *StationStore) ActiveCount() int {
+	if s == nil {
+		return 0
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.active)
+}
+
 func (s *StationStore) Location(id string) (BuoyLocation, bool) {
 	s.mu.RLock()
 	rec, ok := s.byID[id]

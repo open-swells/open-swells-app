@@ -532,7 +532,9 @@
 
                 // One modal serves both station and beach pages; only the
                 // iframe URL and header text differ.
-                function openModalFrame(url, title, subtitle) {
+                let activeForecastFavorite = null;
+
+                function openModalFrame(url, title, subtitle, favorite = null) {
                     closeFavorites();
                     const modal = document.getElementById('forecastModal');
                     const frame = document.getElementById('forecastFrame');
@@ -543,15 +545,18 @@
                     frame.onload = () => {
                         document.getElementById('forecastLoading').classList.add('hidden');
                         frame.classList.remove('opacity-0');
+                        bindForecastPageFavorite();
                     };
                     frame.src = url;
                     modal.classList.add('is-open');
+                    activeForecastFavorite = favorite;
                 }
 
                 function openForecast(stationId, stationName = '') {
                     if (!stationId) return;
                     openModalFrame(`/forecast/${stationId}`,
-                        stationName || 'Station report & forecast', `BUOY ${stationId}`);
+                        stationName || 'Station report & forecast', `BUOY ${stationId}`,
+                        { type: 'buoy', id: stationId });
                 }
 
                 function openBeach(zoneId, zoneName = '') {
@@ -563,11 +568,39 @@
                 function openSpot(spotId, spotName = '', region = '') {
                     if (!spotId) return;
                     openModalFrame(`/spot/${encodeURIComponent(spotId)}`,
-                        spotName || 'Spot forecast', region ? region.toUpperCase() : 'SURF SPOT');
+                        spotName || 'Spot forecast', region ? region.toUpperCase() : 'SURF SPOT',
+                        { type: 'spot', id: spotId });
                 }
 
                 function closeForecast() {
                     document.getElementById('forecastModal').classList.remove('is-open');
+                }
+
+                function syncForecastPageFavorite() {
+                    if (!activeForecastFavorite) return;
+                    const frame = document.getElementById('forecastFrame');
+                    const button = frame.contentDocument?.querySelector('[data-forecast-favorite]');
+                    if (!button) return;
+                    const isFavorite = activeForecastFavorite.type === 'spot'
+                        ? userSpots.includes(activeForecastFavorite.id)
+                        : userBuoys.includes(activeForecastFavorite.id);
+                    button.textContent = isFavorite ? '−' : '+';
+                    button.classList.toggle('is-favorite', isFavorite);
+                    button.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+                    button.setAttribute('aria-label', button.title);
+                }
+
+                function bindForecastPageFavorite() {
+                    if (!activeForecastFavorite) return;
+                    const frame = document.getElementById('forecastFrame');
+                    const button = frame.contentDocument?.querySelector('[data-forecast-favorite]');
+                    if (!button) return;
+                    button.onclick = async () => {
+                        if (activeForecastFavorite.type === 'spot') await toggleSpotFavorite(activeForecastFavorite.id);
+                        else await toggleFavorite(activeForecastFavorite.id);
+                        syncForecastPageFavorite();
+                    };
+                    syncForecastPageFavorite();
                 }
 
                 document.addEventListener('keydown', (event) => {
@@ -679,6 +712,7 @@
                 const countBadge = document.getElementById('favoritesMenuCount');
                 countBadge.textContent = count;
                 countBadge.classList.toggle('hidden', count === 0);
+                syncForecastPageFavorite();
             }
             // Wait for Firebase authentication
             document.addEventListener('DOMContentLoaded', () => {
@@ -1721,6 +1755,8 @@
                 // Refresh the favorites display and update popup content
                 updateFavoritesMenuCount();
                 await loadForecastSummary();
+                document.querySelectorAll(`.favorite-btn[data-station-id="${CSS.escape(stationId)}"]`)
+                    .forEach(updateFavoriteButton);
             }
 
             async function toggleSpotFavorite(spotId) {

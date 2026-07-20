@@ -16,7 +16,7 @@
     .open-button { color: #fff; background: #5e6ad2; border-color: #737ee3; box-shadow: 0 3px 10px rgba(94, 106, 210, .2); }
     .open-button:hover { background: #6d78de; border-color: #8f9bff; }
     .action-icon { width: 13px; height: 13px; flex: none; }
-    .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: #e06c75; background: #281f22; border: 1px solid #553137; cursor: pointer; }
+    .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: #e06c75; background: #281f22; border: 1px solid #553137; font-size: 18px; line-height: 1; cursor: pointer; }
     .remove-button:hover { color: #ff9299; background: #382429; border-color: #8f4952; }
     .stat-row { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 16px; }
     .stat-row > div { min-width: 0; }
@@ -33,6 +33,7 @@
     .hour-scale { display: flex; justify-content: space-between; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: .04em; color: #6f7177; }
     .favorite-outlook { min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #26272b; padding-left: 24px; }
     .outlook-scroll { min-width: 0; display: flex; flex: 1; flex-direction: column; }
+    .outlook-hover-line { position: absolute; z-index: 2; top: 0; width: 1px; background: #c6ccff; pointer-events: none; display: none; }
     .outlook-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
     .outlook-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
     .outlook-note { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #6f7177; }
@@ -42,10 +43,14 @@
     .day-tick-track i { display: block; width: 100%; min-height: 2px; opacity: .5; }
     .day-tick:hover .day-tick-track i { opacity: 1; }
     .day-tick span { height: 9px; line-height: 9px; font-family: 'JetBrains Mono', monospace; font-size: 7px; color: #6f7177; }
-    .lane-swell { height: 56px; margin-top: 10px; }
+    .lane-swell { position: relative; height: 56px; margin-top: 10px; }
     .lane-swell svg { display: block; width: 100%; height: 100%; }
-    .lane-wind { margin-top: 8px; }
-    .lane-wind svg { display: block; width: 100%; height: 30px; }
+    .lane-wind { position: relative; margin-top: 8px; }
+    .wind-graph { position: relative; height: 38px; padding-top: 8px; }
+    .wind-graph svg { display: block; width: 100%; height: 30px; }
+    .wind-peak { position: absolute; top: 0; color: #6fcf97; pointer-events: none; }
+    .wind-peak::after { content: ''; position: absolute; top: 9px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px #17181b; }
+    .wind-peak span { position: absolute; top: 0; left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: 'JetBrains Mono', monospace; font-size: 7px; line-height: 8px; white-space: nowrap; color: currentColor; }
     .lane-labels { display: flex; justify-content: space-between; padding-top: 5px; font-family: 'JetBrains Mono', monospace; font-size: 7px; text-transform: uppercase; color: #6f7177; }
     .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
     .location-badge-buoy { color: #8e97e8; }
@@ -68,6 +73,7 @@
         .favorites-detailed .stat-sub { font-size: 9px; }
         .outlook-scroll { display: block; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
         .outlook-scroll > * { min-width: 480px; }
+        [data-buoy-outlook] .outlook-scroll > * { min-width: 960px; }
     }
 </style>
 <div class="{{if .Detailed}}favorites-detailed{{else}}favorites-compact{{end}}">
@@ -95,18 +101,18 @@
                     {{else}}
                     <button onclick="showFavoriteOnMap('buoy', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
                     {{end}}
-                    <button onclick="toggleFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites"><svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button>
+                    <button onclick="toggleFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">−</button>
                 </div>
             </div>
             <div class="stat-row">
                 <div><div class="stat-label">Primary swell</div><div class="stat-value">{{if .SwellReport.PrimaryWaveHeight}}{{.SwellReport.PrimaryWaveHeight}}ft @ {{.SwellReport.PrimaryPeriod}}s{{else}}--{{end}}</div><div class="stat-sub">{{if .SwellReport.PrimaryDegrees}}{{.SwellReport.PrimaryDegrees}}&deg;{{else}}Direction --{{end}}</div></div>
                 <div><div class="stat-label">Secondary swell</div><div class="stat-value">{{if .SwellReport.SecondaryWaveHeight}}{{.SwellReport.SecondaryWaveHeight}}ft @ {{.SwellReport.SecondaryPeriod}}s{{else}}--{{end}}</div><div class="stat-sub">{{if .SwellReport.SecondaryDegrees}}{{.SwellReport.SecondaryDegrees}}&deg;{{else}}Direction --{{end}}</div></div>
                 <div><div class="stat-label">Wind</div><div class="stat-value">{{if .WindReport.WindSpeed}}{{.WindReport.WindSpeed}} mph{{else}}--{{end}}</div><div class="stat-sub">Gust {{if .WindReport.WindGust}}{{.WindReport.WindGust}} mph{{else}}--{{end}}</div></div>
-                <div><div class="stat-label">Temperature</div><div class="stat-value">{{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}&deg; air{{else}}--{{end}}</div><div class="stat-sub">Water {{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;{{else}}--{{end}}</div></div>
+                <div><div class="stat-label">Temperature</div><div class="stat-value">{{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}&deg;C air{{else}}--{{end}}</div><div class="stat-sub">Water {{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;C{{else}}--{{end}}</div></div>
             </div>
         </div>
         {{if and $.Detailed (gt (len .Summary) 1)}}
-        <div class="favorite-outlook" data-buoy-outlook data-station="{{.ID}}" data-heights="{{range .Summary}}{{printf "%.2f" .HeightFt}} {{end}}" data-labels="{{range $i, $day := .Summary}}{{if $i}}|{{end}}{{$day.DateAbv}}{{end}}">
+        <div class="favorite-outlook" data-buoy-outlook data-station="{{.ID}}" data-hourly-heights="{{range .Forecast.Forecast}}{{.PrimaryWaveHeight}} {{end}}" data-hourly-times="{{range .Forecast.Forecast}}{{.Time.UnixMilli}} {{end}}">
             <div class="outlook-head"><span class="outlook-label">16-day swell &amp; wind</span><span class="outlook-note" data-swell-note></span></div>
             <div class="outlook-scroll">
                 <div class="lane-swell" data-swell-lane aria-label="16-day swell height trend"></div>
@@ -137,7 +143,7 @@
                     {{else}}
                     <button onclick="showFavoriteOnMap('spot', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
                     {{end}}
-                    <button onclick="toggleSpotFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites"><svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"/></svg></button>
+                    <button onclick="toggleSpotFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">−</button>
                 </div>
             </div>
             <div class="stat-row">
@@ -159,7 +165,7 @@
             <div class="outlook-head"><span class="outlook-label">16-day outlook</span><span class="outlook-note">Conditions</span></div>
             <div class="outlook-scroll">
                 <div class="day-ticks" aria-label="16-day conditions outlook">
-                    {{range .Summary}}<div class="day-tick" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"><div class="day-tick-track"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div><span>{{.DayNum}}</span></div>{{end}}
+                    {{range .Summary}}<div class="day-tick" data-date="{{.Date}}" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"><div class="day-tick-track"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div><span>{{.DayNum}}</span></div>{{end}}
                 </div>
             </div>
         </div>

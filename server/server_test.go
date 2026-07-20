@@ -128,13 +128,22 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(io.Discard, "favorites.html", gin.H{"SearchView": false}); err != nil {
 		t.Fatalf("favorites template failed to render: %v", err)
 	}
+	var landing bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&landing, "landing.html", LandingPageData{SpotCount: 5878, BuoyCount: 178}); err != nil {
+		t.Fatalf("landing template failed to render: %v", err)
+	}
+	if !bytes.Contains(landing.Bytes(), []byte("5,878 surf spots")) {
+		t.Error("landing template is missing the formatted spot count")
+	}
 	summaryData := struct {
 		Buoys    []BuoyWithSummary
 		Spots    []SpotFavorite
 		Detailed bool
 	}{
 		Buoys: []BuoyWithSummary{{
-			Buoy: Buoy{ID: "46221", Name: "Santa Monica Bay"},
+			Buoy: Buoy{ID: "46221", Name: "Santa Monica Bay", Forecast: ForecastData{Forecast: []ForecastRow{{
+				Time: time.Date(2026, 7, 20, 6, 0, 0, 0, time.UTC), PrimaryWaveHeight: "1.25",
+			}}}},
 			Summary: []ForecastSummary{
 				{DateAbv: "Mon 7/20", DayNum: "20", WaveHeight: "3.2ft", HeightFt: 3.2, Condition: "good", Score: 57},
 				{DateAbv: "Tue 7/21", DayNum: "21", WaveHeight: "4.1ft", HeightFt: 4.1, Condition: "good", Score: 63},
@@ -151,7 +160,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "day-tick", "12 mph", "270&deg;"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-hourly-heights=\"1.25 ", "day-tick", "12 mph", "270&deg;"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}

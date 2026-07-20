@@ -52,7 +52,18 @@
                 .station-shell { padding: 12px; }
             }
         </style>
-        <script>if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));</script>
+        <script>
+            if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));
+            document.addEventListener('DOMContentLoaded', () => {
+                const formatter = new Intl.DateTimeFormat(undefined, {
+                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+                });
+                document.querySelectorAll('[data-local-time]').forEach(el => {
+                    const date = new Date(Number(el.dataset.localTime));
+                    if (!Number.isNaN(date.getTime())) el.textContent = formatter.format(date);
+                });
+            });
+        </script>
     </head>
 
     <body>
@@ -63,7 +74,7 @@
             </div>
             <div class="w-full min-w-0">
                 <h1 class="text-base font-semibold text-white truncate">{{.ZoneName}}</h1>
-                <div class="mono text-[10px] text-[#8b8d93] mt-1">SURF ZONE {{.ZoneID}} &middot; NWS {{.Office}} &middot; ISSUED {{.Issued.Format "Jan 2 15:04"}} UTC</div>
+                <div class="mono text-[10px] text-[#8b8d93] mt-1">SURF ZONE {{.ZoneID}} &middot; NWS {{.Office}} &middot; ISSUED <span data-local-time="{{.Issued.UnixMilli}}">{{.Issued.Format "Jan 2 15:04"}} UTC</span></div>
             </div>
         </div>
 
@@ -95,7 +106,7 @@
         </details>
 
         <div class="mono text-[9px] text-[#6f7177] mt-3">
-            SOURCE: NATIONAL WEATHER SERVICE SURF ZONE FORECAST ({{.Office}}) &middot; EXPIRES {{.Expires.Format "Jan 2 15:04"}} UTC
+            SOURCE: NATIONAL WEATHER SERVICE SURF ZONE FORECAST ({{.Office}}) &middot; EXPIRES <span data-local-time="{{.Expires.UnixMilli}}">{{.Expires.Format "Jan 2 15:04"}} UTC</span>
         </div>
       </main>
     </body>
