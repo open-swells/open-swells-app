@@ -111,18 +111,19 @@ func TestApplyConditionSummary(t *testing.T) {
 		t.Errorf("unexpected current condition candles: %+v", candles)
 	}
 
-	// A series spanning now starts at the current hour and caps at 24.
+	// A series spanning now supplies the surrounding 48 hours so the client
+	// can select midnight-to-midnight in its local timezone.
 	nowHour := time.Now().UTC().Truncate(time.Hour)
 	var series []HourlyCondition
-	for i := -6; i < 40; i++ {
+	for i := -30; i < 30; i++ {
 		series = append(series, HourlyCondition{UnixMs: nowHour.Add(time.Duration(i) * time.Hour).UnixMilli(), Score: 50, Rating: "fair"})
 	}
-	windowed := currentConditionCandles(series)
-	if len(windowed) != 24 {
-		t.Fatalf("windowed candles length = %d, want 24", len(windowed))
+	windowed := conditionCandlesAround(series, nowHour)
+	if len(windowed) != 48 {
+		t.Fatalf("windowed candles length = %d, want 48", len(windowed))
 	}
 	first := windowed[0].UnixMs
-	if first < nowHour.Add(-time.Hour).UnixMilli() || first > nowHour.UnixMilli() {
-		t.Errorf("windowed candles should start at the current hour, got %d", first)
+	if first != nowHour.Add(-24*time.Hour).UnixMilli() {
+		t.Errorf("windowed candles should start 24 hours before now, got %d", first)
 	}
 }

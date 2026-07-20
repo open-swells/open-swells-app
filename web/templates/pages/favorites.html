@@ -19,6 +19,10 @@
         .button:hover { background: #2a2c30; color: #fff; }
         .button-primary { background: #5e6ad2; border-color: #6d78de; color: #fff; }
         .button-primary:hover { background: #6d78de; }
+        .view-switch { width: 162px; height: 36px; padding: 4px; }
+        .view-switch a { width: 76px; height: 28px; flex: none; }
+        .profile-button.is-user { width: 32px; padding: 0; border-color: transparent; background: transparent; }
+        .profile-button.is-user:hover { border-color: transparent; background: #202125; }
         #favoritesGrid { display: block; }
         .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 64px; border-bottom: 1px solid #2b2d31; }
         .search-row:last-child { border-bottom: 0; }
@@ -44,13 +48,13 @@
                 <span class="text-[#8f9bff]">◒</span><span class="brand-word">OpenSwells</span>
             </a>
 
-            <nav class="surface absolute left-1/2 -translate-x-1/2 h-9 p-1 flex items-center" aria-label="Primary view">
-                <a href="/map" class="h-7 min-w-[76px] px-3 flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Map</a>
-                <a href="/favorites" aria-current="page" class="h-7 min-w-[76px] px-3 flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Favorites</a>
+            <nav class="surface view-switch absolute left-1/2 -translate-x-1/2 flex items-center" aria-label="Primary view">
+                <a href="/map" class="flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Map</a>
+                <a href="/favorites" aria-current="page" class="flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Favorites</a>
             </nav>
 
             <div class="relative flex items-center">
-                <button id="signInBtn" class="button">Sign in</button>
+                <button id="signInBtn" class="button profile-button">Sign in</button>
                 <div id="userMenu" class="surface absolute top-full right-0 mt-2 w-60 hidden overflow-hidden">
                     <div class="px-3 py-3 border-b border-[#34363b]">
                         <div id="userName" class="text-xs font-medium text-white truncate"></div>
@@ -66,7 +70,7 @@
         <section>
             <div class="mb-3 flex items-center justify-between gap-3">
                 <p id="favoriteCount" class="mono text-[10px] uppercase tracking-wide text-[#8b8d93]">Loading saved locations…</p>
-                <button class="button" onclick="openLocationSearch()">
+                <button class="button shrink-0 whitespace-nowrap" onclick="openLocationSearch()">
                     <span class="text-base leading-none">+</span> Add location
                 </button>
             </div>
@@ -225,7 +229,7 @@
                 grid.innerHTML = await summaryResponse.text();
                 enhanceSummary(grid);
                 const count = userBuoys.length + userSpots.length;
-                document.getElementById('favoriteCount').textContent = `${count} saved ${count === 1 ? 'location' : 'locations'} · refreshed from the latest forecast`;
+                document.getElementById('favoriteCount').textContent = `${count} saved ${count === 1 ? 'location' : 'locations'}`;
                 if (directoryLoaded) renderSearchResults();
             } catch (error) {
                 grid.innerHTML = '<div class="surface py-12 px-5 text-center text-xs text-[#8b8d93]">Could not load your forecast outlook. Please try again.</div>';
@@ -238,9 +242,29 @@
         function enhanceSummary(root) {
             const hourFmt = new Intl.DateTimeFormat([], { hour: 'numeric' });
             root.querySelectorAll('[data-hour-strip]').forEach(strip => {
-                const candles = [...strip.querySelectorAll('.hour-candle')];
-                if (!candles.length) return;
+                const sourceCandles = [...strip.querySelectorAll('.hour-candle')];
+                if (!sourceCandles.length) return;
                 const now = Date.now();
+                const today = new Date(now);
+                const sameDay = date => date.getFullYear() === today.getFullYear() &&
+                    date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+                const byHour = new Map();
+                sourceCandles.forEach(candle => {
+                    const date = new Date(Number(candle.dataset.ts));
+                    if (sameDay(date) && !byHour.has(date.getHours())) byHour.set(date.getHours(), candle);
+                });
+                const candles = Array.from({ length: 24 }, (_, hour) => {
+                    if (byHour.has(hour)) return byHour.get(hour);
+                    const candle = document.createElement('div');
+                    const slot = new Date(today);
+                    slot.setHours(hour, 0, 0, 0);
+                    candle.className = 'hour-candle is-unavailable';
+                    candle.dataset.ts = String(slot.getTime());
+                    candle.title = `${hourFmt.format(slot)} · Forecast unavailable`;
+                    candle.innerHTML = '<i></i>';
+                    return candle;
+                });
+                strip.replaceChildren(...candles);
                 candles.forEach(candle => {
                     const ts = Number(candle.dataset.ts);
                     if (!ts) return;
@@ -250,10 +274,12 @@
                 });
                 const scale = strip.parentElement.querySelector('.hour-scale');
                 if (scale) {
-                    const first = Number(candles[0].dataset.ts);
-                    const last = Number(candles[candles.length - 1].dataset.ts);
-                    if (first) scale.querySelector('[data-hour-start]').textContent = hourFmt.format(new Date(first));
-                    if (last) scale.querySelector('[data-hour-end]').textContent = hourFmt.format(new Date(last));
+                    const midnight = new Date(today);
+                    midnight.setHours(0, 0, 0, 0);
+                    const nextMidnight = new Date(midnight);
+                    nextMidnight.setDate(nextMidnight.getDate() + 1);
+                    scale.querySelector('[data-hour-start]').textContent = hourFmt.format(midnight);
+                    scale.querySelector('[data-hour-end]').textContent = hourFmt.format(nextMidnight);
                 }
             });
             root.querySelectorAll('[data-buoy-outlook]').forEach(drawBuoyOutlook);
@@ -357,11 +383,13 @@
             const button = document.getElementById('signInBtn');
             const menu = document.getElementById('userMenu');
             if (user) {
-                button.innerHTML = user.photoURL ? `<img src="${escapeHTML(user.photoURL)}" alt="" class="w-6 h-6 rounded-full"><span class="hidden sm:inline">Account</span>` : 'Account';
+                button.classList.add('is-user');
+                button.innerHTML = user.photoURL ? `<img src="${escapeHTML(user.photoURL)}" alt="Profile" class="w-6 h-6 rounded-full">` : 'Account';
                 button.onclick = () => menu.classList.toggle('hidden');
                 document.getElementById('userName').textContent = user.displayName || 'OpenSwells user';
                 document.getElementById('userEmail').textContent = user.email || '';
             } else {
+                button.classList.remove('is-user');
                 button.textContent = 'Sign in';
                 button.onclick = openSignIn;
                 menu.classList.add('hidden');

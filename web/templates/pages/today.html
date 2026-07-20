@@ -40,6 +40,13 @@
         .favorites-menu-button { background: #24252a; border: 1px solid #3b3d42; }
         .favorites-menu-button svg { color: #8f9bff; }
         .favorites-menu-count { min-width: 17px; height: 17px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; background: #343650; color: #c8ceff; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
+        .view-switch { width: 162px; height: 36px; padding: 4px; }
+        .view-switch a { width: 76px; height: 28px; flex: none; }
+        #signInBtn.is-user { width: 32px; padding: 0; border: 0; background: transparent; }
+        .drawer-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid #34363b; }
+        .drawer-tool { min-width: 0; height: 42px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #a7a9ae; font-size: 11px; }
+        .drawer-tool + .drawer-tool { border-left: 1px solid #34363b; }
+        .drawer-tool:hover { color: #fff; background: #24252a; }
         /* Buoy popup card. Styled with plain CSS rather than runtime
            Tailwind utility classes so the buttons hold their size and
            layout everywhere, including mobile. */
@@ -248,10 +255,7 @@
                 position: static; width: 100%; max-width: 540px; margin-top: 4px;
                 max-height: min(55dvh, 380px);
             }
-            /* With the search collapsed there is room for the view switch
-               in the top row again */
             nav[aria-label="Primary view"] { top: 0.75rem; }
-            nav[aria-label="Primary view"] a { min-width: 64px; }
         }
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
@@ -283,9 +287,9 @@
         </div>
 
         <!-- Primary view switch -->
-        <nav class="surface absolute top-14 2xl:top-3 left-1/2 -translate-x-1/2 z-30 h-9 p-1 flex items-center" aria-label="Primary view">
-            <a href="/map" aria-current="page" class="h-7 min-w-[76px] px-3 flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Map</a>
-            <a href="/favorites" class="h-7 min-w-[76px] px-3 flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Favorites</a>
+        <nav class="surface view-switch absolute top-14 2xl:top-3 left-1/2 -translate-x-1/2 z-30 flex items-center" aria-label="Primary view">
+            <a href="/map" aria-current="page" class="flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Map</a>
+            <a href="/favorites" class="flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Favorites</a>
         </nav>
 
         <!-- 2) Header "island" at the top -->
@@ -322,7 +326,7 @@
 
             <!-- Icons -->
             <div class="icons surface top-menu relative ml-auto flex items-center min-w-fit">
-                <button id="showFavoritesBtn" class="toolbar-button favorites-menu-button" onclick="toggleFavorites()" aria-expanded="false" title="Favorites">
+                <button id="showFavoritesBtn" class="toolbar-button favorites-menu-button hidden sm:inline-flex" onclick="toggleFavorites()" aria-expanded="false" title="Favorites">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg><span class="hidden sm:inline">Favorites</span><span id="favoritesMenuCount" class="favorites-menu-count hidden">0</span>
                 </button>
                 <a href="/about" class="icon-button hidden md:inline-flex" title="About">
@@ -353,9 +357,12 @@
                                  c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
                     </svg>
                 </a>
-                <a href="#" id="signInBtn" class="toolbar-button border-0 bg-transparent">
+                <a href="#" id="signInBtn" class="toolbar-button profile-control hidden sm:inline-flex border-0 bg-transparent">
                     Sign In
                 </a>
+                <button id="mobilePanelBtn" class="icon-button sm:hidden" onclick="toggleFavorites()" aria-expanded="false" aria-label="Open favorites and menu">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
 
                 <!-- Sign-in Modal -->
                 <div id="signInModal"
@@ -402,15 +409,20 @@
         <!-- End Header -->
 
 
-            <div id="drawerBackdrop" class="fixed inset-0 z-20 bg-black/25" onclick="closeFavorites()"></div>
+            <div id="drawerBackdrop" class="fixed inset-0 z-[35] bg-black/25" onclick="closeFavorites()"></div>
             <!-- Favorites drawer -->
             <div 
                                 id="favoritesView" 
-                                class="surface fixed z-30 top-3 bottom-3 right-3 flex flex-col overflow-hidden"
+                                class="surface fixed z-40 top-3 bottom-3 right-3 flex flex-col overflow-hidden"
                                 >
                                 <div class="h-12 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
                                     <div><div class="text-sm font-semibold text-white">Favorites</div><div class="text-[11px] text-[#8b8d93]">Live station outlook</div></div>
                                     <button class="icon-button" onclick="closeFavorites()" aria-label="Close favorites"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
+                                </div>
+                                <div class="drawer-tools shrink-0">
+                                    <button class="drawer-tool" onclick="openDrawerAccount()" aria-label="Account"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="drawerAccountLabel">Sign in</span></button>
+                                    <a class="drawer-tool" href="/about"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>Info</span></a>
+                                    <a class="drawer-tool" href="https://github.com/open-swells/open-swells-app"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.87c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.55 9.55 0 0 1 12 6.82a9.5 9.5 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.77c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg><span>GitHub</span></a>
                                 </div>
                                 <div 
                                 id="buoy-containers" 
@@ -496,12 +508,19 @@
                     document.getElementById('favoritesView').classList.add('is-open');
                     document.getElementById('drawerBackdrop').classList.add('is-open');
                     document.getElementById('showFavoritesBtn').setAttribute('aria-expanded', 'true');
+                    document.getElementById('mobilePanelBtn').setAttribute('aria-expanded', 'true');
                 }
 
                 function closeFavorites() {
                     document.getElementById('favoritesView').classList.remove('is-open');
                     document.getElementById('drawerBackdrop').classList.remove('is-open');
                     document.getElementById('showFavoritesBtn').setAttribute('aria-expanded', 'false');
+                    document.getElementById('mobilePanelBtn').setAttribute('aria-expanded', 'false');
+                }
+
+                function openDrawerAccount() {
+                    closeFavorites();
+                    document.getElementById('signInBtn').click();
                 }
 
                 // One modal serves both station and beach pages; only the
@@ -683,15 +702,19 @@
                 const signInBtn = document.getElementById('signInBtn');
                 if (user) {
                     // User is signed in
+                    signInBtn.classList.add('is-user');
                     signInBtn.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="md:w-8 md:h-8 w-6 h-6 rounded-full">`;
                     // signInBtn.onclick = () => firebase.auth().signOut().then(() => updateUIForSignedInUser(null));
                     signInBtn.onclick = () => document.getElementById('userPopup').classList.remove('hidden');
                     document.getElementById('userName').textContent = user.displayName;
                     document.getElementById('userEmail').textContent = user.email;
+                    document.getElementById('drawerAccountLabel').textContent = 'Account';
                 } else {
                     // User is signed out
+                    signInBtn.classList.remove('is-user');
                     signInBtn.innerHTML = 'Sign In';
                     signInBtn.onclick = () => document.getElementById('signInModal').classList.remove('hidden');
+                    document.getElementById('drawerAccountLabel').textContent = 'Sign in';
                 }
                 document.getElementById('signInModal').classList.add('hidden');
             }

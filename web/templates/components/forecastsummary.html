@@ -19,6 +19,7 @@
     .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: #e06c75; background: #281f22; border: 1px solid #553137; cursor: pointer; }
     .remove-button:hover { color: #ff9299; background: #382429; border-color: #8f4952; }
     .stat-row { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 16px; }
+    .stat-row > div { min-width: 0; }
     .stat-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
     .stat-value { margin-top: 3px; font-size: 13px; font-weight: 600; color: #f0f0f1; white-space: nowrap; }
     .stat-sub { margin-top: 1px; font-size: 10px; color: #8b8d93; white-space: nowrap; }
@@ -26,10 +27,12 @@
     .hour-strip { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 38px; align-items: end; border-bottom: 1px solid #2e3035; }
     .hour-candle { position: relative; height: 100%; display: flex; align-items: flex-end; }
     .hour-candle i { display: block; width: 100%; min-height: 2px; opacity: .85; }
+    .hour-candle.is-unavailable i { background: #2a2c30; opacity: .55; }
     .hour-candle.is-now i { opacity: 1; }
     .hour-candle.is-now::after { content: ''; position: absolute; left: 50%; top: -7px; bottom: -1px; width: 1px; background: #c6ccff; }
     .hour-scale { display: flex; justify-content: space-between; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: .04em; color: #6f7177; }
     .favorite-outlook { min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #26272b; padding-left: 24px; }
+    .outlook-scroll { min-width: 0; display: flex; flex: 1; flex-direction: column; }
     .outlook-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
     .outlook-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
     .outlook-note { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #6f7177; }
@@ -38,12 +41,12 @@
     .day-tick-track { flex: 1; width: 100%; min-height: 40px; display: flex; align-items: flex-end; }
     .day-tick-track i { display: block; width: 100%; min-height: 2px; opacity: .5; }
     .day-tick:hover .day-tick-track i { opacity: 1; }
-    .day-tick span { font-family: 'JetBrains Mono', monospace; font-size: 7px; color: #6f7177; }
+    .day-tick span { height: 9px; line-height: 9px; font-family: 'JetBrains Mono', monospace; font-size: 7px; color: #6f7177; }
     .lane-swell { height: 56px; margin-top: 10px; }
     .lane-swell svg { display: block; width: 100%; height: 100%; }
     .lane-wind { margin-top: 8px; }
     .lane-wind svg { display: block; width: 100%; height: 30px; }
-    .lane-labels { display: flex; justify-content: space-between; margin-top: auto; padding-top: 5px; font-family: 'JetBrains Mono', monospace; font-size: 7px; text-transform: uppercase; color: #6f7177; }
+    .lane-labels { display: flex; justify-content: space-between; padding-top: 5px; font-family: 'JetBrains Mono', monospace; font-size: 7px; text-transform: uppercase; color: #6f7177; }
     .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
     .location-badge-buoy { color: #8e97e8; }
     .location-badge-beach { color: #f0a05a; }
@@ -59,9 +62,12 @@
     }
     @media (max-width: 640px) {
         .favorite-row { padding: 14px; }
-        .favorites-detailed .stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-        .day-tick span { display: none; }
-        .day-tick:nth-child(2n + 1) span { display: block; }
+        .favorites-detailed .stat-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
+        .favorites-detailed .stat-label { font-size: 8px; white-space: nowrap; }
+        .favorites-detailed .stat-value { font-size: 11px; }
+        .favorites-detailed .stat-sub { font-size: 9px; }
+        .outlook-scroll { display: block; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+        .outlook-scroll > * { min-width: 480px; }
     }
 </style>
 <div class="{{if .Detailed}}favorites-detailed{{else}}favorites-compact{{end}}">
@@ -102,9 +108,11 @@
         {{if and $.Detailed (gt (len .Summary) 1)}}
         <div class="favorite-outlook" data-buoy-outlook data-station="{{.ID}}" data-heights="{{range .Summary}}{{printf "%.2f" .HeightFt}} {{end}}" data-labels="{{range $i, $day := .Summary}}{{if $i}}|{{end}}{{$day.DateAbv}}{{end}}">
             <div class="outlook-head"><span class="outlook-label">16-day swell &amp; wind</span><span class="outlook-note" data-swell-note></span></div>
-            <div class="lane-swell" data-swell-lane aria-label="16-day swell height trend"></div>
-            <div class="lane-wind" data-wind-lane aria-label="16-day wind speed trend" hidden></div>
-            <div class="lane-labels" data-lane-labels></div>
+            <div class="outlook-scroll">
+                <div class="lane-swell" data-swell-lane aria-label="16-day swell height trend"></div>
+                <div class="lane-wind" data-wind-lane aria-label="16-day wind speed trend" hidden></div>
+                <div class="lane-labels" data-lane-labels></div>
+            </div>
         </div>
         {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}
         <div class="compact-condition"><span class="stat-label">Current swell</span><span class="text-[9px] font-semibold uppercase" style="color: #8f9bff;">{{$current.WaveHeight}}</span></div>
@@ -139,18 +147,20 @@
             </div>
             {{if and $.Detailed (gt (len .CurrentConditions) 0)}}
             <div class="hour-block">
-                <div class="hour-strip" data-hour-strip aria-label="Hourly conditions for the next 24 hours">
+                <div class="hour-strip" data-hour-strip aria-label="Hourly conditions for today, midnight to midnight">
                     {{range .CurrentConditions}}<div class="hour-candle" data-ts="{{.UnixMs}}" title="{{.Hour}}:00 &middot; {{.Condition}}"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div>{{end}}
                 </div>
-                <div class="hour-scale"><span data-hour-start></span><span>Next 24 hours</span><span data-hour-end></span></div>
+                <div class="hour-scale"><span data-hour-start></span><span>Today · 24 hours</span><span data-hour-end></span></div>
             </div>
             {{end}}
         </div>
         {{if and $.Detailed (gt (len .Summary) 0)}}
         <div class="favorite-outlook">
             <div class="outlook-head"><span class="outlook-label">16-day outlook</span><span class="outlook-note">Conditions</span></div>
-            <div class="day-ticks" aria-label="16-day conditions outlook">
-                {{range .Summary}}<div class="day-tick" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"><div class="day-tick-track"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div><span>{{.DayNum}}</span></div>{{end}}
+            <div class="outlook-scroll">
+                <div class="day-ticks" aria-label="16-day conditions outlook">
+                    {{range .Summary}}<div class="day-tick" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"><div class="day-tick-track"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div><span>{{.DayNum}}</span></div>{{end}}
+                </div>
             </div>
         </div>
         {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}

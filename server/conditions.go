@@ -273,23 +273,34 @@ func applyConditionSummary(summary []ForecastSummary, conds []HourlyCondition) {
 	}
 }
 
-// currentConditionCandles picks the next 24 hourly entries from the
-// classifier series, starting at the current hour, so the favorites strip
-// is always a dense day-long window regardless of UTC day boundaries.
-// A run that predates now entirely falls back to the series start.
+// currentConditionCandles supplies enough hours on either side of now for
+// the browser to build the viewer's local calendar day (midnight to
+// midnight). The forecast run may not contain earlier hours from today; the
+// client renders those as unavailable instead of shifting the strip forward.
 func currentConditionCandles(conds []HourlyCondition) []ConditionCandle {
+	return conditionCandlesAround(conds, time.Now())
+}
+
+func conditionCandlesAround(conds []HourlyCondition, now time.Time) []ConditionCandle {
 	if len(conds) == 0 {
 		return nil
 	}
-	cutoff := time.Now().Add(-time.Hour).UnixMilli()
+	windowStart := now.Add(-24 * time.Hour).UnixMilli()
+	windowEnd := now.Add(24 * time.Hour).UnixMilli()
 	start := 0
-	for start < len(conds) && conds[start].UnixMs < cutoff {
+	for start < len(conds) && conds[start].UnixMs < windowStart {
 		start++
 	}
 	if start >= len(conds) {
 		start = 0
 	}
-	end := min(start+24, len(conds))
+	end := start
+	for end < len(conds) && conds[end].UnixMs < windowEnd {
+		end++
+	}
+	if end == start {
+		end = min(start+24, len(conds))
+	}
 	candles := make([]ConditionCandle, 0, end-start)
 	for _, condition := range conds[start:end] {
 		candles = append(candles, ConditionCandle{
