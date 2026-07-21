@@ -1162,7 +1162,7 @@ func run() {
 			log.Printf("Warning: failed to get default forecast for map: %v", err)
 			forecastdata = ForecastData{}
 		}
-		renderTemplate(c, tmpl, "today.html", MapPageData{ForecastData: forecastdata})
+		renderTemplate(c, tmpl, "map.html", MapPageData{ForecastData: forecastdata})
 	})
 
 	renderFavoritesPage := func(c *gin.Context) {

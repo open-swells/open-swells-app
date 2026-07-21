@@ -122,7 +122,7 @@ func TestNDBCValue(t *testing.T) {
 
 func TestLoadTemplates(t *testing.T) {
 	tmpl := loadTemplates(filepath.Join("..", "web", "templates"))
-	for _, name := range []string{"landing.html", "about.html", "today.html", "favorites.html", "buoy.html", "report", "forecastsummary"} {
+	for _, name := range []string{"landing.html", "about.html", "map.html", "favorites.html", "buoy.html", "report", "forecastsummary"} {
 		if tmpl.Lookup(name) == nil {
 			t.Errorf("template %q not found", name)
 		}
@@ -141,7 +141,7 @@ func TestLoadTemplates(t *testing.T) {
 		}
 	}
 	var mapPage bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&mapPage, "today.html", MapPageData{}); err != nil {
+	if err := tmpl.ExecuteTemplate(&mapPage, "map.html", MapPageData{}); err != nil {
 		t.Fatalf("map template failed to render: %v", err)
 	}
 	if !bytes.Contains(mapPage.Bytes(), []byte("updateUIForSignedInUser(user);")) {
