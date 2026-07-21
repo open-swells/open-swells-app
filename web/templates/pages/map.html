@@ -82,9 +82,7 @@
             transform: translateX(calc(100% + 24px));
             transition: transform 180ms ease;
         }
-        /* The open state must be transform: none, not translateX(0): iOS
-           Safari drops touch scrolling inside a fixed element that keeps an
-           active transform, and none still animates as the identity. */
+        /* Remove the transform after the desktop slide-in completes. */
         #favoritesView.is-open { transform: none; }
         #drawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
         #drawerBackdrop.is-open { opacity: 1; pointer-events: auto; }
@@ -294,6 +292,52 @@
             overscroll-behavior: contain;
             touch-action: pan-y;
         }
+        /* Touch browsers are unreliable when a fixed, transformed element
+           contains a second scrolling element (the old drawer layout used
+           exactly that combination). On phones and touch-first devices,
+           skip the transform and let the fixed drawer itself scroll. The
+           injected favorites content then participates in normal document
+           flow instead of having to resize a nested scroller. */
+        @media (max-width: 767px), (hover: none) and (pointer: coarse) {
+            #favoritesView {
+                display: none;
+                bottom: auto;
+                height: calc(100dvh - 1.5rem - env(safe-area-inset-bottom, 0px));
+                max-height: calc(100dvh - 1.5rem - env(safe-area-inset-bottom, 0px));
+                transform: none;
+                transition: none;
+                overflow-x: hidden;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior-y: contain;
+                touch-action: auto;
+            }
+            /* Block layout is intentional: flex sizing can shrink the
+               asynchronously injected list to the drawer height on WebKit,
+               leaving the outer element with nothing to scroll. */
+            #favoritesView.is-open { display: block; }
+            #favoritesView .drawer-header {
+                position: sticky;
+                top: 0;
+                z-index: 2;
+                background: #18191c;
+            }
+            #favoritesView .drawer-tools {
+                position: sticky;
+                top: 3rem;
+                z-index: 2;
+                flex: none;
+                background: #18191c;
+            }
+            #buoy-containers {
+                display: block;
+                flex: initial;
+                height: auto;
+                min-height: 0;
+                overflow: visible;
+                touch-action: auto;
+            }
+        }
         </style>
     </head>
 
@@ -442,7 +486,7 @@
                                 id="favoritesView" 
                                 class="surface fixed z-40 top-3 bottom-3 right-3 flex flex-col overflow-hidden"
                                 >
-                                <div class="h-12 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
+                                <div class="drawer-header h-12 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
                                     <div><div class="text-sm font-semibold text-white">Favorites</div><div class="text-[11px] text-[#8b8d93]">Live station outlook</div></div>
                                     <button class="icon-button" onclick="closeFavorites()" aria-label="Close favorites"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
                                 </div>

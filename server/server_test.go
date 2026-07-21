@@ -151,18 +151,17 @@ func TestLoadTemplates(t *testing.T) {
 		[]byte("#favoritesView {"),
 		[]byte("flex-direction: column;"),
 		[]byte("#buoy-containers {"),
-		[]byte("flex: 1 1 0%;"),
-		[]byte("height: 0;"),
-		[]byte("#favoritesView.is-open { transform: none; }"),
+		[]byte("@media (max-width: 767px), (hover: none) and (pointer: coarse)"),
+		[]byte("#favoritesView.is-open { display: block; }"),
+		[]byte("overflow-y: auto;"),
+		[]byte("-webkit-overflow-scrolling: touch;"),
+		[]byte("#favoritesView .drawer-header"),
+		[]byte("height: auto;"),
+		[]byte("overflow: visible;"),
 	} {
 		if !bytes.Contains(mapPage.Bytes(), want) {
 			t.Errorf("mobile favorites drawer is missing scroll constraint %q", want)
 		}
-	}
-	// Deprecated on iOS 13+; freezes touch scrolling in containers whose
-	// content is injected after load, like the favorites drawer list.
-	if bytes.Contains(mapPage.Bytes(), []byte("-webkit-overflow-scrolling")) {
-		t.Error("map page reintroduced -webkit-overflow-scrolling, which breaks the mobile favorites drawer")
 	}
 	var landing bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&landing, "landing.html", LandingPageData{SpotCount: 5878, BuoyCount: 178}); err != nil {
