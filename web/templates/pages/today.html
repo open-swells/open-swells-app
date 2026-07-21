@@ -77,8 +77,8 @@
             width: min(460px, calc(100vw - 24px));
             min-height: 0;
             bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-            display: grid;
-            grid-template-rows: auto auto minmax(0, 1fr);
+            display: flex;
+            flex-direction: column;
             transform: translateX(calc(100% + 24px));
             transition: transform 180ms ease;
         }
@@ -275,13 +275,14 @@
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
         .bottom-controls { bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important; }
-        /* A definite minmax(0, 1fr) drawer row plus min-height: 0 here is
-           required for nested momentum scrolling in iOS Safari. Without it,
-           Safari sizes this child to its content and sends the swipe to the
-           fixed, transformed drawer instead of scrolling the list. */
+        /* Give the list a definite zero flex basis and block size. This makes
+           it consume only the drawer's remaining height, which is required
+           for momentum scrolling inside a transformed fixed element on iOS. */
         #buoy-containers {
+            flex: 1 1 0%;
+            height: 0;
             min-height: 0;
-            max-height: 100%;
+            max-height: none;
             overflow-x: hidden;
             overflow-y: scroll;
             -webkit-overflow-scrolling: touch;

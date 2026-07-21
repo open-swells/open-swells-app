@@ -147,6 +147,18 @@ func TestLoadTemplates(t *testing.T) {
 	if !bytes.Contains(mapPage.Bytes(), []byte("updateUIForSignedInUser(user);")) {
 		t.Error("map auth-state listener does not update the account button")
 	}
+	for _, want := range [][]byte{
+		[]byte("#favoritesView {"),
+		[]byte("flex-direction: column;"),
+		[]byte("#buoy-containers {"),
+		[]byte("flex: 1 1 0%;"),
+		[]byte("height: 0;"),
+		[]byte("-webkit-overflow-scrolling: touch;"),
+	} {
+		if !bytes.Contains(mapPage.Bytes(), want) {
+			t.Errorf("mobile favorites drawer is missing scroll constraint %q", want)
+		}
+	}
 	var landing bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&landing, "landing.html", LandingPageData{SpotCount: 5878, BuoyCount: 178}); err != nil {
 		t.Fatalf("landing template failed to render: %v", err)
