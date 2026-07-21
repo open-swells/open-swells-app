@@ -82,7 +82,10 @@
             transform: translateX(calc(100% + 24px));
             transition: transform 180ms ease;
         }
-        #favoritesView.is-open { transform: translateX(0); }
+        /* The open state must be transform: none, not translateX(0): iOS
+           Safari drops touch scrolling inside a fixed element that keeps an
+           active transform, and none still animates as the identity. */
+        #favoritesView.is-open { transform: none; }
         #drawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
         #drawerBackdrop.is-open { opacity: 1; pointer-events: auto; }
         #forecastModal { opacity: 0; pointer-events: none; transition: opacity 150ms ease; }
@@ -275,9 +278,12 @@
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
         .bottom-controls { bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important; }
-        /* Give the list a definite zero flex basis and block size. This makes
-           it consume only the drawer's remaining height, which is required
-           for momentum scrolling inside a transformed fixed element on iOS. */
+        /* Give the list a definite zero flex basis and block size so it
+           consumes only the drawer's remaining height. Do NOT add the legacy
+           WebKit momentum-scrolling property here: it is deprecated, and on
+           modern iOS it freezes touch scrolling in containers that only
+           overflow after content is injected — this list is filled by
+           fetch + innerHTML, which is exactly that case. */
         #buoy-containers {
             flex: 1 1 0%;
             height: 0;
@@ -285,7 +291,6 @@
             max-height: none;
             overflow-x: hidden;
             overflow-y: scroll;
-            -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
             touch-action: pan-y;
         }
