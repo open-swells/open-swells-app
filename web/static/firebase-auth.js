@@ -5,9 +5,9 @@
     const firebaseConfig = {
         apiKey: 'AIzaSyBKZUgrKoU8MxXIm9H0mGubjfL8TANdH5g',
         // Firebase's auth helper is reverse-proxied at /__/auth so auth state
-        // stays first-party on browsers that partition third-party storage.
-        // Local development can use Firebase's default helper without adding
-        // every development port as an OAuth redirect URI.
+        // stays first-party on production browsers that partition third-party
+        // storage. Firebase custom auth domains require HTTPS, so HTTP
+        // localhost uses the project's hosted helper and the popup flow.
         authDomain: localDevelopment ? 'open-swells-89714.firebaseapp.com' : window.location.host,
         projectId: 'open-swells-89714',
         storageBucket: 'open-swells-89714.appspot.com',
@@ -63,7 +63,7 @@
     async function signIn() {
         await redirectReady;
         const provider = new firebase.auth.GoogleAuthProvider();
-        if (isMobileBrowser()) {
+        if (isMobileBrowser() && !localDevelopment) {
             sessionStorage.setItem(returnKey, window.location.pathname + window.location.search + window.location.hash);
             return auth.signInWithRedirect(provider);
         }

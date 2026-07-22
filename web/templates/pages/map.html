@@ -43,10 +43,7 @@
         .view-switch { width: 162px; height: 36px; padding: 4px; }
         .view-switch a { width: 76px; height: 28px; flex: none; }
         #signInBtn.is-user { width: 32px; padding: 0; border: 0; background: transparent; }
-        .drawer-tools { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid #34363b; }
-        .drawer-tool { min-width: 0; height: 42px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #a7a9ae; font-size: 11px; }
-        .drawer-tool + .drawer-tool { border-left: 1px solid #34363b; }
-        .drawer-tool:hover { color: #fff; background: #24252a; }
+        .mobile-account-button { position: absolute; top: calc(100% + 8px); right: 0; }
         .compact-only { display: none; }
         /* Buoy popup card. Styled with plain CSS rather than runtime
            Tailwind utility classes so the buttons hold their size and
@@ -272,6 +269,7 @@
             }
             nav[aria-label="Primary view"] { top: 0.75rem; width: 138px; }
             nav[aria-label="Primary view"] a { width: 65px; }
+            #userPopup { top: calc(100% + 48px); }
         }
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
@@ -320,13 +318,6 @@
                 position: sticky;
                 top: 0;
                 z-index: 2;
-                background: #18191c;
-            }
-            #favoritesView .drawer-tools {
-                position: sticky;
-                top: 3rem;
-                z-index: 2;
-                flex: none;
                 background: #18191c;
             }
             #buoy-containers {
@@ -434,6 +425,9 @@
                 <button id="mobilePanelBtn" class="compact-only icon-button" onclick="toggleFavorites()" aria-expanded="false" aria-label="Open favorites and menu">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
+                <button id="mobileAccountBtn" class="compact-only icon-button surface mobile-account-button" onclick="openDrawerAccount()" aria-label="Sign in" title="Sign in">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                </button>
 
                 <!-- Sign-in Modal -->
                 <div id="signInModal"
@@ -489,11 +483,6 @@
                                 <div class="drawer-header h-12 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
                                     <div><div class="text-sm font-semibold text-white">Favorites</div><div class="text-[11px] text-[#8b8d93]">Live station outlook</div></div>
                                     <button class="icon-button" onclick="closeFavorites()" aria-label="Close favorites"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
-                                </div>
-                                <div class="drawer-tools shrink-0">
-                                    <button class="drawer-tool" onclick="openDrawerAccount()" aria-label="Account"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span id="drawerAccountLabel">Sign in</span></button>
-                                    <a class="drawer-tool" href="/about"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>Info</span></a>
-                                    <a class="drawer-tool" href="https://github.com/open-swells/open-swells-app"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.87c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.55 9.55 0 0 1 12 6.82a9.5 9.5 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.77c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg><span>GitHub</span></a>
                                 </div>
                                 <div 
                                 id="buoy-containers" 
@@ -788,13 +777,15 @@
                     signInBtn.onclick = () => document.getElementById('userPopup').classList.remove('hidden');
                     document.getElementById('userName').textContent = user.displayName;
                     document.getElementById('userEmail').textContent = user.email;
-                    document.getElementById('drawerAccountLabel').textContent = 'Account';
+                    document.getElementById('mobileAccountBtn').setAttribute('aria-label', 'Open account');
+                    document.getElementById('mobileAccountBtn').title = 'Account';
                 } else {
                     // User is signed out
                     signInBtn.classList.remove('is-user');
                     signInBtn.innerHTML = 'Sign In';
                     signInBtn.onclick = () => document.getElementById('signInModal').classList.remove('hidden');
-                    document.getElementById('drawerAccountLabel').textContent = 'Sign in';
+                    document.getElementById('mobileAccountBtn').setAttribute('aria-label', 'Sign in');
+                    document.getElementById('mobileAccountBtn').title = 'Sign in';
                 }
                 document.getElementById('signInModal').classList.add('hidden');
             }
@@ -1015,7 +1006,7 @@
             const HEATMAP_FADE_MS = 550;
             const HEATMAP_OVERLAP_MS = 180;
             const TRANSPARENT_PX =
-                'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNgYGD4DwABBAEAX+XLSgAAAABJRU5ErkJggg==';
+                'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
             let heatmapBounds = null; // set from metadata.json
             let heatmapReady = false;
             let swellLayersReady = false;

@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/base64"
+	"image/png"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -146,6 +148,22 @@ func TestLoadTemplates(t *testing.T) {
 	}
 	if !bytes.Contains(mapPage.Bytes(), []byte("updateUIForSignedInUser(user);")) {
 		t.Error("map auth-state listener does not update the account button")
+	}
+	const imagePrefix = "data:image/png;base64,"
+	imageStart := bytes.Index(mapPage.Bytes(), []byte(imagePrefix))
+	if imageStart < 0 {
+		t.Error("map template is missing its placeholder PNG")
+	} else {
+		encoded := mapPage.Bytes()[imageStart+len(imagePrefix):]
+		if imageEnd := bytes.IndexByte(encoded, '\''); imageEnd >= 0 {
+			encoded = encoded[:imageEnd]
+		}
+		decoded, err := base64.StdEncoding.DecodeString(string(encoded))
+		if err != nil {
+			t.Errorf("map placeholder PNG has invalid base64: %v", err)
+		} else if _, err := png.DecodeConfig(bytes.NewReader(decoded)); err != nil {
+			t.Errorf("map placeholder PNG cannot be decoded: %v", err)
+		}
 	}
 	for _, want := range [][]byte{
 		[]byte("#favoritesView {"),
