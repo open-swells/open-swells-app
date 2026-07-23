@@ -43,12 +43,67 @@
         .favorites-filter-button:hover { z-index: 1; color: #fff; background: #202125; }
         #filterBuoys[aria-pressed="true"] { z-index: 2; color: #c8ceff; border-color: #8e97e8; background: #252641; }
         #filterBeaches[aria-pressed="true"] { z-index: 2; color: #ffc38f; border-color: #f0a05a; background: #34271d; }
+        .mobile-favorites-filter { display: none; position: relative; }
+        .mobile-filter-trigger {
+            width: 34px; height: 34px; position: relative;
+            display: inline-flex; align-items: center; justify-content: center;
+            border: 1px solid #3b3d42; background: #202125; color: #a7a9ae;
+        }
+        .mobile-filter-trigger:hover, .mobile-filter-trigger[aria-expanded="true"], .mobile-filter-trigger.has-filters {
+            color: #fff; border-color: #565961; background: #2a2c30;
+        }
+        .mobile-filter-count {
+            position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px;
+            display: none; place-items: center; padding: 0 4px;
+            border: 2px solid #0f1012; border-radius: 999px;
+            background: #6d78de; color: #fff; font: 600 8px/1 'JetBrains Mono', monospace;
+        }
+        .mobile-filter-trigger.has-filters .mobile-filter-count { display: grid; }
+        .mobile-filter-menu {
+            position: absolute; top: calc(100% + 8px); left: 0; z-index: 35;
+            width: min(280px, calc(100vw - 32px)); padding: 5px;
+            background: #18191c; border: 1px solid #3b3d42;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
+        }
+        .mobile-filter-menu[hidden] { display: none; }
+        .mobile-filter-menu-head {
+            height: 36px; padding: 0 8px 0 9px;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid #2b2d31;
+        }
+        .mobile-filter-section { padding: 10px 8px 8px; }
+        .mobile-filter-section + .mobile-filter-section { border-top: 1px solid #2b2d31; }
+        .mobile-filter-label {
+            display: block; margin-bottom: 7px;
+            color: #777a81; font-size: 9px; font-weight: 600;
+            letter-spacing: .08em; text-transform: uppercase;
+        }
+        .mobile-filter-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .mobile-filter-options.sort-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .mobile-filter-option {
+            min-height: 34px; margin-left: -1px;
+            display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+            border: 1px solid #3b3d42; background: transparent;
+            color: #92949a; font-size: 11px; font-weight: 500;
+        }
+        .mobile-filter-option:first-child { margin-left: 0; }
+        .mobile-filter-option:hover { position: relative; z-index: 1; color: #fff; background: #202125; }
+        .mobile-filter-option[aria-pressed="true"] {
+            position: relative; z-index: 2; color: #fff;
+            border-color: #6d78de; background: #292c4d;
+        }
+        .mobile-filter-option.option-buoy[aria-pressed="true"] { color: #c8ceff; border-color: #8e97e8; background: #252641; }
+        .mobile-filter-option.option-beach[aria-pressed="true"] { color: #ffc38f; border-color: #f0a05a; background: #34271d; }
+        .mobile-filter-clear { color: #8f9bff; font-size: 10px; font-weight: 500; }
+        .mobile-filter-clear:hover { color: #b9c0ff; }
         .favorite-filter-hidden { display: none !important; }
         .skeleton { height: 132px; border: 1px solid #34363b; background: linear-gradient(90deg, #18191c 25%, #202125 50%, #18191c 75%); background-size: 200% 100%; animation: pulse 1.4s infinite; }
         .skeleton + .skeleton { border-top: 0; }
         @keyframes pulse { to { background-position: -200% 0; } }
         @media (max-width: 760px) {
             .brand-word { display: none; }
+            .desktop-favorites-filter { display: none; }
+            .mobile-favorites-filter { display: block; }
         }
         /* iOS Safari auto-zooms focused inputs whose font size is below 16px. */
         @media (pointer: coarse) {
@@ -91,14 +146,49 @@
             <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-3">
                     <p id="favoriteCount" class="mono text-[10px] uppercase tracking-wide text-[#8b8d93]">Loading saved locations…</p>
-                    <div id="favoritesFilters" class="hidden" role="group" aria-label="Filter saved locations">
-                        <div class="favorites-filter">
+                    <div id="favoritesFilters" class="hidden relative">
+                        <div class="favorites-filter desktop-favorites-filter" role="group" aria-label="Filter saved locations">
                             <button id="filterBuoys" class="favorites-filter-button" type="button" aria-pressed="false" aria-controls="favoritesGrid" onclick="setFavoritesFilter('buoy')">
                                 Buoys <span id="filterBuoyCount" class="mono text-[9px]">0</span>
                             </button>
                             <button id="filterBeaches" class="favorites-filter-button" type="button" aria-pressed="false" aria-controls="favoritesGrid" onclick="setFavoritesFilter('spot')">
                                 Beaches <span id="filterBeachCount" class="mono text-[9px]">0</span>
                             </button>
+                        </div>
+                        <div id="mobileFavoritesFilter" class="mobile-favorites-filter">
+                            <button id="mobileFilterTrigger" class="mobile-filter-trigger" type="button"
+                                    aria-expanded="false" aria-controls="mobileFavoritesFilterMenu"
+                                    aria-label="Filter and sort saved locations" onclick="toggleFavoritesFilterMenu()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                    <path d="M4 6h16M7 12h10M10 18h4"/>
+                                </svg>
+                                <span id="mobileFilterCount" class="mobile-filter-count">0</span>
+                            </button>
+                            <div id="mobileFavoritesFilterMenu" class="mobile-filter-menu" hidden>
+                                <div class="mobile-filter-menu-head">
+                                    <span class="text-[11px] font-semibold text-white">Filter favorites</span>
+                                    <button class="mobile-filter-clear" type="button" onclick="clearFavoritesFilters()">Reset</button>
+                                </div>
+                                <div class="mobile-filter-section">
+                                    <span class="mobile-filter-label">Location type</span>
+                                    <div class="mobile-filter-options" role="group" aria-label="Location type">
+                                        <button id="mobileFilterAll" class="mobile-filter-option" type="button" aria-pressed="true" onclick="setFavoritesFilter('all')">All</button>
+                                        <button id="mobileFilterBuoys" class="mobile-filter-option option-buoy" type="button" aria-pressed="false" onclick="setFavoritesFilter('buoy')">
+                                            Buoys <span id="mobileFilterBuoyCount" class="mono text-[8px]">0</span>
+                                        </button>
+                                        <button id="mobileFilterBeaches" class="mobile-filter-option option-beach" type="button" aria-pressed="false" onclick="setFavoritesFilter('spot')">
+                                            Beaches <span id="mobileFilterBeachCount" class="mono text-[8px]">0</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mobile-filter-section">
+                                    <span class="mobile-filter-label">Order</span>
+                                    <div class="mobile-filter-options sort-options" role="group" aria-label="Sort saved locations">
+                                        <button id="mobileSortDefault" class="mobile-filter-option" type="button" aria-pressed="true" onclick="setFavoritesSort('default')">Saved order</button>
+                                        <button id="mobileSortName" class="mobile-filter-option" type="button" aria-pressed="false" onclick="setFavoritesSort('name')">Name A–Z</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -161,6 +251,7 @@
         let directory = [];
         let directoryLoaded = false;
         let favoritesFilter = 'all';
+        let favoritesSort = 'default';
 
         const escapeHTML = (value) => String(value || '').replace(/[&<>'"]/g, char => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -231,8 +322,32 @@
         }
 
         function setFavoritesFilter(type) {
-            favoritesFilter = favoritesFilter === type ? 'all' : type;
+            favoritesFilter = favoritesFilter === type && type !== 'all' ? 'all' : type;
             applyFavoritesFilter();
+        }
+
+        function setFavoritesSort(order) {
+            favoritesSort = order;
+            applyFavoritesFilter();
+        }
+
+        function clearFavoritesFilters() {
+            favoritesFilter = 'all';
+            favoritesSort = 'default';
+            applyFavoritesFilter();
+        }
+
+        function toggleFavoritesFilterMenu() {
+            const trigger = document.getElementById('mobileFilterTrigger');
+            const menu = document.getElementById('mobileFavoritesFilterMenu');
+            const opening = menu.hidden;
+            menu.hidden = !opening;
+            trigger.setAttribute('aria-expanded', String(opening));
+        }
+
+        function closeFavoritesFilterMenu() {
+            document.getElementById('mobileFavoritesFilterMenu').hidden = true;
+            document.getElementById('mobileFilterTrigger').setAttribute('aria-expanded', 'false');
         }
 
         function applyFavoritesFilter() {
@@ -240,13 +355,39 @@
             const empty = document.getElementById('favoritesFilterEmpty');
             document.getElementById('filterBuoys').setAttribute('aria-pressed', String(favoritesFilter === 'buoy'));
             document.getElementById('filterBeaches').setAttribute('aria-pressed', String(favoritesFilter === 'spot'));
+            document.getElementById('mobileFilterAll').setAttribute('aria-pressed', String(favoritesFilter === 'all'));
+            document.getElementById('mobileFilterBuoys').setAttribute('aria-pressed', String(favoritesFilter === 'buoy'));
+            document.getElementById('mobileFilterBeaches').setAttribute('aria-pressed', String(favoritesFilter === 'spot'));
+            document.getElementById('mobileSortDefault').setAttribute('aria-pressed', String(favoritesSort === 'default'));
+            document.getElementById('mobileSortName').setAttribute('aria-pressed', String(favoritesSort === 'name'));
+
+            const rows = [...grid.querySelectorAll('[data-favorite-type]')];
+            rows.forEach((row, index) => {
+                if (!row.dataset.favoriteOrder) row.dataset.favoriteOrder = String(index);
+            });
+            rows.sort((left, right) => {
+                if (favoritesSort === 'name') {
+                    const leftName = left.querySelector('.favorite-name')?.textContent.trim() || '';
+                    const rightName = right.querySelector('.favorite-name')?.textContent.trim() || '';
+                    return leftName.localeCompare(rightName, undefined, { sensitivity: 'base' });
+                }
+                return Number(left.dataset.favoriteOrder) - Number(right.dataset.favoriteOrder);
+            }).forEach(row => row.parentElement.appendChild(row));
 
             let visibleRows = 0;
-            grid.querySelectorAll('[data-favorite-type]').forEach(row => {
+            rows.forEach(row => {
                 const visible = favoritesFilter === 'all' || row.dataset.favoriteType === favoritesFilter;
                 row.classList.toggle('favorite-filter-hidden', !visible);
                 if (visible) visibleRows++;
             });
+
+            const activeCount = Number(favoritesFilter !== 'all') + Number(favoritesSort !== 'default');
+            const trigger = document.getElementById('mobileFilterTrigger');
+            trigger.classList.toggle('has-filters', activeCount > 0);
+            trigger.setAttribute('aria-label', activeCount
+                ? `Filter and sort saved locations, ${activeCount} active`
+                : 'Filter and sort saved locations');
+            document.getElementById('mobileFilterCount').textContent = activeCount;
 
             const filtered = favoritesFilter !== 'all';
             empty.classList.toggle('hidden', !filtered || visibleRows > 0);
@@ -262,6 +403,7 @@
             const grid = document.getElementById('favoritesGrid');
             const filters = document.getElementById('favoritesFilters');
             const filterEmpty = document.getElementById('favoritesFilterEmpty');
+            closeFavoritesFilterMenu();
             document.getElementById('signedOutState').classList.toggle('hidden', !!user);
             grid.style.display = user ? 'block' : 'none';
             if (!user) {
@@ -286,8 +428,10 @@
                 document.getElementById('favoriteCount').textContent = `${count} saved ${count === 1 ? 'location' : 'locations'}`;
                 document.getElementById('filterBuoyCount').textContent = userBuoys.length;
                 document.getElementById('filterBeachCount').textContent = userSpots.length;
+                document.getElementById('mobileFilterBuoyCount').textContent = userBuoys.length;
+                document.getElementById('mobileFilterBeachCount').textContent = userSpots.length;
                 filters.classList.toggle('hidden', count === 0);
-                if (count === 0) favoritesFilter = 'all';
+                if (count === 0) clearFavoritesFilters();
                 applyFavoritesFilter();
                 if (directoryLoaded) renderSearchResults();
             } catch (error) {
@@ -508,7 +652,16 @@
         document.getElementById('signOutBtn').addEventListener('click', () => openSwellsAuth.signOut());
         document.getElementById('signInModal').addEventListener('click', event => { if (event.target.id === 'signInModal') closeSignIn(); });
         document.getElementById('searchModal').addEventListener('click', event => { if (event.target.id === 'searchModal') closeLocationSearch(); });
-        document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeSignIn(); closeLocationSearch(); } });
+        document.addEventListener('click', event => {
+            if (!document.getElementById('mobileFavoritesFilter').contains(event.target)) closeFavoritesFilterMenu();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                closeSignIn();
+                closeLocationSearch();
+                closeFavoritesFilterMenu();
+            }
+        });
         window.addEventListener('popstate', () => location.pathname.endsWith('/search') ? openLocationSearch(false) : closeLocationSearch(false));
 
         openSwellsAuth.auth.onAuthStateChanged(user => {

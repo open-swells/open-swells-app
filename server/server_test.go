@@ -149,6 +149,11 @@ func TestLoadTemplates(t *testing.T) {
 		[]byte("function applyFavoritesFilter()"),
 		[]byte("row.dataset.favoriteType === favoritesFilter"),
 		[]byte("favorite-filter-hidden"),
+		[]byte("id=\"mobileFilterTrigger\""),
+		[]byte("id=\"mobileFavoritesFilterMenu\""),
+		[]byte("onclick=\"setFavoritesFilter('all')\""),
+		[]byte("onclick=\"setFavoritesSort('name')\""),
+		[]byte("function closeFavoritesFilterMenu()"),
 	} {
 		if !bytes.Contains(favorites.Bytes(), want) {
 			t.Errorf("favorites page is missing location filter behavior %q", want)
