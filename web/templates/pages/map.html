@@ -37,13 +37,11 @@
         .toolbar-button:hover, .toolbar-button[aria-expanded="true"] { background: #2a2c30; color: #fff; }
         .top-menu { min-height: 44px; padding: 5px; gap: 3px; }
         .top-menu .toolbar-button { height: 34px; padding-inline: 11px; }
-        .favorites-menu-button { background: #24252a; border: 1px solid #3b3d42; }
-        .favorites-menu-button svg { color: #8f9bff; }
-        .favorites-menu-count { min-width: 17px; height: 17px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; background: #343650; color: #c8ceff; font-family: 'JetBrains Mono', monospace; font-size: 9px; }
         .view-switch { width: 162px; height: 36px; padding: 4px; }
         .view-switch a { width: 76px; height: 28px; flex: none; }
         #signInBtn.is-user { width: 32px; padding: 0; border: 0; background: transparent; }
-        .mobile-account-button { position: absolute; top: calc(100% + 8px); right: 0; }
+        .mobile-account-button { flex: none; }
+        .mobile-account-button img { width: 24px; height: 24px; border-radius: 999px; }
         .compact-only { display: none; }
         /* Buoy popup card. Styled with plain CSS rather than runtime
            Tailwind utility classes so the buttons hold their size and
@@ -70,19 +68,24 @@
         }
         .search-badge-buoy { color: #8e97e8; }
         .search-badge-beach { color: #f0a05a; }
-        #favoritesView {
-            width: min(460px, calc(100vw - 24px));
-            min-height: 0;
-            bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-            display: flex;
-            flex-direction: column;
-            transform: translateX(calc(100% + 24px));
-            transition: transform 180ms ease;
+        .search-favorite-star { font-size: 14px; line-height: 1; }
+        .favorite-star-buoy { color: #8e97e8; }
+        .favorite-star-beach { color: #f0a05a; }
+        /* Favorites are a small, final DOM-marker pass above MapLibre's
+           canvas layers and ordinary markers. */
+        .favorite-map-marker {
+            z-index: 30;
+            width: 28px; height: 28px;
+            display: grid; place-items: center;
+            cursor: pointer;
         }
-        /* Remove the transform after the desktop slide-in completes. */
-        #favoritesView.is-open { transform: none; }
-        #drawerBackdrop { opacity: 0; pointer-events: none; transition: opacity 180ms ease; }
-        #drawerBackdrop.is-open { opacity: 1; pointer-events: auto; }
+        .favorite-map-marker svg {
+            width: 25px; height: 25px;
+            filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .65));
+            transition: transform 120ms ease;
+        }
+        .favorite-map-marker:hover svg { transform: scale(1.14); }
+        .buoy-marker.has-favorite-overlay .buoy-marker-dot { opacity: 0; }
         #forecastModal { opacity: 0; pointer-events: none; transition: opacity 150ms ease; }
         #forecastModal.is-open { opacity: 1; pointer-events: auto; }
         #forecastDialog { transform: translateY(8px) scale(.99); transition: transform 150ms ease; }
@@ -269,66 +272,10 @@
             }
             nav[aria-label="Primary view"] { top: 0.75rem; width: 138px; }
             nav[aria-label="Primary view"] a { width: 65px; }
-            #userPopup { top: calc(100% + 48px); }
         }
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
         .bottom-controls { bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important; }
-        /* Give the list a definite zero flex basis and block size so it
-           consumes only the drawer's remaining height. Do NOT add the legacy
-           WebKit momentum-scrolling property here: it is deprecated, and on
-           modern iOS it freezes touch scrolling in containers that only
-           overflow after content is injected — this list is filled by
-           fetch + innerHTML, which is exactly that case. */
-        #buoy-containers {
-            flex: 1 1 0%;
-            height: 0;
-            min-height: 0;
-            max-height: none;
-            overflow-x: hidden;
-            overflow-y: scroll;
-            overscroll-behavior: contain;
-            touch-action: pan-y;
-        }
-        /* Touch browsers are unreliable when a fixed, transformed element
-           contains a second scrolling element (the old drawer layout used
-           exactly that combination). On phones and touch-first devices,
-           skip the transform and let the fixed drawer itself scroll. The
-           injected favorites content then participates in normal document
-           flow instead of having to resize a nested scroller. */
-        @media (max-width: 767px), (hover: none) and (pointer: coarse) {
-            #favoritesView {
-                display: none;
-                bottom: auto;
-                height: calc(100dvh - 1.5rem - env(safe-area-inset-bottom, 0px));
-                max-height: calc(100dvh - 1.5rem - env(safe-area-inset-bottom, 0px));
-                transform: none;
-                transition: none;
-                overflow-x: hidden;
-                overflow-y: auto;
-                -webkit-overflow-scrolling: touch;
-                overscroll-behavior-y: contain;
-                touch-action: auto;
-            }
-            /* Block layout is intentional: flex sizing can shrink the
-               asynchronously injected list to the drawer height on WebKit,
-               leaving the outer element with nothing to scroll. */
-            #favoritesView.is-open { display: block; }
-            #favoritesView .drawer-header {
-                position: sticky;
-                top: 0;
-                z-index: 2;
-                background: #18191c;
-            }
-            #buoy-containers {
-                display: block;
-                flex: initial;
-                height: auto;
-                min-height: 0;
-                overflow: visible;
-                touch-action: auto;
-            }
-        }
         </style>
     </head>
 
@@ -388,9 +335,6 @@
 
             <!-- Icons -->
             <div class="icons surface top-menu relative ml-auto flex items-center min-w-fit">
-                <button id="showFavoritesBtn" class="desktop-only toolbar-button favorites-menu-button" onclick="toggleFavorites()" aria-expanded="false" title="Favorites">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z"/></svg><span class="hidden sm:inline">Favorites</span><span id="favoritesMenuCount" class="favorites-menu-count hidden">0</span>
-                </button>
                 <a href="/about" class="desktop-only icon-button" title="About">
                     <svg xmlns="http://www.w3.org/2000/svg" 
                          viewBox="0 0 24 24" fill="none" stroke="currentColor" 
@@ -422,10 +366,7 @@
                 <a href="#" id="signInBtn" class="desktop-only toolbar-button profile-control border-0 bg-transparent">
                     Sign In
                 </a>
-                <button id="mobilePanelBtn" class="compact-only icon-button" onclick="toggleFavorites()" aria-expanded="false" aria-label="Open favorites and menu">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-                </button>
-                <button id="mobileAccountBtn" class="compact-only icon-button surface mobile-account-button" onclick="openDrawerAccount()" aria-label="Sign in" title="Sign in">
+                <button id="mobileAccountBtn" class="compact-only icon-button mobile-account-button" onclick="openMobileAccount()" aria-label="Sign in" title="Sign in">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
                 </button>
 
@@ -472,25 +413,6 @@
             </div>
         </div>
         <!-- End Header -->
-
-
-            <div id="drawerBackdrop" class="fixed inset-0 z-[35] bg-black/25" onclick="closeFavorites()"></div>
-            <!-- Favorites drawer -->
-            <div 
-                                id="favoritesView" 
-                                class="surface fixed z-40 top-3 bottom-3 right-3 flex flex-col overflow-hidden"
-                                >
-                                <div class="drawer-header h-12 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
-                                    <div><div class="text-sm font-semibold text-white">Favorites</div><div class="text-[11px] text-[#8b8d93]">Live station outlook</div></div>
-                                    <button class="icon-button" onclick="closeFavorites()" aria-label="Close favorites"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
-                                </div>
-                                <div 
-                                id="buoy-containers" 
-                                class="favorites flex-1 overflow-auto bg-[#18191c] p-2"
-                                >
-                                <!-- Favorites content goes here -->
-                                </div>
-            </div>
 
             <!-- Forecast dialog -->
             <div id="forecastModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px] flex items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-labelledby="forecastModalTitle">
@@ -559,27 +481,7 @@
 
 
             <script>
-                function toggleFavorites() {
-                    const drawer = document.getElementById('favoritesView');
-                    drawer.classList.contains('is-open') ? closeFavorites() : openFavorites();
-                }
-
-                function openFavorites() {
-                    document.getElementById('favoritesView').classList.add('is-open');
-                    document.getElementById('drawerBackdrop').classList.add('is-open');
-                    document.getElementById('showFavoritesBtn').setAttribute('aria-expanded', 'true');
-                    document.getElementById('mobilePanelBtn').setAttribute('aria-expanded', 'true');
-                }
-
-                function closeFavorites() {
-                    document.getElementById('favoritesView').classList.remove('is-open');
-                    document.getElementById('drawerBackdrop').classList.remove('is-open');
-                    document.getElementById('showFavoritesBtn').setAttribute('aria-expanded', 'false');
-                    document.getElementById('mobilePanelBtn').setAttribute('aria-expanded', 'false');
-                }
-
-                function openDrawerAccount() {
-                    closeFavorites();
+                function openMobileAccount() {
                     document.getElementById('signInBtn').click();
                 }
 
@@ -588,7 +490,6 @@
                 let activeForecastFavorite = null;
 
                 function openModalFrame(url, title, subtitle, favorite = null) {
-                    closeFavorites();
                     const modal = document.getElementById('forecastModal');
                     const frame = document.getElementById('forecastFrame');
                     document.getElementById('forecastModalTitle').textContent = title;
@@ -659,7 +560,6 @@
                 document.addEventListener('keydown', (event) => {
                     if (event.key !== 'Escape') return;
                     if (document.getElementById('forecastModal').classList.contains('is-open')) closeForecast();
-                    else closeFavorites();
                 });
 
                 document.getElementById('forecastModal').addEventListener('click', (event) => {
@@ -676,7 +576,11 @@
         <script> 
             let userBuoys = [];
             let userSpots = [];
+            let currentBuoy = {};
+            let buoyData = [];
+            let spotData = []; // surf spots from /api/spots, feeds search
             const popupMap = new Map(); // Use a Map to store popups by their ID
+            const favoriteMapMarkers = new Map();
 
             // All per-user API calls authenticate with the Firebase ID token;
             // the server derives the uid from the verified token.
@@ -684,69 +588,41 @@
                 return openSwellsAuth.authFetch(url, options);
             }
 
-            async function loadForecastSummary() {
+            async function loadUserFavorites() {
                 try {
-                    const summaryResponse = await authFetch('/forecast-summary');
+                    const favoritesResponse = await authFetch('/api/favorites');
 
-                    if (!summaryResponse.ok) {
-                        console.log("Error: Could not load forecast summary");
-                        throw new Error('Failed to load forecast summary');
+                    if (!favoritesResponse.ok) {
+                        throw new Error('Failed to load user favorites');
                     }
 
-                    const html = await summaryResponse.text();
-                    document.getElementById('buoy-containers').innerHTML = html;
-
-                } catch (error) {
-                    console.error('Error loading forecast summary:', error);
-                    document.getElementById('buoy-containers').innerHTML =
-                        '<p>Failed to load forecast summary. Please try again later.</p>';
-                }
-            }
-
-            async function loadUserBuoys() {
-                try {
-                    const userBuoysResponse = await authFetch('/api/favorites');
-
-                    if (!userBuoysResponse.ok) {
-                        console.log("Error: Could not load user buoys");
-                        throw new Error('Failed to load user buoys');
-                    }
-
-                    const favoritesData = await userBuoysResponse.json();
+                    const favoritesData = await favoritesResponse.json();
                     userBuoys = favoritesData.buoys || [];
                     userSpots = favoritesData.spots || [];
-
-                    updateFavoritesMenuCount();
-
-                    console.log('User buoys:', userBuoys, 'user spots:', userSpots);
                 } catch (error) {
-                    console.error('Error loading user buoys:', error);
+                    console.error('Error loading user favorites:', error);
                     userBuoys = [];
                     userSpots = [];
-                    document.getElementById('favoritesMenuCount').classList.add('hidden');
                 }
+                syncFavoritePresentation();
             }
 
-            function updateFavoritesMenuCount() {
-                const count = userBuoys.length + userSpots.length;
-                const countBadge = document.getElementById('favoritesMenuCount');
-                countBadge.textContent = count;
-                countBadge.classList.toggle('hidden', count === 0);
+            function syncFavoritePresentation() {
                 syncForecastPageFavorite();
+                refreshFavoriteMapMarkers();
+                refreshSearchResults();
             }
+
             // Wait for Firebase authentication
             document.addEventListener('DOMContentLoaded', () => {
                 openSwellsAuth.auth.onAuthStateChanged(async (user) => {
                     updateUIForSignedInUser(user);
                     if (user) {
-                        await loadForecastSummary();
-                        await loadUserBuoys();
-                        // Update all popup contents after loading user buoys
+                        await loadUserFavorites();
                     } else {
-                        console.log('User not signed in.');
-                        document.getElementById('favoritesMenuCount').classList.add('hidden');
-                        document.getElementById('buoy-containers').innerHTML =
-                            '<p class="dark:text-white">Please sign in to view your favorite buoys.</p>';
+                        userBuoys = [];
+                        userSpots = [];
+                        syncFavoritePresentation();
                     }
                 });
             });
@@ -761,6 +637,8 @@
 
             function updateUIForSignedInUser(user) {
                 const signInBtn = document.getElementById('signInBtn');
+                const mobileAccountBtn = document.getElementById('mobileAccountBtn');
+                mobileAccountBtn.replaceChildren();
                 if (user) {
                     // User is signed in
                     signInBtn.classList.add('is-user');
@@ -777,15 +655,24 @@
                     signInBtn.onclick = () => document.getElementById('userPopup').classList.remove('hidden');
                     document.getElementById('userName').textContent = user.displayName;
                     document.getElementById('userEmail').textContent = user.email;
-                    document.getElementById('mobileAccountBtn').setAttribute('aria-label', 'Open account');
-                    document.getElementById('mobileAccountBtn').title = 'Account';
+                    if (user.photoURL) {
+                        const mobileProfileImage = document.createElement('img');
+                        mobileProfileImage.src = user.photoURL;
+                        mobileProfileImage.alt = '';
+                        mobileAccountBtn.appendChild(mobileProfileImage);
+                    } else {
+                        mobileAccountBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+                    }
+                    mobileAccountBtn.setAttribute('aria-label', 'Open account');
+                    mobileAccountBtn.title = 'Account';
                 } else {
                     // User is signed out
                     signInBtn.classList.remove('is-user');
                     signInBtn.innerHTML = 'Sign In';
                     signInBtn.onclick = () => document.getElementById('signInModal').classList.remove('hidden');
-                    document.getElementById('mobileAccountBtn').setAttribute('aria-label', 'Sign in');
-                    document.getElementById('mobileAccountBtn').title = 'Sign in';
+                    mobileAccountBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+                    mobileAccountBtn.setAttribute('aria-label', 'Sign in');
+                    mobileAccountBtn.title = 'Sign in';
                 }
                 document.getElementById('signInModal').classList.add('hidden');
             }
@@ -804,7 +691,7 @@
                     document.getElementById('userPopup').classList.add('hidden');
                     userBuoys = [];
                     userSpots = [];
-                    document.getElementById('favoritesMenuCount').classList.add('hidden');
+                    syncFavoritePresentation();
                 });
             });
 
@@ -1640,28 +1527,6 @@
             map.setCenter([-119.069824, 33.101608]);
             map.setZoom(3);
 
-
-
-
-            async function addBuoyToFavorites(stationId) {
-                const user = openSwellsAuth.auth.currentUser;
-                if (!user) {
-                    alert('Please sign in to add favorites');
-                    return;
-                }
-                try {
-                    const response = await authFetch(`/api/favorites/${stationId}`, { method: 'POST' });
-                    if (!response.ok) {
-                        throw new Error('Failed to add buoy to favorites');
-                    }
-                    alert('Buoy added to favorites');
-                } catch (error) {
-                    console.error('Error:', error);
-                    alert('Failed to add buoy to favorites');
-                }
-            }
-
-
             // Function to update favorite button appearance (buoy popups
             // carry data-station-id, spot popups data-spot-id)
             function updateFavoriteButton(button) {
@@ -1742,12 +1607,58 @@
                     // Store marker reference on the element
                     el._marker = marker;
                 });
+                refreshFavoriteMapMarkers();
+                refreshSearchResults();
+            }
+
+            function favoriteMarkerElement(match) {
+                const el = document.createElement('div');
+                el.className = `favorite-map-marker favorite-star-${match.type === 'buoy' ? 'buoy' : 'beach'}`;
+                el.title = `Favorite: ${match.name}`;
+                el.setAttribute('role', 'button');
+                el.setAttribute('tabindex', '0');
+                el.setAttribute('aria-label', `Open favorite ${match.name}`);
+                el.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.85 5.78 6.38.93-4.62 4.5 1.09 6.36L12 17.4l-5.7 3 1.09-6.37-4.62-4.5 6.38-.93L12 2.8Z" fill="currentColor" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
+                const open = event => {
+                    event.stopPropagation();
+                    showSearchMatchOnMap(match);
+                };
+                el.addEventListener('click', open);
+                el.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        open(event);
+                    }
+                });
+                return el;
+            }
+
+            function refreshFavoriteMapMarkers() {
+                favoriteMapMarkers.forEach(marker => marker.remove());
+                favoriteMapMarkers.clear();
+                document.querySelectorAll('.buoy-marker.has-favorite-overlay')
+                    .forEach(marker => marker.classList.remove('has-favorite-overlay'));
+
+                const favoriteMatches = [
+                    ...userBuoys.map(id => buoyData.find(buoy => buoy.stationId === id))
+                        .filter(Boolean).map(buoySearchMatch),
+                    ...userSpots.map(id => spotData.find(spot => spot.id === id))
+                        .filter(Boolean).map(spotSearchMatch),
+                ];
+
+                favoriteMatches.forEach(match => {
+                    if (!Number.isFinite(match.lon) || !Number.isFinite(match.lat)) return;
+                    if (match.type === 'buoy') {
+                        document.getElementById(`buoymarker-${match.id}`)?.classList.add('has-favorite-overlay');
+                    }
+                    const marker = new maplibregl.Marker({ element: favoriteMarkerElement(match) })
+                        .setLngLat([match.lon, match.lat])
+                        .addTo(map);
+                    favoriteMapMarkers.set(`${match.type}:${match.id}`, marker);
+                });
             }
 
             async function toggleFavorite(stationId) {
-                console.log(`Toggling favorite for station ID: ${stationId}`);
-                console.log("user buoys here: ", userBuoys);
-                console.log("station id here: ", stationId);
                 const user = openSwellsAuth.auth.currentUser;
                 if (!user) {
                     alert('Please sign in to manage favorites');
@@ -1782,9 +1693,7 @@
                     }
                 }
 
-                // Refresh the favorites display and update popup content
-                updateFavoritesMenuCount();
-                await loadForecastSummary();
+                syncFavoritePresentation();
                 document.querySelectorAll(`.favorite-btn[data-station-id="${CSS.escape(stationId)}"]`)
                     .forEach(updateFavoriteButton);
             }
@@ -1810,18 +1719,13 @@
                     console.error('Error:', error);
                     alert(`Failed to ${isFavorite ? 'remove' : 'add'} favorite`);
                 }
-                updateFavoritesMenuCount();
-                await loadForecastSummary();
+                syncFavoritePresentation();
             }
 
 
             // Stations reporting spectral wave data, refreshed daily from
             // NDBC by the server (see stations.go). Markers and search stay
             // empty until the list arrives.
-            let currentBuoy = {};
-            let buoyData = [];
-            let spotData = []; // surf spots from /api/spots, feeds search
-
             async function loadBuoyStations() {
                 try {
                     const response = await fetch('/api/buoys');
@@ -1856,24 +1760,71 @@
                 if (window.matchMedia('(min-width: 1400px)').matches) closeMobileSearch();
             });
 
-            // Search covers buoys and surf spots; each result is tagged with
-            // its kind. Spots dominate by count (~6k), so buoys list first
-            // and the total is capped.
+            // Search covers buoys and surf spots. An empty focused search
+            // shows favorites; typed searches keep favorite matches first.
             const SEARCH_RESULT_LIMIT = 20;
-            searchInput.addEventListener('input', function(e) {
-                const searchTerm = e.target.value.trim().toLowerCase();
-                if (!searchTerm) {
+
+            function buoySearchMatch(buoy) {
+                return {
+                    type: 'buoy', id: buoy.stationId, name: buoy.name,
+                    sub: buoy.stationId, lat: buoy.latitude, lon: buoy.longitude,
+                    buoy, favorite: userBuoys.includes(buoy.stationId),
+                };
+            }
+
+            function spotSearchMatch(spot) {
+                return {
+                    type: 'spot', id: spot.id, name: spot.name,
+                    sub: spot.region || '', lat: spot.lat, lon: spot.lon,
+                    region: spot.region || '', favorite: userSpots.includes(spot.id),
+                };
+            }
+
+            function searchMatches(searchTerm) {
+                const buoyMatches = buoyData
+                    .filter(buoy => !searchTerm || buoy.name.toLowerCase().includes(searchTerm) || buoy.stationId.toLowerCase().includes(searchTerm))
+                    .map(buoySearchMatch);
+                const spotMatches = spotData
+                    .filter(spot => !searchTerm || spot.name.toLowerCase().includes(searchTerm) || (spot.region || '').toLowerCase().includes(searchTerm))
+                    .map(spotSearchMatch);
+                return [...buoyMatches, ...spotMatches]
+                    .filter(match => searchTerm || match.favorite)
+                    .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name))
+                    .slice(0, SEARCH_RESULT_LIMIT);
+            }
+
+            function refreshSearchResults() {
+                const searchBox = document.getElementById('searchBox');
+                if (document.activeElement !== searchInput && !searchBox.classList.contains('mobile-open')) return;
+                const searchTerm = searchInput.value.trim().toLowerCase();
+                const matches = searchMatches(searchTerm);
+                if (!searchTerm && !matches.length) {
                     document.getElementById('searchResults').innerHTML = '';
                     return;
                 }
-                const buoyMatches = buoyData
-                    .filter(buoy => buoy.name.toLowerCase().includes(searchTerm) || buoy.stationId.toLowerCase().includes(searchTerm))
-                    .map(buoy => ({ type: 'buoy', id: buoy.stationId, name: buoy.name, sub: buoy.stationId, lat: buoy.latitude, lon: buoy.longitude, buoy }));
-                const spotMatches = spotData
-                    .filter(s => s.name.toLowerCase().includes(searchTerm) || (s.region || '').toLowerCase().includes(searchTerm))
-                    .map(s => ({ type: 'spot', id: s.id, name: s.name, sub: s.region || '', lat: s.lat, lon: s.lon, region: s.region || '' }));
-                displayMatches([...buoyMatches, ...spotMatches].slice(0, SEARCH_RESULT_LIMIT));
-            });
+                displayMatches(matches);
+            }
+
+            searchInput.addEventListener('focus', refreshSearchResults);
+            searchInput.addEventListener('input', refreshSearchResults);
+
+            function showSearchMatchOnMap(match) {
+                if (match.type === 'buoy') {
+                    currentBuoy = match.buoy;
+                    const marker = popupMap.get(match.id);
+                    if (marker) {
+                        if (marker.getPopup() && !marker.getPopup().isOpen()) marker.togglePopup();
+                        map.flyTo({ center: [match.lon, match.lat], zoom: 4, offset: [0, -100] });
+                    }
+                    return;
+                }
+
+                map.flyTo({ center: [match.lon, match.lat], zoom: 9.5, offset: [0, -100] });
+                new maplibregl.Popup({ offset: 10, maxWidth: '280px' })
+                    .setLngLat([match.lon, match.lat])
+                    .setHTML(spotPopupHTML({ id: match.id, name: match.name, region: match.region }))
+                    .addTo(map);
+            }
 
             // "/" focuses the search from anywhere; Escape clears and blurs it
             document.addEventListener('keydown', (e) => {
@@ -1911,38 +1862,18 @@
                     const badge = match.type === 'buoy'
                         ? '<span class="search-badge search-badge-buoy shrink-0">Buoy</span>'
                         : '<span class="search-badge search-badge-beach shrink-0">Beach</span>';
+                    const favoriteStar = match.favorite
+                        ? `<span class="search-favorite-star favorite-star-${match.type === 'buoy' ? 'buoy' : 'beach'}" title="Favorite" aria-label="Favorite">&#9733;</span>`
+                        : '';
                     div.innerHTML =
-                        `<span class="text-[13px] text-[#d6d7da] truncate">${esc(match.name)}</span>` +
+                        `<span class="flex items-center gap-2 min-w-0">${favoriteStar}<span class="text-[13px] text-[#d6d7da] truncate">${esc(match.name)}</span></span>` +
                         `<span class="flex items-center gap-2 shrink-0 max-w-[55%]">${badge}` +
                         `<span class="mono text-[10px] text-[#8b8d93] truncate">${esc(match.sub)}</span></span>`;
                     div.onclick = function () {
                         searchResults.innerHTML = '';
                         searchInput.value = match.name;
                         closeMobileSearch();
-
-                        if (match.type === 'buoy') {
-                            currentBuoy = match.buoy;
-                            const marker = popupMap.get(match.id);
-                            if (marker) {
-                                marker.togglePopup();
-                                map.flyTo({
-                                    center: [match.lon, match.lat],
-                                    zoom: 4,
-                                    offset: [0, -100], // Offset to account for the popup
-                                });
-                            } else {
-                                console.warn(`No marker found for stationId: ${match.id}`);
-                            }
-                            return;
-                        }
-
-                        // Spots have no DOM marker: fly in past the cluster
-                        // zoom and open the popup directly.
-                        map.flyTo({ center: [match.lon, match.lat], zoom: 9.5, offset: [0, -100] });
-                        new maplibregl.Popup({ offset: 10, maxWidth: '280px' })
-                            .setLngLat([match.lon, match.lat])
-                            .setHTML(spotPopupHTML({ id: match.id, name: match.name, region: match.region }))
-                            .addTo(map);
+                        showSearchMatchOnMap(match);
                     };
                     searchResults.appendChild(div);
                 });
@@ -2193,25 +2124,6 @@
                 </div>`;
             }
 
-            function showFavoriteOnMap(kind, id, lon, lat) {
-                closeFavorites();
-                if (!Number.isFinite(lon) || !Number.isFinite(lat)) return;
-                map.flyTo({ center: [lon, lat], zoom: kind === 'spot' ? 9.5 : 6, offset: [0, -90] });
-
-                if (kind === 'buoy') {
-                    const marker = popupMap.get(id);
-                    if (marker && marker.getPopup() && !marker.getPopup().isOpen()) marker.togglePopup();
-                    return;
-                }
-
-                const spot = spotData.find(item => item.id === id);
-                if (!spot) return;
-                new maplibregl.Popup({ offset: 10, maxWidth: '280px' })
-                    .setLngLat([lon, lat])
-                    .setHTML(spotPopupHTML(spot))
-                    .addTo(map);
-            }
-
             function addSpotLayers(fc) {
                 if (map.getSource('surf-spots')) return;
                 map.addSource('surf-spots', {
@@ -2282,6 +2194,8 @@
                     if (!response.ok) return;
                     const spots = await response.json();
                     spotData = spots;
+                    refreshFavoriteMapMarkers();
+                    refreshSearchResults();
                     const fc = {
                         type: 'FeatureCollection',
                         features: spots

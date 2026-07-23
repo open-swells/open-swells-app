@@ -166,19 +166,34 @@ func TestLoadTemplates(t *testing.T) {
 		}
 	}
 	for _, want := range [][]byte{
-		[]byte("#favoritesView {"),
-		[]byte("flex-direction: column;"),
-		[]byte("#buoy-containers {"),
-		[]byte("@media (max-width: 767px), (hover: none) and (pointer: coarse)"),
-		[]byte("#favoritesView.is-open { display: block; }"),
-		[]byte("overflow-y: auto;"),
-		[]byte("-webkit-overflow-scrolling: touch;"),
-		[]byte("#favoritesView .drawer-header"),
-		[]byte("height: auto;"),
-		[]byte("overflow: visible;"),
+		[]byte(".search-favorite-star"),
+		[]byte(".favorite-map-marker"),
+		[]byte(".favorite-star-buoy { color: #8e97e8; }"),
+		[]byte(".favorite-star-beach { color: #f0a05a; }"),
+		[]byte("fill=\"currentColor\""),
+		[]byte("const favoriteMapMarkers = new Map();"),
+		[]byte("favorite: userBuoys.includes"),
+		[]byte("favorite: userSpots.includes"),
+		[]byte("Number(b.favorite) - Number(a.favorite)"),
+		[]byte("searchInput.addEventListener('focus', refreshSearchResults);"),
+		[]byte("refreshFavoriteMapMarkers();"),
+		[]byte("id=\"mobileAccountBtn\""),
+		[]byte("onclick=\"openMobileAccount()\""),
 	} {
 		if !bytes.Contains(mapPage.Bytes(), want) {
-			t.Errorf("mobile favorites drawer is missing scroll constraint %q", want)
+			t.Errorf("map favorites search/marker integration is missing %q", want)
+		}
+	}
+	for _, removed := range [][]byte{
+		[]byte("favoritesView"),
+		[]byte("drawerBackdrop"),
+		[]byte("showFavoritesBtn"),
+		[]byte("mobilePanelBtn"),
+		[]byte("loadForecastSummary"),
+		[]byte("/forecast-summary"),
+	} {
+		if bytes.Contains(mapPage.Bytes(), removed) {
+			t.Errorf("map page still contains removed favorites drawer code %q", removed)
 		}
 	}
 	var landing bytes.Buffer
