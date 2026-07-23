@@ -104,7 +104,7 @@
 </div>
 {{else}}
     {{range .Buoys}}
-    <article class="favorite-row">
+    <article class="favorite-row" data-favorite-type="buoy">
         <div class="favorite-left">
             <div class="favorite-head">
                 <div class="min-w-0">
@@ -156,7 +156,7 @@
     {{end}}
 
     {{range .Spots}}
-    <article class="favorite-row">
+    <article class="favorite-row" data-favorite-type="spot">
         <div class="favorite-left">
             <div class="favorite-head">
                 <div class="min-w-0">

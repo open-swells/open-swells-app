@@ -32,6 +32,18 @@
         .location-badge { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
         .location-badge-buoy { color: #8e97e8; }
         .location-badge-beach { color: #f0a05a; }
+        .favorites-filter { display: inline-flex; align-items: center; }
+        .favorites-filter-button {
+            position: relative; min-width: 92px; height: 32px;
+            display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+            border: 1px solid #3b3d42; background: transparent;
+            color: #8b8d93; font-size: 11px; font-weight: 500;
+        }
+        .favorites-filter-button + .favorites-filter-button { margin-left: -1px; }
+        .favorites-filter-button:hover { z-index: 1; color: #fff; background: #202125; }
+        #filterBuoys[aria-pressed="true"] { z-index: 2; color: #c8ceff; border-color: #8e97e8; background: #252641; }
+        #filterBeaches[aria-pressed="true"] { z-index: 2; color: #ffc38f; border-color: #f0a05a; background: #34271d; }
+        .favorite-filter-hidden { display: none !important; }
         .skeleton { height: 132px; border: 1px solid #34363b; background: linear-gradient(90deg, #18191c 25%, #202125 50%, #18191c 75%); background-size: 200% 100%; animation: pulse 1.4s infinite; }
         .skeleton + .skeleton { border-top: 0; }
         @keyframes pulse { to { background-position: -200% 0; } }
@@ -76,8 +88,20 @@
 
     <main class="max-w-[1440px] mx-auto px-4 sm:px-6 py-5 sm:py-7">
         <section>
-            <div class="mb-3 flex items-center justify-between gap-3">
-                <p id="favoriteCount" class="mono text-[10px] uppercase tracking-wide text-[#8b8d93]">Loading saved locations…</p>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3">
+                    <p id="favoriteCount" class="mono text-[10px] uppercase tracking-wide text-[#8b8d93]">Loading saved locations…</p>
+                    <div id="favoritesFilters" class="hidden" role="group" aria-label="Filter saved locations">
+                        <div class="favorites-filter">
+                            <button id="filterBuoys" class="favorites-filter-button" type="button" aria-pressed="false" aria-controls="favoritesGrid" onclick="setFavoritesFilter('buoy')">
+                                Buoys <span id="filterBuoyCount" class="mono text-[9px]">0</span>
+                            </button>
+                            <button id="filterBeaches" class="favorites-filter-button" type="button" aria-pressed="false" aria-controls="favoritesGrid" onclick="setFavoritesFilter('spot')">
+                                Beaches <span id="filterBeachCount" class="mono text-[9px]">0</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <button class="button shrink-0 whitespace-nowrap" onclick="openLocationSearch()">
                     <span class="text-base leading-none">+</span> Add location
                 </button>
@@ -91,6 +115,7 @@
             <div id="favoritesGrid">
                 <div class="skeleton"></div><div class="skeleton"></div>
             </div>
+            <div id="favoritesFilterEmpty" class="surface hidden py-12 px-5 text-center text-xs text-[#8b8d93]" role="status"></div>
         </section>
     </main>
 
@@ -135,6 +160,7 @@
         let userSpots = [];
         let directory = [];
         let directoryLoaded = false;
+        let favoritesFilter = 'all';
 
         const escapeHTML = (value) => String(value || '').replace(/[&<>'"]/g, char => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -204,17 +230,50 @@
             }).join('');
         }
 
+        function setFavoritesFilter(type) {
+            favoritesFilter = favoritesFilter === type ? 'all' : type;
+            applyFavoritesFilter();
+        }
+
+        function applyFavoritesFilter() {
+            const grid = document.getElementById('favoritesGrid');
+            const empty = document.getElementById('favoritesFilterEmpty');
+            document.getElementById('filterBuoys').setAttribute('aria-pressed', String(favoritesFilter === 'buoy'));
+            document.getElementById('filterBeaches').setAttribute('aria-pressed', String(favoritesFilter === 'spot'));
+
+            let visibleRows = 0;
+            grid.querySelectorAll('[data-favorite-type]').forEach(row => {
+                const visible = favoritesFilter === 'all' || row.dataset.favoriteType === favoritesFilter;
+                row.classList.toggle('favorite-filter-hidden', !visible);
+                if (visible) visibleRows++;
+            });
+
+            const filtered = favoritesFilter !== 'all';
+            empty.classList.toggle('hidden', !filtered || visibleRows > 0);
+            if (filtered && !visibleRows) {
+                empty.textContent = favoritesFilter === 'buoy'
+                    ? 'No saved buoys yet.'
+                    : 'No saved beaches yet.';
+            }
+        }
+
         async function loadFavorites() {
             const user = openSwellsAuth.auth.currentUser;
             const grid = document.getElementById('favoritesGrid');
+            const filters = document.getElementById('favoritesFilters');
+            const filterEmpty = document.getElementById('favoritesFilterEmpty');
             document.getElementById('signedOutState').classList.toggle('hidden', !!user);
             grid.style.display = user ? 'block' : 'none';
             if (!user) {
                 grid.innerHTML = '';
+                filters.classList.add('hidden');
+                filterEmpty.classList.add('hidden');
                 document.getElementById('favoriteCount').textContent = 'Sign in to load saved locations';
                 return;
             }
             grid.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>';
+            filters.classList.add('hidden');
+            filterEmpty.classList.add('hidden');
             try {
                 const [favoritesResponse, summaryResponse] = await Promise.all([authFetch('/api/favorites'), authFetch('/forecast-summary?detailed=1')]);
                 if (!favoritesResponse.ok || !summaryResponse.ok) throw new Error('Favorites request failed');
@@ -225,8 +284,15 @@
                 enhanceSummary(grid);
                 const count = userBuoys.length + userSpots.length;
                 document.getElementById('favoriteCount').textContent = `${count} saved ${count === 1 ? 'location' : 'locations'}`;
+                document.getElementById('filterBuoyCount').textContent = userBuoys.length;
+                document.getElementById('filterBeachCount').textContent = userSpots.length;
+                filters.classList.toggle('hidden', count === 0);
+                if (count === 0) favoritesFilter = 'all';
+                applyFavoritesFilter();
                 if (directoryLoaded) renderSearchResults();
             } catch (error) {
+                filters.classList.add('hidden');
+                filterEmpty.classList.add('hidden');
                 grid.innerHTML = '<div class="surface py-12 px-5 text-center text-xs text-[#8b8d93]">Could not load your forecast outlook. Please try again.</div>';
             }
         }

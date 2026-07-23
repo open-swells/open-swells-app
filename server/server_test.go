@@ -142,6 +142,18 @@ func TestLoadTemplates(t *testing.T) {
 			t.Errorf("favorites page still contains legacy Firebase code %q", legacy)
 		}
 	}
+	for _, want := range [][]byte{
+		[]byte("id=\"favoritesFilters\""),
+		[]byte("onclick=\"setFavoritesFilter('buoy')\""),
+		[]byte("onclick=\"setFavoritesFilter('spot')\""),
+		[]byte("function applyFavoritesFilter()"),
+		[]byte("row.dataset.favoriteType === favoritesFilter"),
+		[]byte("favorite-filter-hidden"),
+	} {
+		if !bytes.Contains(favorites.Bytes(), want) {
+			t.Errorf("favorites page is missing location filter behavior %q", want)
+		}
+	}
 	var mapPage bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&mapPage, "map.html", MapPageData{}); err != nil {
 		t.Fatalf("map template failed to render: %v", err)
@@ -266,7 +278,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-hourly-heights=\"1.25 ", "day-tick", "12 mph", "270&deg;", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-hourly-heights=\"1.25 ", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "day-tick", "12 mph", "270&deg;", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}
