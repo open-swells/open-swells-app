@@ -32,9 +32,22 @@
     .hour-candle.is-now i { opacity: 1; }
     .hour-candle.is-now::after { content: ''; position: absolute; left: 50%; top: -7px; bottom: -1px; width: 1px; background: #c6ccff; }
     .hour-scale { display: flex; justify-content: space-between; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: .04em; color: #6f7177; }
-    .favorite-outlook { min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #26272b; padding-left: 24px; }
+    .favorite-outlook { position: relative; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #26272b; padding-left: 24px; }
     .outlook-scroll { min-width: 0; display: flex; flex: 1; flex-direction: column; }
     .outlook-hover-line { position: absolute; z-index: 2; top: 0; width: 1px; background: #c6ccff; pointer-events: none; display: none; }
+    .outlook-panel-tooltip {
+        position: absolute; z-index: 4; display: none; min-width: 136px;
+        padding: 8px 9px; border: 1px solid #575c75; border-left: 2px solid #8f9bff;
+        background: linear-gradient(145deg, rgba(37, 39, 49, .98), rgba(20, 21, 25, .98));
+        box-shadow: 0 10px 24px rgba(0, 0, 0, .42);
+        color: #dfe1e7; font-family: 'JetBrains Mono', monospace;
+        font-size: 8px; line-height: 1.4; pointer-events: none;
+    }
+    .forecast-tooltip-date { margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid #3b3e49; color: #f0f0f1; font-weight: 600; white-space: nowrap; }
+    .forecast-tooltip-row { display: grid; grid-template-columns: 8px 42px 1fr; align-items: center; gap: 5px; margin-top: 4px; white-space: nowrap; }
+    .forecast-tooltip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tooltip-color); }
+    .forecast-tooltip-label { color: #858891; font-size: 7px; letter-spacing: .04em; }
+    .forecast-tooltip-value { color: var(--tooltip-color); font-weight: 600; text-align: right; text-transform: capitalize; }
     .outlook-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
     .outlook-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
     .outlook-note { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #6f7177; }
@@ -44,8 +57,15 @@
     .day-tick-track i { display: block; width: 100%; min-height: 2px; opacity: .5; }
     .day-tick:hover .day-tick-track i { opacity: 1; }
     .day-tick span { height: 9px; line-height: 9px; font-family: 'JetBrains Mono', monospace; font-size: 7px; color: #6f7177; }
+    .day-tick .day-wave-height { color: #aeb4ed; }
+    .day-tick .day-date-label { color: #8b8d93; white-space: nowrap; letter-spacing: -.02em; }
     .lane-swell { position: relative; height: 56px; margin-top: 10px; }
     .lane-swell svg { display: block; width: 100%; height: 100%; }
+    .swell-graph { position: relative; height: 56px; }
+    .swell-unit-label { position: absolute; z-index: 1; top: 2px; left: 2px; font-family: 'JetBrains Mono', monospace; font-size: 7px; line-height: 8px; color: #777caa; pointer-events: none; }
+    .swell-peak { position: absolute; color: #8f9bff; pointer-events: none; }
+    .swell-peak::after { content: ''; position: absolute; top: -2px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px #17181b; }
+    .swell-peak span { position: absolute; top: var(--peak-label-top, -12px); left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: 'JetBrains Mono', monospace; font-size: 7px; line-height: 8px; white-space: nowrap; color: #c8ceff; }
     .lane-wind { position: relative; margin-top: 8px; }
     .wind-graph { position: relative; height: 38px; padding-top: 8px; }
     .wind-graph svg { display: block; width: 100%; height: 30px; }
@@ -53,6 +73,9 @@
     .wind-peak::after { content: ''; position: absolute; top: 9px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px #17181b; }
     .wind-peak span { position: absolute; top: 0; left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: 'JetBrains Mono', monospace; font-size: 7px; line-height: 8px; white-space: nowrap; color: currentColor; }
     .lane-labels { display: flex; justify-content: space-between; padding-top: 5px; font-family: 'JetBrains Mono', monospace; font-size: 7px; text-transform: uppercase; color: #6f7177; }
+    .spot-forecast-levels { padding-bottom: 10px; border-bottom: 1px solid #26272b; }
+    .spot-forecast-levels .lane-swell { margin-top: 8px; }
+    .spot-conditions-head { margin-top: 10px; }
     .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
     .location-badge-buoy { color: #8e97e8; }
     .location-badge-beach { color: #f0a05a; }
@@ -79,6 +102,11 @@
         .favorites-detailed .favorite-row { grid-template-columns: minmax(0, 1fr); }
         .favorites-detailed .spot-stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         .favorite-outlook { border-left: 0; padding-left: 0; border-top: 1px solid #26272b; padding-top: 12px; }
+        .spot-forecast-levels { display: none; }
+        .spot-conditions-head { margin-top: 0; }
+        .day-tick .day-wave-height { display: none; }
+        .day-tick .day-date-label { font-size: 0; }
+        .day-tick .day-date-label::after { content: attr(data-short-label); font-size: 7px; }
     }
     @media (max-width: 640px) {
         .favorite-row { padding: 14px; }
@@ -203,11 +231,16 @@
             {{end}}
         </div>
         {{if and $.Detailed (gt (len .Summary) 0)}}
-        <div class="favorite-outlook">
-            <div class="outlook-head"><span class="outlook-label">16-day outlook</span><span class="outlook-note">Conditions</span></div>
+        <div class="favorite-outlook" data-spot-outlook data-station="{{.ID}}" data-hourly-heights="{{range .Forecast.Forecast}}{{.PrimaryWaveHeight}} {{end}}" data-hourly-times="{{range .Forecast.Forecast}}{{.Time.UnixMilli}} {{end}}">
             <div class="outlook-scroll">
+                <div class="spot-forecast-levels" aria-label="16-day swell and wind levels">
+                    <div class="outlook-head"><span class="outlook-label">16-day swell &amp; wind</span><span class="outlook-note" data-swell-note></span></div>
+                    <div class="lane-swell" data-swell-lane aria-label="16-day swell height trend"></div>
+                    <div class="lane-wind" data-wind-lane aria-label="16-day wind speed trend" hidden></div>
+                </div>
+                <div class="outlook-head spot-conditions-head"><span class="outlook-label">16-day outlook</span><span class="outlook-note">Conditions</span></div>
                 <div class="day-ticks" aria-label="16-day conditions outlook">
-                    {{range .Summary}}<div class="day-tick" data-date="{{.Date}}" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"><div class="day-tick-track"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div><span>{{.DayNum}}</span></div>{{end}}
+                    {{range .Summary}}<div class="day-tick" data-date="{{.Date}}" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"><div class="day-tick-track"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div><span class="day-wave-height">{{.WaveHeight}}</span><span class="day-date-label" data-day-label data-short-label="{{.DayNum}}">{{.DateAbv}}</span></div>{{end}}
                 </div>
             </div>
         </div>

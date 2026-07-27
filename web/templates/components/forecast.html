@@ -264,6 +264,9 @@
             // jumps to that day's hourly detail.
             const stripHost = document.getElementById('swellStrip');
             const stripReadout = document.getElementById('stripReadout');
+            const stripPanel = stripHost.closest('.swell-strip');
+            const stripHoverLine = document.getElementById('stripHoverLine');
+            const stripTooltip = document.getElementById('stripTooltip');
             const stripPts = data.map(d => ({
                 t: d.dateObj,
                 ft: (parseFloat(d.PrimaryWaveHeight) || 0) * 3.28084,
@@ -287,6 +290,8 @@
             function buildSwellStrip() {
                 if (!stripHost || stripPts.length < 2 || !dayKeys.length) return;
                 stripHost.innerHTML = '';
+                stripHoverLine.style.display = 'none';
+                stripTooltip.style.display = 'none';
                 const width = stripHost.clientWidth;
                 if (width < 60) return;
 
@@ -429,10 +434,6 @@
                         .attr('fill', c => CONDITION_COLORS[c.rating]);
                 }
 
-                const crosshair = svg.append('line')
-                    .attr('y1', swTop - 6).attr('y2', gridBase)
-                    .attr('stroke', '#6f7177').attr('stroke-dasharray', '3,3').attr('display', 'none');
-
                 const bisect = d3.bisector(p => p.t).center;
                 const windBisect = d3.bisector(w => w.t).center;
                 const condBisect = d3.bisector(c => c.t).center;
@@ -444,20 +445,58 @@
                         const [mx] = d3.pointer(event);
                         const t = x.invert(mx);
                         const p = stripPts[bisect(stripPts, t)];
-                        crosshair.attr('x1', x(p.t)).attr('x2', x(p.t)).attr('display', null);
+                        const panelRect = stripPanel.getBoundingClientRect();
+                        const hostRect = stripHost.getBoundingClientRect();
+                        const panelX = hostRect.left - panelRect.left + x(p.t);
+                        stripHoverLine.style.left = `${panelX}px`;
+                        stripHoverLine.style.display = 'block';
+
+                        stripTooltip.replaceChildren();
+                        const tooltipDate = document.createElement('div');
+                        tooltipDate.className = 'forecast-tooltip-date';
+                        tooltipDate.textContent = stripTimeFmt(p.t);
+                        stripTooltip.appendChild(tooltipDate);
+                        const appendTooltipRow = (label, value, color) => {
+                            const row = document.createElement('div');
+                            row.className = 'forecast-tooltip-row';
+                            row.style.setProperty('--tooltip-color', color);
+                            const dot = document.createElement('i');
+                            dot.className = 'forecast-tooltip-dot';
+                            const rowLabel = document.createElement('span');
+                            rowLabel.className = 'forecast-tooltip-label';
+                            rowLabel.textContent = label;
+                            const rowValue = document.createElement('strong');
+                            rowValue.className = 'forecast-tooltip-value';
+                            rowValue.textContent = value;
+                            row.append(dot, rowLabel, rowValue);
+                            stripTooltip.appendChild(row);
+                        };
+                        appendTooltipRow('SWELL', `${p.ft.toFixed(1)} ft`, '#8f9bff');
+
                         let text = `${stripTimeFmt(p.t)} · ${p.ft.toFixed(1)} ft`;
                         if (hasWind) {
                             const w = windPts[windBisect(windPts, t)];
-                            text += ` · ${(w.s * 2.237).toFixed(0)} mph`;
+                            const windText = `${(w.s * 2.237).toFixed(0)} mph`;
+                            appendTooltipRow('WIND', windText, '#e2b86b');
+                            text += ` · ${windText}`;
                         }
                         if (showCondLane) {
-                            text += ` · ${condPts[condBisect(condPts, t)].rating}`;
+                            const condition = condPts[condBisect(condPts, t)].rating;
+                            appendTooltipRow('SURF', condition, CONDITION_COLORS[condition]);
+                            text += ` · ${condition}`;
                         }
+                        stripTooltip.style.display = 'block';
+                        const tooltipWidth = stripTooltip.offsetWidth;
+                        const tooltipHeight = stripTooltip.offsetHeight;
+                        const placeLeft = panelX + 10 + tooltipWidth > stripPanel.clientWidth;
+                        stripTooltip.style.left = `${placeLeft ? panelX - tooltipWidth - 10 : panelX + 10}px`;
+                        stripTooltip.style.top = `${Math.max(6, Math.min(stripPanel.clientHeight - tooltipHeight - 6, event.clientY - panelRect.top - tooltipHeight / 2))}px`;
                         stripReadout.textContent = text;
                         stripReadout.style.color = '#c8ceff';
                     })
                     .on('mouseleave', () => {
-                        crosshair.attr('display', 'none');
+                        stripHoverLine.style.display = 'none';
+                        stripTooltip.style.display = 'none';
                         stripReadout.textContent = 'Select a day for hourly detail';
                         stripReadout.style.color = '';
                     })
@@ -717,30 +756,48 @@
                     const hoverDate = x.invert(mouseX);
                     const closestData = data.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
                     const formattedHour = `${closestData.hour.toString().padStart(2, '0')}:00`;
-                    const createArrowHTML = (direction, color) => `<span style="display: inline-block; color: ${color}; transform: rotate(${travelBearing(direction)}deg); margin-right: 5px;">&#8593;</span>`;
+                    const createArrowHTML = (direction, color) => `<span class="detail-tooltip-arrow" style="color: ${color}; transform: rotate(${travelBearing(direction)}deg);">&#8593;</span>`;
+                    const detailTooltipRow = (label, color, value) => `
+                        <div class="forecast-tooltip-row detail-tooltip-row" style="--tooltip-color: ${color};">
+                            <i class="forecast-tooltip-dot"></i>
+                            <span class="forecast-tooltip-label">${label}</span>
+                            <strong class="forecast-tooltip-value">${value}</strong>
+                        </div>`;
                     let windRow = '';
                     if (windDayPts.length) {
                         const w = windDayPts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
-                        windRow = `<br><span style="color: #e2b86b;">${createArrowHTML(w.d, '#e2b86b')} wind ${(w.s * 2.237).toFixed(0)} mph ${cardinal(w.d)}</span>`;
+                        windRow = detailTooltipRow(
+                            'WIND',
+                            '#e2b86b',
+                            `${createArrowHTML(w.d, '#e2b86b')}${(w.s * 2.237).toFixed(0)} mph · ${cardinal(w.d)}`
+                        );
                     }
                     let condRow = '';
                     if (condDayPts.length) {
                         const c = condDayPts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
-                        condRow = `<br><span style="color: ${CONDITION_COLORS[c.rating]};">&#9632; ${c.rating} &middot; score ${c.score}</span>`;
+                        condRow = detailTooltipRow(
+                            'SURF',
+                            CONDITION_COLORS[c.rating],
+                            `${c.rating} · score ${c.score}`
+                        );
                     }
-                    const swellRow = (deg, color, hgt, per) =>
-                        `<span style="color: ${color};">${createArrowHTML(deg, color)} ${(hgt * 3.28084).toFixed(1)}ft at ${per}s &middot; ${cardinal(deg)}</span>`;
+                    const swellLabels = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'QUATERNARY'];
                     // only trains that exist at this hour get a row
                     const swellRows = [
                         [closestData.PrimaryDegrees, chartColors.linePrimary, closestData.PrimaryWaveHeight, closestData.PrimaryPeriod],
                         [closestData.SecondaryDegrees, chartColors.lineSecondary, closestData.SecondaryWaveHeight, closestData.SecondaryPeriod],
                         [closestData.TertiaryDegrees, chartColors.lineTertiary, closestData.TertiaryWaveHeight, closestData.TertiaryPeriod],
                         [closestData.QuaternaryDegrees, chartColors.lineQuaternary, closestData.QuaternaryWaveHeight, closestData.QuaternaryPeriod],
-                    ].filter(([, , hgt]) => parseFloat(hgt) > 0)
-                        .map(([deg, color, hgt, per]) => swellRow(deg, color, hgt, per))
-                        .join('<br>');
+                    ].map((row, index) => [...row, swellLabels[index]])
+                        .filter(([, , hgt]) => parseFloat(hgt) > 0)
+                        .map(([deg, color, hgt, per, label]) => detailTooltipRow(
+                            label,
+                            color,
+                            `${createArrowHTML(deg, color)}${(hgt * 3.28084).toFixed(1)} ft @ ${per}s · ${cardinal(deg)}`
+                        ))
+                        .join('');
                     tooltip.style("visibility", "visible")
-                        .html(`<strong>${formattedHour}</strong>${swellRows ? '<br>' + swellRows : ''}${windRow}${condRow}`);
+                        .html(`<div class="forecast-tooltip-date">${formattedHour}</div>${swellRows}${windRow}${condRow}`);
                     // flip to the cursor's left when the tooltip would be
                     // squeezed against the right edge (measure after setting
                     // content so the width is the natural, unwrapped one)
@@ -781,9 +838,23 @@
     </script>
 
     <style>
-        .swell-strip { margin-top: 12px; background: #202125; border: 1px solid #34363b; }
+        .swell-strip { position: relative; margin-top: 12px; background: #202125; border: 1px solid #34363b; }
         .swell-strip .strip-title, .swell-strip #stripReadout { font-family: 'JetBrains Mono', monospace; }
         .swell-strip svg { display: block; }
+        .strip-hover-line { position: absolute; z-index: 3; top: 0; bottom: 0; display: none; width: 1px; background: #c6ccff; box-shadow: 0 0 7px rgba(143, 155, 255, .45); pointer-events: none; }
+        .strip-panel-tooltip {
+            position: absolute; z-index: 5; display: none; min-width: 144px;
+            padding: 9px 10px; border: 1px solid #575c75; border-left: 2px solid #8f9bff;
+            background: linear-gradient(145deg, rgba(37, 39, 49, .98), rgba(20, 21, 25, .98));
+            box-shadow: 0 12px 28px rgba(0, 0, 0, .45);
+            color: #dfe1e7; font-family: 'JetBrains Mono', monospace;
+            font-size: 9px; line-height: 1.4; pointer-events: none;
+        }
+        .forecast-tooltip-date { margin-bottom: 7px; padding-bottom: 6px; border-bottom: 1px solid #3b3e49; color: #f0f0f1; font-weight: 600; white-space: nowrap; }
+        .forecast-tooltip-row { display: grid; grid-template-columns: 8px 44px 1fr; align-items: center; gap: 6px; margin-top: 5px; white-space: nowrap; }
+        .forecast-tooltip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tooltip-color); }
+        .forecast-tooltip-label { color: #858891; font-size: 8px; letter-spacing: .04em; }
+        .forecast-tooltip-value { color: var(--tooltip-color); font-weight: 600; text-align: right; text-transform: capitalize; }
         /* One equal-width column per forecast day; the row scrolls on
            narrow screens. The selected day is also shown as a band in the
            strip above, so the strip stays readable while this scrolls. */
@@ -847,16 +918,20 @@
         @keyframes windPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.75; } }
         #tooltip {
             z-index: 20;
-            padding: 7px 9px;
-            background: #18191c;
-            border: 1px solid #45474d;
-            border-radius: 0;
-            color: #e6e6e6;
+            min-width: 205px;
+            padding: 9px 10px;
+            background: linear-gradient(145deg, rgba(37, 39, 49, .98), rgba(20, 21, 25, .98));
+            border: 1px solid #575c75;
+            border-left: 2px solid #8f9bff;
+            color: #dfe1e7;
             font-family: 'JetBrains Mono', monospace;
             font-size: 9px;
-            line-height: 1.65;
-            box-shadow: 0 8px 24px rgba(0,0,0,.35);
+            line-height: 1.4;
+            box-shadow: 0 12px 28px rgba(0,0,0,.45);
         }
+        #tooltip .detail-tooltip-row { grid-template-columns: 8px 58px minmax(0, 1fr); }
+        #tooltip .forecast-tooltip-value { text-align: left; }
+        .detail-tooltip-arrow { display: inline-block; margin-right: 6px; transform-origin: 50% 50%; }
         /* phones: the day-card row scrolls anyway, so give each card
            room to be readable under a thumb */
         @media (max-width: 767px) {
@@ -880,6 +955,8 @@
             <span id="stripReadout" class="text-[10px] text-[#8b8d93]">Select a day for hourly detail</span>
         </div>
         <div id="swellStrip"></div>
+        <div id="stripHoverLine" class="strip-hover-line" aria-hidden="true"></div>
+        <div id="stripTooltip" class="strip-panel-tooltip" role="tooltip"></div>
     </div>
     <div id="forecastContainer"></div>
     <div class="swell-detail">

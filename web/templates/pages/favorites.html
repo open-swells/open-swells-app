@@ -450,6 +450,10 @@
             const localTodayKey = `${nowDate.getFullYear()}-${String(nowDate.getMonth() + 1).padStart(2, '0')}-${String(nowDate.getDate()).padStart(2, '0')}`;
             root.querySelectorAll('.day-tick[data-date]').forEach(tick => {
                 if (tick.dataset.date < localTodayKey) tick.remove();
+                else if (tick.dataset.date === localTodayKey) {
+                    const label = tick.querySelector('[data-day-label]');
+                    if (label) label.textContent = 'Today';
+                }
             });
             root.querySelectorAll('[data-hour-strip]').forEach(strip => {
                 const sourceCandles = [...strip.querySelectorAll('.hour-candle')];
@@ -493,11 +497,12 @@
                 }
             });
             root.querySelectorAll('[data-buoy-outlook]').forEach(drawBuoyOutlook);
+            root.querySelectorAll('[data-spot-outlook]').forEach(drawBuoyOutlook);
         }
 
         // One lane of the buoy outlook: values normalized into a 0–100 wide
         // SVG so the lane stretches with the row, area fill optional.
-        function laneSVG(values, height, color, withArea) {
+        function laneSVG(values, height, color, withArea, dayBreaks = []) {
             const w = 100, pad = 3;
             const max = Math.max(...values), min = Math.min(0, ...values);
             const span = (max - min) || 1;
@@ -505,14 +510,17 @@
                 `${(i / (values.length - 1)) * w},${(height - pad) - ((v - min) / span) * (height - 2 * pad)}`);
             const area = withArea
                 ? `<polygon points="0,${height} ${points.join(' ')} ${w},${height}" fill="${color}" opacity="0.1"/>` : '';
-            return `<svg viewBox="0 0 ${w} ${height}" preserveAspectRatio="none" aria-hidden="true">${area}
+            const grid = dayBreaks.map(x =>
+                `<line x1="${x}" x2="${x}" y1="0" y2="${height}" stroke="#45474d" stroke-width="1" vector-effect="non-scaling-stroke" opacity="0.55"/>`
+            ).join('');
+            return `<svg viewBox="0 0 ${w} ${height}" preserveAspectRatio="none" aria-hidden="true">${grid}${area}
                 <polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
             </svg>`;
         }
 
-        // Buoy outlook: the complete hourly bulletin drives the swell lane.
-        // Three-hourly source wind is interpolated onto that same timeline;
-        // the wind lane stays hidden if the fetch fails.
+        // Forecast outlook: the complete hourly bulletin drives the swell
+        // lane. Three-hourly source wind is interpolated onto that same
+        // timeline; the wind lane stays hidden if the fetch fails.
         async function drawBuoyOutlook(el) {
             const rawHeights = (el.dataset.hourlyHeights || '').trim().split(/\s+/).map(Number);
             const rawTimes = (el.dataset.hourlyTimes || '').trim().split(/\s+/).map(Number);
@@ -524,8 +532,28 @@
             })).filter(point => point.timestamp >= nowDate.getTime() && Number.isFinite(point.height));
             const heights = timeline.map(point => point.height * 3.28084);
             if (heights.length < 2) return;
+            const localDayKey = timestamp => {
+                const date = new Date(timestamp);
+                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            };
+            const dayBreaks = timeline.slice(1).flatMap((point, index) =>
+                localDayKey(point.timestamp) !== localDayKey(timeline[index].timestamp)
+                    ? [(index + 1) / (timeline.length - 1) * 100]
+                    : []);
             const swellLane = el.querySelector('[data-swell-lane]');
-            swellLane.innerHTML = laneSVG(heights, 56, '#8f9bff', true);
+            const isSpotOutlook = el.hasAttribute('data-spot-outlook');
+            if (isSpotOutlook) {
+                const peak = Math.max(...heights);
+                const peakIndex = heights.indexOf(peak);
+                const peakLeft = peakIndex / (heights.length - 1) * 100;
+                const peakTop = 3;
+                const labelShift = peakLeft < 5 ? '0%' : peakLeft > 95 ? '-100%' : '-50%';
+                swellLane.innerHTML = `<div class="swell-graph"><span class="swell-unit-label">SWELL (FT)</span>${laneSVG(heights, 56, '#8f9bff', true, dayBreaks)}
+                    <div class="swell-peak" style="left: ${peakLeft}%; top: ${peakTop}px; --peak-label-shift: ${labelShift}; --peak-label-top: 6px;"><span>${peak.toFixed(1)} ft</span></div>
+                </div>`;
+            } else {
+                swellLane.innerHTML = laneSVG(heights, 56, '#8f9bff', true);
+            }
             const note = el.querySelector('[data-swell-note]');
             const minFt = Math.min(...heights), maxFt = Math.max(...heights);
             const defaultNote = `Swell ${minFt.toFixed(1)}–${maxFt.toFixed(1)} ft`;
@@ -541,18 +569,69 @@
                     spanEl(labels[labels.length - 1] || ''));
             }
             const windLane = el.querySelector('[data-wind-lane]');
+            const windColor = isSpotOutlook ? '#e2b86b' : '#6fcf97';
             const hoverLine = document.createElement('div');
             hoverLine.className = 'outlook-hover-line';
+            const panelTooltip = isSpotOutlook ? document.createElement('div') : null;
+            if (panelTooltip) {
+                hoverLine.classList.add('is-panel');
+                panelTooltip.className = 'outlook-panel-tooltip';
+                el.append(hoverLine, panelTooltip);
+            }
             let hourlyWindMph = [];
             const updateHover = (lane, event) => {
-                const rect = lane.getBoundingClientRect();
-                const laneX = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
-                const fraction = rect.width ? laneX / rect.width : 0;
+                const laneRect = swellLane.getBoundingClientRect();
+                const laneX = Math.max(0, Math.min(laneRect.width, event.clientX - laneRect.left));
+                const fraction = laneRect.width ? laneX / laneRect.width : 0;
                 const index = Math.min(timeline.length - 1, Math.round(fraction * (timeline.length - 1)));
-                lane.appendChild(hoverLine);
-                hoverLine.style.left = `${Math.min(rect.width - 1, index / (timeline.length - 1) * rect.width)}px`;
-                hoverLine.style.top = lane === swellLane ? '0' : '8px';
-                hoverLine.style.height = lane === swellLane ? '56px' : '30px';
+                const lineX = Math.min(laneRect.width - 1, index / (timeline.length - 1) * laneRect.width);
+                if (isSpotOutlook) {
+                    if (!window.matchMedia('(min-width: 901px)').matches) {
+                        clearHover();
+                        return;
+                    }
+                    const panelRect = el.getBoundingClientRect();
+                    const panelX = laneRect.left - panelRect.left + lineX;
+                    hoverLine.style.left = `${panelX}px`;
+                    hoverLine.style.top = '0';
+                    hoverLine.style.bottom = '0';
+                    hoverLine.style.height = 'auto';
+
+                    const dayKey = localDayKey(timeline[index].timestamp);
+                    const conditionTick = el.querySelector(`.day-tick[data-date="${dayKey}"]`);
+                    const condition = conditionTick
+                        ? (conditionTick.title.split(',').pop() || '').trim()
+                        : '';
+                    const wind = Number.isFinite(hourlyWindMph[index])
+                        ? `${hourlyWindMph[index].toFixed(0)} mph`
+                        : 'Unavailable';
+                    const conditionColor = {
+                        epic: '#b48cff', good: '#45c4b0', fair: '#e2b86b', poor: '#e06c75'
+                    }[condition.toLowerCase()] || '#a7a9ae';
+                    panelTooltip.innerHTML = `
+                        <div class="forecast-tooltip-date">${escapeHTML(labels[index])}</div>
+                        <div class="forecast-tooltip-row" style="--tooltip-color: #8f9bff;">
+                            <i class="forecast-tooltip-dot"></i><span class="forecast-tooltip-label">SWELL</span><strong class="forecast-tooltip-value">${heights[index].toFixed(1)} ft</strong>
+                        </div>
+                        <div class="forecast-tooltip-row" style="--tooltip-color: #e2b86b;">
+                            <i class="forecast-tooltip-dot"></i><span class="forecast-tooltip-label">WIND</span><strong class="forecast-tooltip-value">${escapeHTML(wind)}</strong>
+                        </div>
+                        ${condition ? `<div class="forecast-tooltip-row" style="--tooltip-color: ${conditionColor};">
+                            <i class="forecast-tooltip-dot"></i><span class="forecast-tooltip-label">SURF</span><strong class="forecast-tooltip-value">${escapeHTML(condition)}</strong>
+                        </div>` : ''}`;
+                    panelTooltip.style.display = 'block';
+                    const tooltipWidth = panelTooltip.offsetWidth;
+                    const tooltipHeight = panelTooltip.offsetHeight;
+                    const placeLeft = panelX + 10 + tooltipWidth > el.clientWidth;
+                    panelTooltip.style.left = `${placeLeft ? panelX - tooltipWidth - 10 : panelX + 10}px`;
+                    panelTooltip.style.top = `${Math.max(6, Math.min(el.clientHeight - tooltipHeight - 6, event.clientY - panelRect.top - tooltipHeight / 2))}px`;
+                } else {
+                    lane.appendChild(hoverLine);
+                    hoverLine.style.left = `${lineX}px`;
+                    hoverLine.style.top = lane === swellLane ? '0' : '8px';
+                    hoverLine.style.bottom = 'auto';
+                    hoverLine.style.height = lane === swellLane ? '56px' : '30px';
+                }
                 hoverLine.style.display = 'block';
                 if (note) {
                     const wind = Number.isFinite(hourlyWindMph[index]) ? ` · wind ${hourlyWindMph[index].toFixed(0)} mph` : '';
@@ -561,16 +640,23 @@
             };
             const clearHover = () => {
                 hoverLine.style.display = 'none';
+                if (panelTooltip) panelTooltip.style.display = 'none';
                 if (note) note.textContent = defaultNote;
             };
-            swellLane.addEventListener('mousemove', event => updateHover(swellLane, event));
-            swellLane.addEventListener('mouseleave', clearHover);
-            if (windLane) {
-                windLane.addEventListener('mousemove', event => {
-                    if (event.target.closest('svg')) updateHover(windLane, event);
-                    else clearHover();
-                });
-                windLane.addEventListener('mouseleave', clearHover);
+            if (isSpotOutlook) {
+                const panel = el.querySelector('.outlook-scroll');
+                panel.addEventListener('mousemove', event => updateHover(panel, event));
+                panel.addEventListener('mouseleave', clearHover);
+            } else {
+                swellLane.addEventListener('mousemove', event => updateHover(swellLane, event));
+                swellLane.addEventListener('mouseleave', clearHover);
+                if (windLane) {
+                    windLane.addEventListener('mousemove', event => {
+                        if (event.target.closest('svg')) updateHover(windLane, event);
+                        else clearHover();
+                    });
+                    windLane.addEventListener('mouseleave', clearHover);
+                }
             }
             if (!windLane) return;
             try {
@@ -603,8 +689,8 @@
                 const peakIndex = hourlyWindMph.indexOf(peak);
                 const peakLeft = peakIndex / (timeline.length - 1) * 100;
                 const labelShift = peakLeft < 5 ? '0%' : peakLeft > 95 ? '-100%' : '-50%';
-                windLane.innerHTML = `<div class="wind-graph">${laneSVG(mph, 30, '#6fcf97', false)}
-                    <div class="wind-peak" style="left: ${peakLeft}%; --peak-label-shift: ${labelShift};"><span>${peak.toFixed(0)} mph</span></div>
+                windLane.innerHTML = `<div class="wind-graph">${laneSVG(mph, 30, windColor, false, isSpotOutlook ? dayBreaks : [])}
+                    <div class="wind-peak" style="left: ${peakLeft}%; --peak-label-shift: ${labelShift}; color: ${windColor};"><span>${peak.toFixed(0)} mph</span></div>
                 </div>`;
                 windLane.hidden = false;
             } catch (error) {

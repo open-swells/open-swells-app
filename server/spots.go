@@ -573,6 +573,7 @@ func spotConditions(staticDir string, spot Spot, hours []hourSwells) []HourlyCon
 type SpotFavorite struct {
 	ID, Name, Region        string
 	Latitude, Longitude     float64
+	Forecast                ForecastData
 	Summary                 []ForecastSummary
 	CurrentConditions       []ConditionCandle
 	Primary, PrimarySub     string
@@ -590,6 +591,7 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 		entry.HasError = true
 		return entry
 	}
+	entry.Forecast = forecastData
 	entry.Summary = generateForecastSummary(forecastData)
 	conditions := spotConditions(staticDir, spot, hours)
 	applyConditionSummary(entry.Summary, conditions)

@@ -243,7 +243,7 @@ func TestLoadTemplates(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("spot template failed to render: %v", err)
 	}
-	for _, want := range []string{"Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #45c4b0"} {
+	for _, want := range []string{"Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #45c4b0", "stripHoverLine", "stripTooltip", "forecast-tooltip-row", "detail-tooltip-row"} {
 		if !bytes.Contains(spotPage.Bytes(), []byte(want)) {
 			t.Errorf("spot condition summary is missing %q", want)
 		}
@@ -274,6 +274,9 @@ func TestLoadTemplates(t *testing.T) {
 		}},
 		Spots: []SpotFavorite{{
 			ID: "el-porto", Name: "El Porto", Region: "Los Angeles", WindSpeed: "12", WindDir: "270", HasWind: true,
+			Forecast: ForecastData{Forecast: []ForecastRow{{
+				Time: time.Date(2026, 7, 20, 6, 0, 0, 0, time.UTC), PrimaryWaveHeight: "0.98",
+			}}},
 			Summary:           []ForecastSummary{{DateAbv: "Mon 7/20", DayNum: "20", WaveHeight: "3.2ft", HeightFt: 3.2, Condition: "fair", Score: 40}},
 			CurrentConditions: []ConditionCandle{{Hour: "06", UnixMs: 1753000000000, Score: 40, Condition: "fair"}},
 		}},
@@ -283,7 +286,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-hourly-heights=\"1.25 ", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "day-tick", "12 mph", "270&deg;", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "spot-forecast-levels", "day-wave-height", "data-day-label", "Mon 7/20", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "day-tick", "12 mph", "270&deg;", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}
