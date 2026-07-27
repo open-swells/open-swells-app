@@ -5,21 +5,15 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>About — OpenSwells</title>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/assets/theme.css">
         <style>
-            :root { color-scheme: dark; }
-            * { box-sizing: border-box; }
             body {
-                font-family: 'Inter', sans-serif;
-                background: #0f1012;
-                color: #e6e6e6;
-                margin: 0;
                 min-height: 100vh;
-                line-height: 1.65;
-                font-size: 14px;
+                line-height: 1.7;
+                font-size: 15px;
             }
-            .mono { font-family: 'JetBrains Mono', monospace; }
             header.site {
-                border-bottom: 1px solid #26272b;
+                border-bottom: 1px solid #2f3137;
             }
             .site-inner {
                 max-width: 760px;
@@ -45,26 +39,26 @@
                 display: inline-flex;
                 align-items: center;
                 padding: 0 10px;
-                border: 1px solid #3b3d42;
-                background: #202125;
-                color: #c6c7ca;
+                border: 1px solid #43454c;
+                background: #1f2026;
+                color: #d5d7dc;
                 font-size: 12px;
                 text-decoration: none;
                 transition: background 120ms ease, color 120ms ease;
             }
-            .back-link:hover { background: #2a2c30; color: #fff; }
+            .back-link:hover { background: #292a30; color: #fff; }
             main {
                 max-width: 760px;
                 margin: 0 auto;
                 padding: 40px 24px 80px;
             }
             .eyebrow {
-                font-family: 'JetBrains Mono', monospace;
+                font-family: var(--font-mono);
                 font-size: 10px;
                 font-weight: 500;
                 text-transform: uppercase;
                 letter-spacing: 0.05em;
-                color: #8b8d93;
+                color: #a6aab2;
                 margin: 40px 0 8px;
             }
             .eyebrow:first-of-type { margin-top: 0; }
@@ -77,32 +71,32 @@
             }
             .subtitle {
                 margin: 0 0 40px;
-                color: #8b8d93;
+                color: #a6aab2;
                 font-size: 13px;
             }
             .subtitle a { color: #8f9bff; text-decoration: none; }
             .subtitle a:hover { color: #fff; }
-            p { margin: 8px 0 0; color: #a7a9ae; }
+            p { margin: 8px 0 0; color: #b7bac1; }
             a { color: #8f9bff; text-decoration: none; transition: color 120ms ease; }
             a:hover { color: #fff; }
-            strong { color: #e6e6e6; font-weight: 600; }
+            strong { color: #edeef1; font-weight: 600; }
             ul, ol {
                 margin: 8px 0 0;
                 padding-left: 22px;
-                color: #a7a9ae;
+                color: #b7bac1;
             }
             li { margin: 4px 0; }
             code {
-                font-family: 'JetBrains Mono', monospace;
+                font-family: var(--font-mono);
                 font-size: 12px;
-                background: #18191c;
-                border: 1px solid #34363b;
+                background: #17181b;
+                border: 1px solid #2f3137;
                 padding: 2px 6px;
                 color: #c8ceff;
             }
             .panel {
-                background: #18191c;
-                border: 1px solid #34363b;
+                background: #17181b;
+                border: 1px solid #2f3137;
                 padding: 16px 20px;
                 margin-top: 8px;
             }

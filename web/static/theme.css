@@ -1,0 +1,245 @@
+/* OpenSwells design system.
+ *
+ * Every page loads this before its own <style> block. It owns the palette,
+ * the type scale, and the handful of primitives that were previously
+ * copy-pasted (and drifting) across the station, map, and favorites pages.
+ *
+ * Contrast rule of thumb for this UI: the interface is deliberately dense and
+ * runs a lot of 9-11px mono labels, so every text token here clears 4.5:1
+ * against --panel (the lightest surface text sits on). Nothing below 9px
+ * carries information that isn't also available elsewhere.
+ */
+
+:root {
+    color-scheme: dark;
+
+    /* Surfaces, darkest to lightest. Page < panel < raised < hover. */
+    --bg: #0e0f12;
+    --panel: #17181b;
+    --raised: #1f2026;
+    --hover: #292a30;
+    --line: #2f3137;
+    --line-strong: #43454c;
+
+    /* Text. --text-2 is for supporting copy, --text-3 for unit/axis labels. */
+    --text: #edeef1;
+    --text-1: #d5d7dc;
+    --text-2: #a6aab2;
+    --text-3: #8b9099;
+
+    /* Brand / interactive */
+    --accent: #5e6ad2;
+    --accent-hover: #6d78de;
+    --accent-bright: #8f9bff;
+    --accent-soft: #c8ceff;
+
+    /* Data series. Fixed meanings — swell is always indigo, wind always
+       amber — so a color reads the same on every chart in the app. */
+    --swell: #8f9bff;
+    --swell-2: #e2b86b;
+    --swell-3: #6fcf97;
+    --swell-4: #b89cff;
+    --wind: #eec37c;
+    --tide: #2ec2c2;
+
+    /* Surf condition ramp: poor -> epic. Ordered by lightness as well as hue
+       so the four steps stay distinguishable without color vision. */
+    --cond-poor: #ef7a83;
+    --cond-fair: #eec478;
+    --cond-good: #4fd1bc;
+    --cond-epic: #bb97ff;
+
+    /* Entity accents used by badges, markers, and filters */
+    --kind-buoy: #98a0ec;
+    --kind-beach: #f4a967;
+    --positive: #6fcf97;
+    --negative: #e06c75;
+    --warn: #e2b86b;
+
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --shadow-panel: 0 12px 30px rgba(0, 0, 0, .35);
+    --shadow-pop: 0 16px 36px rgba(0, 0, 0, .5);
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    letter-spacing: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, select, textarea { font: inherit; letter-spacing: 0; }
+
+.mono { font-family: var(--font-mono); }
+
+/* Readings line up column-to-column and stop jittering as values animate. */
+.mono, .stat-value, .report-value .main, .fc-height, [data-local-time] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+}
+
+/* Keyboard focus was invisible everywhere before this; the app is a data tool
+   and gets driven from the keyboard. */
+:focus-visible {
+    outline: 2px solid var(--accent-bright);
+    outline-offset: 1px;
+}
+:focus:not(:focus-visible) { outline: none; }
+
+a { color: inherit; text-decoration: none; }
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3a3c42; }
+::-webkit-scrollbar-thumb:hover { background: var(--line-strong); }
+* { scrollbar-width: thin; scrollbar-color: #3a3c42 transparent; }
+
+/* --- Primitives ------------------------------------------------------- */
+
+.surface {
+    background: var(--panel);
+    border: 1px solid var(--line);
+}
+
+.icon-button {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+.icon-button:hover { color: #fff; background: var(--hover); border-color: var(--line-strong); }
+
+.button, .toolbar-button {
+    height: 32px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 0 11px;
+    border: 1px solid var(--line-strong);
+    background: var(--raised);
+    color: var(--text-1);
+    font-size: 12px; font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.button:hover, .toolbar-button:hover, .toolbar-button[aria-expanded="true"] {
+    background: var(--hover); color: #fff; border-color: #55575e;
+}
+.button-primary, .cta-button {
+    background: var(--accent); border-color: var(--accent-hover); color: #fff;
+}
+.button-primary:hover, .cta-button:hover { background: var(--accent-hover); border-color: var(--accent-bright); }
+
+/* --- Station pages (spot / buoy / beach) ------------------------------ */
+/* These three pages render standalone and inside the map's forecast modal,
+   so their chrome is defined once here rather than per page. */
+
+.station-shell { max-width: 1120px; margin: 0 auto; padding: 20px 24px 48px; }
+.station-header { min-height: 48px; border-bottom: 1px solid var(--line); }
+.station-title { font-size: 16px; font-weight: 600; color: #fff; }
+.station-meta {
+    margin-top: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px; letter-spacing: .03em;
+    color: var(--text-3);
+}
+.section-label {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: .06em; text-transform: uppercase;
+    color: var(--text-2);
+}
+
+.station-action {
+    height: 30px;
+    display: inline-flex; align-items: center;
+    padding: 0 9px;
+    border: 1px solid var(--line-strong);
+    background: var(--raised);
+    color: var(--text-1);
+    font-size: 11px;
+}
+.station-action:hover { background: var(--hover); color: #fff; }
+
+.page-header-action {
+    width: 32px; height: 32px;
+    display: inline-flex; flex: none; align-items: center; justify-content: center;
+    background: var(--raised);
+    cursor: pointer;
+}
+.page-open-button { border: 1px solid var(--line-strong); color: var(--text-1); }
+.page-open-button:hover { background: var(--hover); color: #fff; }
+.page-open-button svg { width: 15px; height: 15px; }
+.page-favorite-button {
+    border: 1px solid #47725a; background: var(--raised); color: var(--positive);
+    font-size: 18px; line-height: 1; cursor: pointer;
+}
+.page-favorite-button:hover { background: var(--hover); }
+.page-favorite-button.is-favorite { color: var(--negative); border-color: #5b343a; background: #281f22; }
+
+body.embedded .standalone-only { display: none !important; }
+body.embedded .station-shell { padding-top: 14px; }
+
+/* --- Current-report cards --------------------------------------------- */
+
+.report-cards {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+.report-card {
+    min-width: 0;
+    padding: 12px;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    transition: border-color 120ms ease;
+}
+.report-card:hover { border-color: var(--line-strong); }
+.report-card h2 {
+    margin: 0 0 10px;
+    font-family: var(--font-mono);
+    font-size: 10px; font-weight: 600;
+    letter-spacing: .05em; text-transform: uppercase;
+    color: var(--text-2);
+}
+.report-row { display: flex; align-items: center; gap: 10px; }
+.report-value { min-width: 0; }
+.report-value .main { color: #fff; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.report-value .sub {
+    margin-top: 3px;
+    color: var(--text-2); font-size: 10px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.compass { width: 40px; height: 40px; flex: none; }
+.compass .ring { fill: none; stroke: #4a4c53; stroke-width: 1; }
+.compass .tick { stroke: #5a5c63; stroke-width: 1; }
+.compass .needle { fill: var(--swell); transform-box: view-box; transform-origin: 50% 50%; }
+
+@media (max-width: 719px) {
+    .report-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .report-card { padding: 10px 8px; }
+    .report-card h2 { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .report-row { gap: 8px; }
+    .compass { width: 32px; height: 32px; }
+    .report-value .main { font-size: 12px; }
+}
+
+@media (max-width: 767px) {
+    .station-shell { padding: 12px 12px 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+    }
+}

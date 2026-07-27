@@ -14,13 +14,11 @@
                 }
             }
         </script>
+        <link rel="stylesheet" href="/assets/theme.css">
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
-        
 
-        :root { color-scheme: dark; }
-        * { box-sizing: border-box; }
-        body { font-family: 'Inter', sans-serif !important; background: #0f1012; color: #e6e6e6; overflow: hidden; }
+        body { overflow: hidden; }
         /* h-screen is 100vh, which extends under mobile browser chrome and
            hides the bottom controls; the dynamic viewport unit tracks the
            real visible height. */
@@ -28,17 +26,42 @@
         /* MapLibre adds .maplibregl-map (position: relative) to the container,
            which defeats Tailwind's absolute/inset-0 — size it explicitly. */
         #map { width: 100%; height: 100%; }
-        button, input { letter-spacing: 0; }
-        .mono { font-family: 'JetBrains Mono', monospace; }
-        .surface { background: rgba(24, 25, 28, .96); border: 1px solid #34363b; box-shadow: 0 12px 30px rgba(0,0,0,.24); }
-        .icon-button { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid transparent; color: #a7a9ae; }
-        .icon-button:hover { color: #fff; background: #2a2c30; border-color: #3b3d42; }
-        .toolbar-button { height: 32px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid #3b3d42; background: #202125; color: #d6d7da; font-size: 12px; font-weight: 500; }
-        .toolbar-button:hover, .toolbar-button[aria-expanded="true"] { background: #2a2c30; color: #fff; }
+        /* Floating chrome sits over a light-to-dark basemap, so map surfaces
+           are more opaque and more strongly shadowed than page surfaces —
+           readability over the map wins over seeing through to it. */
+        .surface {
+            background: rgba(20, 21, 25, .97);
+            border: 1px solid var(--line-strong);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, .45);
+        }
         .top-menu { min-height: 44px; padding: 5px; gap: 3px; }
+        /* Legend: a continuous color scale rather than a stack of separate
+           keys, so it takes less of the map and reads top-to-bottom. */
+        .legend { width: 168px; padding: 9px 10px 8px; }
+        .legend-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
+        .legend-title { font-size: 11px; font-weight: 600; color: #fff; }
+        .legend-unit { font-size: 9px; letter-spacing: .08em; color: var(--text-3); }
+        .legend-scale { display: flex; flex-direction: column; }
+        .legend-band { display: flex; align-items: center; gap: 8px; height: 13px; }
+        .legend-band i { width: 22px; height: 100%; flex: none; }
+        .legend-band span { font-size: 10px; color: var(--text-1); }
+        .legend-readout {
+            margin-top: 8px; min-height: 14px;
+            font-size: 10px; line-height: 14px; color: var(--accent-soft);
+        }
+        .legend-toggles { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); display: grid; gap: 5px; }
+        .legend-toggle {
+            display: flex; align-items: center; gap: 7px;
+            font-size: 11px; color: var(--text-1); cursor: pointer;
+        }
+        .legend-toggle:hover { color: #fff; }
+        .legend-toggle input { width: 13px; height: 13px; accent-color: var(--accent); cursor: pointer; }
         .top-menu .toolbar-button { height: 34px; padding-inline: 11px; }
         .view-switch { width: 162px; height: 36px; padding: 4px; }
-        .view-switch a { width: 76px; height: 28px; flex: none; }
+        .view-switch a { width: 76px; height: 28px; flex: none; transition: background 120ms ease, color 120ms ease; }
+        /* The current view is stated with the brand accent, not a grey fill —
+           at 11px a grey-on-grey pill was easy to misread. */
+        .view-switch-active { background: var(--accent); color: #fff; }
         #signInBtn.is-user { width: 32px; padding: 0; border: 0; background: transparent; }
         .mobile-account-button { flex: none; }
         .mobile-account-button img { width: 24px; height: 24px; border-radius: 999px; }
@@ -48,7 +71,7 @@
            layout everywhere, including mobile. */
         .buoy-popup { width: min(230px, calc(100vw - 56px)); }
         .buoy-popup-name { margin: 0 28px 4px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
-        .buoy-popup-id { margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b8d93; }
+        .buoy-popup-id { margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #a6aab2; }
         .buoy-popup-meta { margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
         .buoy-popup-meta .buoy-popup-id { margin-bottom: 0; }
         .buoy-popup-actions { display: flex; gap: 6px; }
@@ -57,20 +80,20 @@
             width: 40px; height: 40px; flex: none;
             display: flex; align-items: center; justify-content: center;
             font-size: 18px; font-weight: 600; line-height: 1;
-            border: 1px solid #3b3d42; background: #202125; color: #6fcf97;
+            border: 1px solid #43454c; background: #1f2026; color: #6fcf97;
         }
-        .favorite-btn:hover { background: #34363b; }
+        .favorite-btn:hover { background: #2f3137; }
         .favorite-btn.is-favorite { color: #e06c75; }
         /* Search result kind badges: buoy indigo, beach (surf spot) sand */
         .search-badge {
             font-size: 9px; font-weight: 600; text-transform: uppercase;
             padding: 1px 5px; border: 1px solid currentColor; line-height: 14px;
         }
-        .search-badge-buoy { color: #8e97e8; }
-        .search-badge-beach { color: #f0a05a; }
+        .search-badge-buoy { color: #98a0ec; }
+        .search-badge-beach { color: #f4a967; }
         .search-favorite-star { font-size: 14px; line-height: 1; }
-        .favorite-star-buoy { color: #8e97e8; }
-        .favorite-star-beach { color: #f0a05a; }
+        .favorite-star-buoy { color: #98a0ec; }
+        .favorite-star-beach { color: #f4a967; }
         /* Favorites are a small, final DOM-marker pass above MapLibre's
            canvas layers and ordinary markers. */
         .favorite-map-marker {
@@ -91,23 +114,23 @@
         #forecastDialog { transform: translateY(8px) scale(.99); transition: transform 150ms ease; }
         #forecastModal.is-open #forecastDialog { transform: translateY(0) scale(1); }
         .maplibregl-popup { font-family: 'Inter', sans-serif; }
-        .maplibregl-popup-content { background: #18191c !important; color: #e6e6e6; border: 1px solid #3b3d42; border-radius: 0 !important; padding: 12px !important; box-shadow: 0 12px 30px rgba(0,0,0,.35) !important; }
+        .maplibregl-popup-content { background: #17181b !important; color: #edeef1; border: 1px solid #43454c; border-radius: 0 !important; padding: 12px !important; box-shadow: 0 12px 30px rgba(0,0,0,.35) !important; }
         .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
         .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
-        .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: #3b3d42 !important; }
+        .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: #43454c !important; }
         .maplibregl-popup-anchor-top .maplibregl-popup-tip,
         .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
-        .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: #3b3d42 !important; }
-        .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #3b3d42 !important; }
-        .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #3b3d42 !important; }
+        .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: #43454c !important; }
+        .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #43454c !important; }
+        .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #43454c !important; }
         .maplibregl-popup-close-button {
             top: 2px; right: 2px;
             width: 34px; height: 34px;
             display: flex; align-items: center; justify-content: center;
-            color: #8b8d93; font-size: 20px; line-height: 1;
+            color: #a6aab2; font-size: 20px; line-height: 1;
             border-radius: 0;
         }
-        .maplibregl-popup-close-button:hover { color: #fff; background: #2a2c30; }
+        .maplibregl-popup-close-button:hover { color: #fff; background: #292a30; }
         input[type="range"] { accent-color: #5e6ad2; }
         /* iOS Safari auto-zooms the page when a focused input's font-size
            is under 16px; keep the search at 16px on touch devices so
@@ -180,18 +203,18 @@
             border: 1px solid #e2b86b; color: #e2b86b;
             font-size: 9px; font-weight: 600; text-transform: uppercase;
         }
-        .surf-popup-period { border-top: 1px solid #34363b; padding: 6px 0 7px; }
+        .surf-popup-period { border-top: 1px solid #2f3137; padding: 6px 0 7px; }
         .surf-popup-period-name {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 9px; font-weight: 600; color: #8b8d93;
+            font-size: 9px; font-weight: 600; color: #a6aab2;
             text-transform: uppercase; margin-bottom: 3px;
         }
         .surf-popup-row { display: flex; justify-content: space-between; gap: 12px; font-size: 11px; line-height: 1.7; }
-        .surf-popup-row .k { color: #8b8d93; flex: none; }
-        .surf-popup-row .v { color: #e6e6e6; text-align: right; }
-        .surf-popup-remarks { font-size: 10px; color: #a7a9ae; margin-top: 3px; }
-        .surf-popup-tides { margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #8b8d93; line-height: 1.6; }
-        .surf-popup-loading { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b8d93; }
+        .surf-popup-row .k { color: #a6aab2; flex: none; }
+        .surf-popup-row .v { color: #edeef1; text-align: right; }
+        .surf-popup-remarks { font-size: 10px; color: #b7bac1; margin-top: 3px; }
+        .surf-popup-tides { margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #a6aab2; line-height: 1.6; }
+        .surf-popup-loading { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #a6aab2; }
         /* Forecast timeline scrubber: a 16-day track with day ticks and a
            sliding playhead. The real <input type="range"> sits invisibly on
            top so dragging/keyboard behavior stays native. */
@@ -199,13 +222,13 @@
         .timeline-track::before {
             content: '';
             position: absolute; left: 0; right: 0; bottom: 15px;
-            height: 1px; background: #2c2e33;
+            height: 1px; background: #2f3137;
         }
         .timeline-track:focus-within { outline: 1px solid #5e6ad2; outline-offset: 3px; }
         .timeline-tick {
             position: absolute; bottom: 15px;
             width: 1px; height: 7px;
-            background: #45474d;
+            background: #565961;
             transform: translateX(-0.5px);
             pointer-events: none;
         }
@@ -213,7 +236,7 @@
             position: absolute; bottom: 0;
             transform: translateX(-50%);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 9px; color: #6f7177;
+            font-size: 9px; color: #8b9099;
             white-space: nowrap;
             pointer-events: none;
         }
@@ -280,7 +303,7 @@
     </head>
 
 
-    <body class="h-screen w-screen relative bg-[#0f1012]">
+    <body class="h-screen w-screen relative bg-[#0e0f12]">
         <script src='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js'></script>
         <link href='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css' rel='stylesheet' />
 
@@ -289,7 +312,7 @@
             <div
                           id="map"
                           class="absolute inset-0 z-0"
-                          style="background: #ccc;"
+                          style="background: #0e0f12;"
                           >
                           <!-- Initialize map -->
             </div>
@@ -297,8 +320,8 @@
 
         <!-- Primary view switch -->
         <nav class="surface view-switch absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center" aria-label="Primary view">
-            <a href="/map" aria-current="page" class="flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Map</a>
-            <a href="/favorites" class="flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Favorites</a>
+            <a href="/map" aria-current="page" class="view-switch-active flex items-center justify-center text-[11px] font-semibold">Map</a>
+            <a href="/favorites" class="flex items-center justify-center text-[11px] font-medium text-[#a6aab2] hover:text-white hover:bg-[#292a30]">Favorites</a>
         </nav>
 
         <!-- 2) Header "island" at the top -->
@@ -313,22 +336,22 @@
 
             <!-- Compact search trigger: below the full-header threshold the
                  inline bar reopens as a centered overlay -->
-            <button id="mobileSearchBtn" class="compact-only surface w-9 h-9 items-center justify-center text-[#c6c7ca] shrink-0" onclick="openMobileSearch()" aria-label="Search stations">
+            <button id="mobileSearchBtn" class="compact-only surface w-9 h-9 items-center justify-center text-[#d5d7dc] shrink-0" onclick="openMobileSearch()" aria-label="Search stations">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
             </button>
 
             <!-- Search -->
             <div id="searchBox" class="searchbox relative w-full max-w-[440px]">
                 <div class="surface relative h-9 flex items-center focus-within:border-[#5e6ad2]">
-                    <svg class="absolute left-3 pointer-events-none text-[#8b8d93]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                    <svg class="absolute left-3 pointer-events-none text-[#a6aab2]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                     <input
                      type="text"
                      id="searchInput"
                      autocomplete="off"
-                     class="w-full h-full bg-transparent pl-9 pr-10 text-[13px] text-white placeholder-[#8b8d93] outline-none border-0"
+                     class="w-full h-full bg-transparent pl-9 pr-10 text-[13px] text-white placeholder-[#a6aab2] outline-none border-0"
                      placeholder="Search stations..."
                      >
-                    <kbd class="mono absolute right-2.5 hidden md:flex items-center justify-center w-5 h-5 text-[10px] text-[#8b8d93] border border-[#3b3d42] bg-[#202125] pointer-events-none">/</kbd>
+                    <kbd class="mono absolute right-2.5 hidden md:flex items-center justify-center w-5 h-5 text-[10px] text-[#a6aab2] border border-[#43454c] bg-[#1f2026] pointer-events-none">/</kbd>
                 </div>
                 <div id="searchResults" class="surface absolute z-50 left-0 right-0 top-full mt-1 max-h-[280px] overflow-y-auto empty:hidden"></div>
             </div>
@@ -375,7 +398,7 @@
                      class="fixed z-50 inset-0 bg-black/60 backdrop-blur-[2px]
                             flex items-start justify-center pt-[20vh] hidden">
                     <div class="signinmodal surface relative w-[300px]">
-                        <div class="h-11 px-4 border-b border-[#34363b] flex items-center justify-between">
+                        <div class="h-11 px-4 border-b border-[#2f3137] flex items-center justify-between">
                             <span class="text-sm font-semibold text-white">Sign in</span>
                             <button id="closeModal" class="icon-button" aria-label="Close">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg>
@@ -388,7 +411,7 @@
                                      alt="Google" style="width: 16px; height: 16px;">
                                 Sign in with Google
                             </button>
-                            <p class="mt-3 text-[11px] text-[#8b8d93] leading-relaxed">Sign in to save your favorite stations.</p>
+                            <p class="mt-3 text-[11px] text-[#a6aab2] leading-relaxed">Sign in to save your favorite stations.</p>
                         </div>
                     </div>
                 </div>
@@ -396,17 +419,17 @@
                 <!-- User Popup -->
                 <div id="userPopup"
                      class="surface absolute top-full right-0 mt-2 w-56 overflow-hidden z-10 hidden">
-                    <div class="px-3 py-2.5 border-b border-[#34363b] flex items-start justify-between gap-2">
+                    <div class="px-3 py-2.5 border-b border-[#2f3137] flex items-start justify-between gap-2">
                         <div class="min-w-0">
                             <p id="userName" class="text-[13px] font-medium text-white truncate"></p>
-                            <p id="userEmail" class="text-[11px] text-[#8b8d93] truncate"></p>
+                            <p id="userEmail" class="text-[11px] text-[#a6aab2] truncate"></p>
                         </div>
                         <button id="closeUserPopup" class="icon-button !w-6 !h-6 shrink-0" aria-label="Close">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg>
                         </button>
                     </div>
                     <a href="#" id="signOutBtn"
-                                class="block px-3 py-2 text-xs text-[#d6d7da] hover:bg-[#2a2c30]">
+                                class="block px-3 py-2 text-xs text-[#d5d7dc] hover:bg-[#292a30]">
                         Sign out
                     </a>
                 </div>
@@ -417,36 +440,41 @@
             <!-- Forecast dialog -->
             <div id="forecastModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px] flex items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-labelledby="forecastModalTitle">
                 <div id="forecastDialog" class="surface relative w-full max-w-[1180px] h-[88vh] max-h-[900px] flex flex-col overflow-hidden">
-                    <div class="h-12 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
-                        <div class="min-w-0"><div id="forecastModalTitle" class="text-sm font-semibold text-white truncate">Station report & forecast</div><div id="forecastStation" class="mono text-[10px] text-[#8b8d93]"></div></div>
+                    <div class="h-12 px-4 border-b border-[#2f3137] flex items-center justify-between shrink-0">
+                        <div class="min-w-0"><div id="forecastModalTitle" class="text-sm font-semibold text-white truncate">Station report & forecast</div><div id="forecastStation" class="mono text-[10px] text-[#a6aab2]"></div></div>
                         <button class="icon-button" onclick="closeForecast()" aria-label="Close forecast"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
                     </div>
-                    <div id="forecastLoading" class="absolute inset-12 flex items-center justify-center text-xs text-[#8b8d93]">Loading forecast...</div>
-                    <iframe id="forecastFrame" class="relative flex-1 w-full bg-[#1e293b] opacity-0" title="Station report and forecast"></iframe>
+                    <div id="forecastLoading" class="absolute inset-12 flex items-center justify-center text-xs text-[#a6aab2]">Loading forecast...</div>
+                    <iframe id="forecastFrame" class="relative flex-1 w-full bg-[#0e0f12] opacity-0" title="Station report and forecast"></iframe>
                 </div>
             </div>
 
 
-            <!-- Legend (rows are generated from SWELL_BANDS in the map script) -->
-            <div class="legend surface absolute bottom-3 left-3 z-20 p-3 hidden lg:block">
-                <div class="text-xs font-semibold mb-2 dark:text-white">Swell height (m)</div>
-                <div id="legendBands" class="flex flex-col gap-1"></div>
-                <div id="legendReadout" class="text-xs mt-2 min-h-[1rem] text-gray-700 dark:text-gray-200"></div>
-                <label class="flex items-center gap-1.5 mt-1 text-xs dark:text-white cursor-pointer">
-                    <input type="checkbox" id="arrowsToggle" checked>
-                    Swell arrows
-                </label>
-                <label class="flex items-center gap-1.5 mt-1 text-xs dark:text-white cursor-pointer">
-                    <input type="checkbox" id="heatmapToggle" checked>
-                    Smooth PNG layer
-                </label>
+            <!-- Legend (bands are generated from SWELL_BANDS in the map script) -->
+            <div class="legend surface absolute bottom-3 left-3 z-20 hidden lg:block">
+                <div class="legend-head">
+                    <span class="legend-title">Swell height</span>
+                    <span class="legend-unit mono">M</span>
+                </div>
+                <div id="legendBands" class="legend-scale"></div>
+                <div id="legendReadout" class="legend-readout mono"></div>
+                <div class="legend-toggles">
+                    <label class="legend-toggle">
+                        <input type="checkbox" id="arrowsToggle" checked>
+                        Swell arrows
+                    </label>
+                    <label class="legend-toggle">
+                        <input type="checkbox" id="heatmapToggle" checked>
+                        Smooth PNG layer
+                    </label>
+                </div>
             </div>
 
             <!-- 5) Bottom Controls (overlay at bottom) -->
             <div class="bottom-controls absolute bottom-3 left-3 right-3 flex flex-col sm:flex-row items-stretch sm:items-end justify-end gap-2 z-10">
                 <!-- Metadata Container -->
                 <div class="surface h-10 px-3 hidden lg:flex items-center gap-2 min-w-fit">
-                    <span class="text-[10px] font-medium uppercase text-[#8b8d93]">Updated</span>
+                    <span class="text-[10px] font-medium uppercase text-[#a6aab2]">Updated</span>
                     <span id="metadataTimestamp" class="mono text-[10px] text-white"></span>
                 </div>
 
@@ -457,7 +485,7 @@
                             <path d="M8 5v14l11-7z"/>
                         </svg>
                     </button>
-                    <div class="flex flex-col shrink-0 min-w-[92px] pr-3 border-r border-[#34363b]">
+                    <div class="flex flex-col shrink-0 min-w-[92px] pr-3 border-r border-[#2f3137]">
                         <span id="timeDay" class="text-[13px] font-semibold leading-tight text-white">--</span>
                         <span id="timeClock" class="mono text-[11px] leading-tight text-[#8f9bff] mt-0.5">--:--</span>
                     </div>
@@ -776,14 +804,19 @@
                 fillColorExpression.push(band.min, band.color);
             }
 
-            // Legend rows, highest band on top
+            // Legend rows, highest band on top. The swatches butt up against
+            // each other so the eleven bands read as one continuous scale
+            // rather than eleven separate keys.
             const legendBands = document.getElementById('legendBands');
             [...SWELL_BANDS].reverse().forEach(band => {
                 const row = document.createElement('div');
-                row.className = 'flex items-center gap-2';
-                row.innerHTML =
-                    `<div class="w-6 h-4" style="background-color: ${band.color};"></div>` +
-                    `<span class="text-xs dark:text-white">${band.label}</span>`;
+                row.className = 'legend-band';
+                const swatch = document.createElement('i');
+                swatch.style.backgroundColor = band.color;
+                const label = document.createElement('span');
+                label.className = 'mono';
+                label.textContent = band.label;
+                row.append(swatch, label);
                 legendBands.appendChild(row);
             });
 
@@ -1270,11 +1303,11 @@
                     for (let k = 1; k <= 3; k++) {
                         const h = f.properties[`h${k}`];
                         if (h === undefined) continue;
-                        rows.push(`<div class="text-xs" style="color: #c6c7ca;">${h} m @ ${f.properties[`p${k}`]} s from ${f.properties[`d${k}`]}&deg;</div>`);
+                        rows.push(`<div class="text-xs" style="color: #d5d7dc;">${h} m @ ${f.properties[`p${k}`]} s from ${f.properties[`d${k}`]}&deg;</div>`);
                     }
                     if (rows.length > 1) {
                         arrowPopup.setHTML(base +
-                            `<div class="mono" style="margin: 6px 0 2px; font-size: 9px; color: #8b8d93; text-transform: uppercase;">Swell systems</div>` +
+                            `<div class="mono" style="margin: 6px 0 2px; font-size: 9px; color: #a6aab2; text-transform: uppercase;">Swell systems</div>` +
                             rows.join(''));
                     }
                 });
@@ -1849,7 +1882,7 @@
 
                 if (!matches.length) {
                     const empty = document.createElement('div');
-                    empty.className = 'px-3 py-2.5 text-xs text-[#8b8d93]';
+                    empty.className = 'px-3 py-2.5 text-xs text-[#a6aab2]';
                     empty.textContent = 'No matches found';
                     searchResults.appendChild(empty);
                     return;
@@ -1858,7 +1891,7 @@
                 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
                 matches.forEach(match => {
                     const div = document.createElement('div');
-                    div.className = 'flex items-center justify-between gap-3 px-3 py-2 cursor-pointer border-b border-[#26272b] last:border-b-0 hover:bg-[#2a2c30]';
+                    div.className = 'flex items-center justify-between gap-3 px-3 py-2 cursor-pointer border-b border-[#2f3137] last:border-b-0 hover:bg-[#292a30]';
                     const badge = match.type === 'buoy'
                         ? '<span class="search-badge search-badge-buoy shrink-0">Buoy</span>'
                         : '<span class="search-badge search-badge-beach shrink-0">Beach</span>';
@@ -1866,9 +1899,9 @@
                         ? `<span class="search-favorite-star favorite-star-${match.type === 'buoy' ? 'buoy' : 'beach'}" title="Favorite" aria-label="Favorite">&#9733;</span>`
                         : '';
                     div.innerHTML =
-                        `<span class="flex items-center gap-2 min-w-0">${favoriteStar}<span class="text-[13px] text-[#d6d7da] truncate">${esc(match.name)}</span></span>` +
+                        `<span class="flex items-center gap-2 min-w-0">${favoriteStar}<span class="text-[13px] text-[#d5d7dc] truncate">${esc(match.name)}</span></span>` +
                         `<span class="flex items-center gap-2 shrink-0 max-w-[55%]">${badge}` +
-                        `<span class="mono text-[10px] text-[#8b8d93] truncate">${esc(match.sub)}</span></span>`;
+                        `<span class="mono text-[10px] text-[#a6aab2] truncate">${esc(match.sub)}</span></span>`;
                     div.onclick = function () {
                         searchResults.innerHTML = '';
                         searchInput.value = match.name;
@@ -1909,10 +1942,10 @@
 
                 let html = `<div class="w-[250px]">
                     <div class="text-[13px] font-medium text-white leading-snug mb-1 pr-4">${st.name || 'Tide station'}</div>
-                    <div class="mono text-[10px] text-[#8b8d93] mb-2">TIDE ${st.id} &middot; MLLW</div>`;
+                    <div class="mono text-[10px] text-[#a6aab2] mb-2">TIDE ${st.id} &middot; MLLW</div>`;
 
                 if (preds.length < 2) {
-                    return html + '<div class="text-xs text-[#8b8d93]">No predictions available.</div></div>';
+                    return html + '<div class="text-xs text-[#a6aab2]">No predictions available.</div></div>';
                 }
 
                 // current level + trend from the two predictions around now
@@ -1936,7 +1969,7 @@
                 const fmtTime = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
                 html += `<div class="text-xs text-white font-semibold">${(level * M_TO_FT).toFixed(1)} ft &middot; ${rising ? 'rising' : 'falling'}</div>`;
                 if (extremum) {
-                    html += `<div class="text-[11px] text-[#a7a9ae] mt-0.5">${extremum.kind} ${(extremum.v * M_TO_FT).toFixed(1)} ft at ${fmtTime.format(new Date(extremum.t))}</div>`;
+                    html += `<div class="text-[11px] text-[#b7bac1] mt-0.5">${extremum.kind} ${(extremum.v * M_TO_FT).toFixed(1)} ft at ${fmtTime.format(new Date(extremum.t))}</div>`;
                 }
 
                 // sparkline: last 24h observed (gray) + next 48h predicted (teal)
@@ -1952,11 +1985,11 @@
                     const nowX = xOf(now).toFixed(1);
                     html += `<svg width="${W}" height="${H}" class="mt-2" style="display:block;">
                         <line x1="${nowX}" y1="0" x2="${nowX}" y2="${H}" stroke="#5e6ad2" stroke-dasharray="3,3"/>
-                        ${window_.obs.length > 1 ? `<path d="${line(window_.obs.filter((_, j) => j % 5 === 0))}" fill="none" stroke="#8b8d93" stroke-width="1"/>` : ''}
+                        ${window_.obs.length > 1 ? `<path d="${line(window_.obs.filter((_, j) => j % 5 === 0))}" fill="none" stroke="#a6aab2" stroke-width="1"/>` : ''}
                         <path d="${line(window_.preds)}" fill="none" stroke="#15a3a3" stroke-width="1.5"/>
                         <circle cx="${nowX}" cy="${yOf(level).toFixed(1)}" r="2.5" fill="#fff"/>
                     </svg>
-                    <div class="mono text-[9px] text-[#6f7177] mt-1">-24H &middot; NOW &middot; +48H</div>`;
+                    <div class="mono text-[9px] text-[#8b9099] mt-1">-24H &middot; NOW &middot; +48H</div>`;
                 }
                 return html + '</div>';
             }
@@ -1994,7 +2027,7 @@
             // outline clears when the popup closes, so only the selected
             // zone is ever drawn.
             const RIP_COLORS = { low: '#6fcf97', moderate: '#e2b86b', high: '#e06c75' };
-            const ripColor = risk => RIP_COLORS[(risk || '').toLowerCase().split(' ')[0]] || '#8b8d93';
+            const ripColor = risk => RIP_COLORS[(risk || '').toLowerCase().split(' ')[0]] || '#a6aab2';
 
             function ensureSurfOutlineLayer() {
                 if (map.getSource('surf-zone-outline')) return;
@@ -2107,7 +2140,7 @@
             // Too many for DOM markers, so they render as a clustered WebGL
             // circle layer. Clicking a spot opens a popup whose button loads
             // the model forecast page in the shared modal iframe.
-            const SPOT_COLOR = '#f0a05a';
+            const SPOT_COLOR = '#f4a967';
 
             function spotPopupHTML(p) {
                 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');

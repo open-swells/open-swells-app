@@ -2,19 +2,25 @@
 <div>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const isDarkMode = () => document.documentElement.classList.contains('dark');
+            // Every chart color comes from the theme's custom properties, so
+            // the SVG series, the legend chips, and the server-rendered
+            // markup can never disagree about what "good" or "wind" looks like.
+            const themeColor = (name, fallback) =>
+                getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
-            const getChartColors = () => {
-                const darkMode = isDarkMode();
-                return {
-                    linePrimary: '#8f9bff',
-                    lineSecondary: '#e2b86b',
-                    lineTertiary: '#6fcf97',
-                    lineQuaternary: '#b89cff',
-                    axis: darkMode ? '#7f8187' : '#62646a',
-                    verticalLine: '#5e6ad2'
-                };
+            const CHART = {
+                linePrimary: themeColor('--swell', '#8f9bff'),
+                lineSecondary: themeColor('--swell-2', '#e2b86b'),
+                lineTertiary: themeColor('--swell-3', '#6fcf97'),
+                lineQuaternary: themeColor('--swell-4', '#b89cff'),
+                wind: themeColor('--wind', '#eec37c'),
+                axis: themeColor('--text-3', '#8b9099'),
+                grid: themeColor('--line', '#2f3137'),
+                gridStrong: themeColor('--line-strong', '#43454c'),
+                verticalLine: themeColor('--accent-bright', '#8f9bff'),
+                label: themeColor('--text-3', '#8b9099'),
             };
+            const getChartColors = () => CHART;
 
             // 16-point compass rose; forecast directions read as cardinals
             const CARDINALS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
@@ -189,7 +195,12 @@
             data = data.filter(item => includedDays.has(localDateKey(item.dateObj)));
             dataGroupedByDay = groupDataByDay(data);
             const dayStats = {}; // key -> {avgFt, cond}, feeds the day log line
-            const CONDITION_COLORS = { epic: '#b48cff', good: '#45c4b0', fair: '#e2b86b', poor: '#e06c75' };
+            const CONDITION_COLORS = {
+                epic: themeColor('--cond-epic', '#bb97ff'),
+                good: themeColor('--cond-good', '#4fd1bc'),
+                fair: themeColor('--cond-fair', '#eec478'),
+                poor: themeColor('--cond-poor', '#ef7a83'),
+            };
 
             // Hourly surf-condition classifier output, injected by the spot
             // page (buoy pages have none). Rendered as a lane in the 16-day
@@ -328,8 +339,8 @@
 
                 const grad = svg.append('defs').append('linearGradient')
                     .attr('id', 'stripFill').attr('x1', 0).attr('y1', 0).attr('x2', 0).attr('y2', 1);
-                grad.append('stop').attr('offset', '0%').attr('stop-color', '#5e6ad2').attr('stop-opacity', 0.45);
-                grad.append('stop').attr('offset', '100%').attr('stop-color', '#5e6ad2').attr('stop-opacity', 0.02);
+                grad.append('stop').attr('offset', '0%').attr('stop-color', CHART.linePrimary).attr('stop-opacity', 0.45);
+                grad.append('stop').attr('offset', '100%').attr('stop-color', CHART.linePrimary).attr('stop-opacity', 0.02);
 
                 // selected-day band spans both lanes
                 stripSel = svg.append('rect')
@@ -345,7 +356,7 @@
                         .attr('y1', swTop - 6).attr('y2', gridBase + 4)
                         .attr('stroke', 'rgba(255, 255, 255, 0.05)');
                     if (i % labelStep === 1) {
-                        stripMono(svg.append('text'), 9, '#6f7177')
+                        stripMono(svg.append('text'), 9, CHART.label)
                             .attr('x', Math.max(18, Math.min(width - 18, x(day))))
                             .attr('y', height - 4)
                             .attr('text-anchor', 'middle')
@@ -359,7 +370,7 @@
                     svg.append('line')
                         .attr('x1', 0).attr('x2', width)
                         .attr('y1', baseline).attr('y2', baseline)
-                        .attr('stroke', '#3b3d42');
+                        .attr('stroke', CHART.gridStrong);
                 }
 
                 // swell lane
@@ -367,7 +378,7 @@
                     .attr('fill', 'url(#stripFill)')
                     .attr('d', d3.area().x(p => x(p.t)).y0(swBase).y1(p => y(p.ft)).curve(d3.curveMonotoneX));
                 svg.append('path').datum(stripPts)
-                    .attr('fill', 'none').attr('stroke', '#8f9bff').attr('stroke-width', 1.5)
+                    .attr('fill', 'none').attr('stroke', CHART.linePrimary).attr('stroke-width', 1.5)
                     .attr('d', d3.line().x(p => x(p.t)).y(p => y(p.ft)).curve(d3.curveMonotoneX));
 
                 const peak = stripPts.reduce((a, b) => (b.ft > a.ft ? b : a));
@@ -383,7 +394,7 @@
                 // wind lane
                 let yw = null;
                 if (showWindLane) {
-                    stripMono(svg.append('text'), 8, '#6f7177')
+                    stripMono(svg.append('text'), 9, CHART.label)
                         .attr('x', 2).attr('y', wdTop - 5)
                         .text('WIND (MPH)');
                 }
@@ -393,9 +404,9 @@
                     svg.append('line').attr('class', 'wind-loading')
                         .attr('x1', 0).attr('x2', width)
                         .attr('y1', wdMid).attr('y2', wdMid)
-                        .attr('stroke', '#e2b86b').attr('stroke-width', 1.5)
+                        .attr('stroke', CHART.wind).attr('stroke-width', 1.5)
                         .attr('stroke-dasharray', '4,5');
-                    stripMono(svg.append('text').attr('class', 'wind-loading'), 9, '#e2b86b')
+                    stripMono(svg.append('text').attr('class', 'wind-loading'), 9, CHART.wind)
                         .attr('x', width / 2).attr('y', wdMid - 8)
                         .attr('text-anchor', 'middle')
                         .text('loading wind…');
@@ -404,13 +415,13 @@
                     const maxMph = d3.max(windPts, w => w.s) * 2.237;
                     yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 5)]).range([wdBase, wdTop]);
                     svg.append('path').datum(windPts)
-                        .attr('fill', 'none').attr('stroke', '#e2b86b').attr('stroke-width', 1.5)
+                        .attr('fill', 'none').attr('stroke', CHART.wind).attr('stroke-width', 1.5)
                         .attr('d', d3.line().x(w => x(w.t)).y(w => yw(w.s * 2.237)).curve(d3.curveMonotoneX));
                     const windPeak = windPts.reduce((a, b) => (b.s > a.s ? b : a));
                     svg.append('circle')
                         .attr('cx', x(windPeak.t)).attr('cy', yw(windPeak.s * 2.237)).attr('r', 2)
-                        .attr('fill', '#e2b86b');
-                    stripMono(svg.append('text'), 9, '#e2b86b')
+                        .attr('fill', CHART.wind);
+                    stripMono(svg.append('text'), 9, CHART.wind)
                         .attr('x', Math.max(28, Math.min(width - 28, x(windPeak.t))))
                         .attr('y', Math.max(yw(windPeak.s * 2.237) - 5, wdTop + 8))
                         .attr('text-anchor', 'middle')
@@ -420,7 +431,7 @@
                 // conditions lane: one bar per hour, height = score,
                 // color = rating, on the same time scale as the lanes above
                 if (showCondLane) {
-                    stripMono(svg.append('text'), 8, '#6f7177')
+                    stripMono(svg.append('text'), 9, CHART.label)
                         .attr('x', 2).attr('y', cdTop - 5)
                         .text('CONDITIONS');
                     const hourW = x(new Date(domainStart.getTime() + 3600e3)) - x(domainStart);
@@ -471,13 +482,13 @@
                             row.append(dot, rowLabel, rowValue);
                             stripTooltip.appendChild(row);
                         };
-                        appendTooltipRow('SWELL', `${p.ft.toFixed(1)} ft`, '#8f9bff');
+                        appendTooltipRow('SWELL', `${p.ft.toFixed(1)} ft`, CHART.linePrimary);
 
                         let text = `${stripTimeFmt(p.t)} · ${p.ft.toFixed(1)} ft`;
                         if (hasWind) {
                             const w = windPts[windBisect(windPts, t)];
                             const windText = `${(w.s * 2.237).toFixed(0)} mph`;
-                            appendTooltipRow('WIND', windText, '#e2b86b');
+                            appendTooltipRow('WIND', windText, CHART.wind);
                             text += ` · ${windText}`;
                         }
                         if (showCondLane) {
@@ -562,11 +573,36 @@
             const setAxisColor = () => {
                 const colors = getChartColors();
                 svg.selectAll(".yaxis, .xaxis").selectAll("text").style("fill", colors.axis);
-                svg.selectAll(".xaxis").selectAll("path, line").style("stroke", '#45474d');
+                svg.selectAll(".xaxis").selectAll("path, line").style("stroke", CHART.gridStrong);
                 svg.selectAll(".yaxis").selectAll("path").style("stroke", 'none');
-                svg.selectAll(".yaxis").selectAll("line").style("stroke", '#34363b');
+                svg.selectAll(".yaxis").selectAll("line").style("stroke", CHART.grid);
             };
             setAxisColor();
+
+            // Chart key. A train is listed only if it has height on the
+            // selected day, so the key always matches what is drawn.
+            function renderSwellLegend(dayRows, hasWind) {
+                const host = document.getElementById('swellLegend');
+                if (!host) return;
+                const entries = [
+                    ['Primary', 'PrimaryWaveHeight', CHART.linePrimary],
+                    ['Secondary', 'SecondaryWaveHeight', CHART.lineSecondary],
+                    ['Tertiary', 'TertiaryWaveHeight', CHART.lineTertiary],
+                    ['4th', 'QuaternaryWaveHeight', CHART.lineQuaternary],
+                ].filter(([, field]) => dayRows.some(row => parseFloat(row[field]) > 0));
+                if (hasWind) entries.push(['Wind', null, CHART.wind]);
+                host.replaceChildren(...entries.map(([label, , color]) => {
+                    const item = document.createElement('span');
+                    item.style.color = color;
+                    const swatch = document.createElement('i');
+                    const text = document.createElement('em');
+                    text.style.fontStyle = 'normal';
+                    text.style.color = 'var(--text-2)';
+                    text.textContent = label;
+                    item.append(swatch, text);
+                    return item;
+                }));
+            }
 
             function updateChart(data, svg) {
                 if (!data || data.length === 0) return;
@@ -632,7 +668,11 @@
                 yScale.domain([0, maxWaveHeight]);
                 // dedupe ticks that would render identical labels
                 yAxis.tickValues([...new Set(yScale.ticks(3).map(v => +v.toFixed(1)))]);
-                svg.select(".yaxis").transition().duration(200).call(yAxis);
+                // Drawn without a transition: updateChart runs again when the
+                // wind fetch lands, and the second call used to interrupt the
+                // first one's exit transition, leaving stale tick labels from
+                // the previous domain on the axis alongside the new ones.
+                svg.select(".yaxis").call(yAxis);
                 setAxisColor();
 
                 const linePrimary = d3.line().x(d => x(d.hour)).y(d => y(d.PrimaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
@@ -645,6 +685,8 @@
                 svg.selectAll(".lineTertiary").data([data]).join("path").attr("class", "lineTertiary").attr("d", lineTertiary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineTertiary);
                 svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineQuaternary);
 
+                renderSwellLegend(data, showWind || windDayPts.length);
+
                 svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.PrimaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(28)).attr("fill", chartColors.linePrimary);
                 svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.SecondaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(24)).attr("fill", chartColors.lineSecondary);
                 svg.selectAll(".tertiaryPoint").data(data).join("path").attr("class", "tertiaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.TertiaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(20)).attr("fill", chartColors.lineTertiary);
@@ -656,33 +698,33 @@
                     lane.append("line")
                         .attr("x1", 0).attr("x2", width)
                         .attr("y1", height).attr("y2", height)
-                        .attr("stroke", '#34363b');
+                        .attr("stroke", CHART.grid);
                     lane.append("text")
                         .attr("x", 0).attr("y", height + 15)
-                        .attr("fill", '#6f7177').attr("font-size", 8)
+                        .attr("fill", CHART.label).attr("font-size", 9)
                         .text('SURFACE WIND · MPH');
                     if (windState === 'loading') {
                         lane.append("line").attr("class", "wind-loading")
                             .attr("x1", 0).attr("x2", width)
                             .attr("y1", wdMid).attr("y2", wdMid)
-                            .attr("stroke", '#e2b86b').attr("stroke-width", 1.5)
+                            .attr("stroke", CHART.wind).attr("stroke-width", 1.5)
                             .attr("stroke-dasharray", '4,5');
                         lane.append("text").attr("class", "wind-loading")
                             .attr("x", width / 2).attr("y", wdMid - 8)
                             .attr("text-anchor", 'middle')
-                            .attr("fill", '#e2b86b').attr("font-size", 9)
+                            .attr("fill", CHART.wind).attr("font-size", 9)
                             .text('loading wind…');
                     } else if (!windDayPts.length) {
                         lane.append("text")
                             .attr("x", width / 2).attr("y", wdMid)
                             .attr("text-anchor", 'middle')
-                            .attr("fill", '#6f7177').attr("font-size", 9)
+                            .attr("fill", CHART.label).attr("font-size", 9)
                             .text('no wind data for this day');
                     } else {
                         const maxMph = d3.max(windDayPts, w => w.s) * 2.237;
                         const yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 5)]).range([wdBase, wdTop]);
                         lane.append("path").datum(windDayPts)
-                            .attr("fill", 'none').attr("stroke", '#e2b86b').attr("stroke-width", 1.5)
+                            .attr("fill", 'none').attr("stroke", CHART.wind).attr("stroke-width", 1.5)
                             .attr("d", d3.line().x(w => x(w.hour)).y(w => yw(w.s * 2.237)).curve(d3.curveMonotoneX));
                         // an arrow per sample carries the direction; the peak
                         // is the one labeled point
@@ -690,10 +732,10 @@
                         for (const w of windDayPts) {
                             const g = lane.append("g")
                                 .attr("transform", `translate(${x(w.hour)}, ${yw(w.s * 2.237)})`);
-                            g.append("circle").attr("r", 2).attr("fill", '#e2b86b');
+                            g.append("circle").attr("r", 2).attr("fill", CHART.wind);
                             g.append("path")
                                 .attr("d", 'M0 -9 L2.6 -4.4 L1 -4.4 L1 2 L-1 2 L-1 -4.4 L-2.6 -4.4 Z')
-                                .attr("fill", '#e2b86b')
+                                .attr("fill", CHART.wind)
                                 .attr("transform", `rotate(${w.d + 180}) translate(0, -7)`)
                                 .attr("opacity", 0.9);
                             if (w === windPeak) {
@@ -701,7 +743,7 @@
                                     .attr("x", Math.max(16, Math.min(width - 16, x(w.hour))))
                                     .attr("y", Math.max(yw(w.s * 2.237) - 14, wdTop - 2))
                                     .attr("text-anchor", 'middle')
-                                    .attr("fill", '#e2b86b').attr("font-size", 9)
+                                    .attr("fill", CHART.wind).attr("font-size", 9)
                                     .text(`${(w.s * 2.237).toFixed(0)} mph`);
                             }
                         }
@@ -716,16 +758,16 @@
                     lane.append("line")
                         .attr("x1", 0).attr("x2", width)
                         .attr("y1", windBottom).attr("y2", windBottom)
-                        .attr("stroke", '#34363b');
+                        .attr("stroke", CHART.grid);
                     const dayBest = condDayPts.reduce((a, b) => (b.score > a.score ? b : a));
                     lane.append("text")
                         .attr("x", 0).attr("y", windBottom + 13)
-                        .attr("fill", '#6f7177').attr("font-size", 8)
+                        .attr("fill", CHART.label).attr("font-size", 9)
                         .text('SURF CONDITIONS');
                     lane.append("text")
                         .attr("x", width).attr("y", windBottom + 13)
                         .attr("text-anchor", 'end')
-                        .attr("fill", CONDITION_COLORS[dayBest.rating]).attr("font-size", 8)
+                        .attr("fill", CONDITION_COLORS[dayBest.rating]).attr("font-size", 9)
                         .attr("font-weight", 600)
                         .text(`BEST ${String(dayBest.hour).padStart(2, '0')}:00 · ${dayBest.rating.toUpperCase()}`);
                     const yc = d3.scaleLinear().domain([0, 100]).range([cdBase, cdTop]);
@@ -768,8 +810,8 @@
                         const w = windDayPts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
                         windRow = detailTooltipRow(
                             'WIND',
-                            '#e2b86b',
-                            `${createArrowHTML(w.d, '#e2b86b')}${(w.s * 2.237).toFixed(0)} mph · ${cardinal(w.d)}`
+                            CHART.wind,
+                            `${createArrowHTML(w.d, CHART.wind)}${(w.s * 2.237).toFixed(0)} mph · ${cardinal(w.d)}`
                         );
                     }
                     let condRow = '';
@@ -838,22 +880,25 @@
     </script>
 
     <style>
-        .swell-strip { position: relative; margin-top: 12px; background: #202125; border: 1px solid #34363b; }
-        .swell-strip .strip-title, .swell-strip #stripReadout { font-family: 'JetBrains Mono', monospace; }
+        .swell-strip { position: relative; margin-top: 12px; background: var(--raised); border: 1px solid var(--line); }
+        .swell-strip .strip-title, .swell-strip #stripReadout { font-family: var(--font-mono); }
         .swell-strip svg { display: block; }
-        .strip-hover-line { position: absolute; z-index: 3; top: 0; bottom: 0; display: none; width: 1px; background: #c6ccff; box-shadow: 0 0 7px rgba(143, 155, 255, .45); pointer-events: none; }
+        .strip-hover-line { position: absolute; z-index: 3; top: 0; bottom: 0; display: none; width: 1px; background: var(--accent-soft); box-shadow: 0 0 7px rgba(143, 155, 255, .45); pointer-events: none; }
+        /* Hover tooltips are the fastest way to read an exact value off any
+           chart here, so they are sized for reading, not for minimalism:
+           10px values, a full-contrast header, and a solid backdrop. */
         .strip-panel-tooltip {
-            position: absolute; z-index: 5; display: none; min-width: 144px;
-            padding: 9px 10px; border: 1px solid #575c75; border-left: 2px solid #8f9bff;
-            background: linear-gradient(145deg, rgba(37, 39, 49, .98), rgba(20, 21, 25, .98));
-            box-shadow: 0 12px 28px rgba(0, 0, 0, .45);
-            color: #dfe1e7; font-family: 'JetBrains Mono', monospace;
-            font-size: 9px; line-height: 1.4; pointer-events: none;
+            position: absolute; z-index: 5; display: none; min-width: 152px;
+            padding: 9px 10px; border: 1px solid #5a5f78; border-left: 2px solid var(--swell);
+            background: rgba(20, 21, 26, .98);
+            box-shadow: var(--shadow-pop);
+            color: var(--text); font-family: var(--font-mono);
+            font-size: 10px; line-height: 1.45; pointer-events: none;
         }
-        .forecast-tooltip-date { margin-bottom: 7px; padding-bottom: 6px; border-bottom: 1px solid #3b3e49; color: #f0f0f1; font-weight: 600; white-space: nowrap; }
-        .forecast-tooltip-row { display: grid; grid-template-columns: 8px 44px 1fr; align-items: center; gap: 6px; margin-top: 5px; white-space: nowrap; }
+        .forecast-tooltip-date { margin-bottom: 7px; padding-bottom: 6px; border-bottom: 1px solid #3b3e49; color: #fff; font-weight: 600; white-space: nowrap; }
+        .forecast-tooltip-row { display: grid; grid-template-columns: 8px 48px 1fr; align-items: center; gap: 6px; margin-top: 5px; white-space: nowrap; }
         .forecast-tooltip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tooltip-color); }
-        .forecast-tooltip-label { color: #858891; font-size: 8px; letter-spacing: .04em; }
+        .forecast-tooltip-label { color: var(--text-3); font-size: 9px; letter-spacing: .04em; }
         .forecast-tooltip-value { color: var(--tooltip-color); font-weight: 600; text-align: right; text-transform: capitalize; }
         /* One equal-width column per forecast day; the row scrolls on
            narrow screens. The selected day is also shown as a band in the
@@ -861,33 +906,39 @@
         #forecastContainer {
             display: grid;
             grid-auto-flow: column;
-            grid-auto-columns: minmax(48px, 1fr);
+            grid-auto-columns: minmax(52px, 1fr);
             gap: 2px;
             margin-top: 2px;
             overflow-x: auto;
-            scrollbar-width: thin;
-            scrollbar-color: #45474d transparent;
         }
         .forecastcard {
             min-width: 0;
-            padding: 6px 2px;
-            background: #202125;
-            border: 1px solid #34363b;
+            padding: 7px 2px;
+            background: var(--raised);
+            border: 1px solid var(--line);
             cursor: pointer;
             text-align: center;
             transition: border-color 120ms ease, background 120ms ease;
         }
-        .forecastcard:hover { background: #292a2f; }
-        .forecastcard.selectedforecast { background: #292a35; border-color: #5e6ad2; }
+        .forecastcard:hover { background: var(--hover); border-color: var(--line-strong); }
+        /* The selected day is the chart's subject; mark it with the accent on
+           all four sides plus a top rule so it reads at a glance in a row of
+           sixteen otherwise identical cards. */
+        .forecastcard.selectedforecast {
+            background: #262941;
+            border-color: var(--accent);
+            box-shadow: inset 0 2px 0 var(--accent-bright);
+        }
         .forecastcard .fc-day {
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 9px;
-            color: #8b8d93;
+            color: var(--text-2);
             white-space: nowrap;
         }
-        .forecastcard .fc-height { font-size: 11px; font-weight: 600; margin-top: 3px; white-space: nowrap; }
+        .forecastcard.selectedforecast .fc-day { color: var(--accent-soft); }
+        .forecastcard .fc-height { font-size: 12px; font-weight: 600; margin-top: 3px; white-space: nowrap; }
         .forecastcard .fc-cond {
-            font-size: 8px;
+            font-size: 9px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.03em;
@@ -896,14 +947,17 @@
         .swell-detail {
             margin-top: 12px;
             padding: 10px 10px 6px;
-            background: #202125;
-            border: 1px solid #34363b;
+            background: var(--raised);
+            border: 1px solid var(--line);
         }
-        .swell-detail-heading, #day-summary { font-family: 'JetBrains Mono', monospace; }
+        .swell-detail-heading, #day-summary { font-family: var(--font-mono); }
+        .swell-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--font-mono); font-size: 9px; }
+        .swell-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+        .swell-legend i { width: 9px; height: 2px; flex: none; background: currentColor; }
         /* the day log line: the popup's one loud element */
-        #date-header { font-size: 14px; font-weight: 600; color: #fff; }
-        #date-header .hdr-date { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 500; color: #8b8d93; margin-left: 2px; }
-        #day-summary { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: #8b8d93; }
+        #date-header { font-size: 15px; font-weight: 600; color: #fff; }
+        #date-header .hdr-date { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--text-2); margin-left: 4px; }
+        #day-summary { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-2); }
         #chart-container { width: 100%; min-width: 0; }
         #chart, #chart svg { display: block; width: 100%; }
         /* The svg can be CSS-stretched from its drawn size; keep hairlines
@@ -912,24 +966,24 @@
             shape-rendering: crispEdges;
             vector-effect: non-scaling-stroke;
         }
-        #chart text { font-family: 'JetBrains Mono', monospace; font-size: 8px; }
+        #chart text { font-family: var(--font-mono); font-size: 9px; }
         /* pulse for the wind lane's loading placeholder */
         .wind-loading { animation: windPulse 1.4s ease-in-out infinite; }
-        @keyframes windPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.75; } }
+        @keyframes windPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.85; } }
         #tooltip {
             z-index: 20;
-            min-width: 205px;
+            min-width: 214px;
             padding: 9px 10px;
-            background: linear-gradient(145deg, rgba(37, 39, 49, .98), rgba(20, 21, 25, .98));
-            border: 1px solid #575c75;
-            border-left: 2px solid #8f9bff;
-            color: #dfe1e7;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 9px;
-            line-height: 1.4;
-            box-shadow: 0 12px 28px rgba(0,0,0,.45);
+            background: rgba(20, 21, 26, .98);
+            border: 1px solid #5a5f78;
+            border-left: 2px solid var(--swell);
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            line-height: 1.45;
+            box-shadow: var(--shadow-pop);
         }
-        #tooltip .detail-tooltip-row { grid-template-columns: 8px 58px minmax(0, 1fr); }
+        #tooltip .detail-tooltip-row { grid-template-columns: 8px 62px minmax(0, 1fr); }
         #tooltip .forecast-tooltip-value { text-align: left; }
         .detail-tooltip-arrow { display: inline-block; margin-right: 6px; transform-origin: 50% 50%; }
         /* phones: the day-card row scrolls anyway, so give each card
@@ -951,8 +1005,8 @@
          horizontally scrollable row built from the same local-day grouping. -->
     <div class="swell-strip">
         <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5 px-3 pt-2">
-            <span class="strip-title text-[10px] font-semibold uppercase text-[#8b8d93]">Swell &amp; wind &middot; 16 day outlook &middot; <span id="forecastTimezone"></span></span>
-            <span id="stripReadout" class="text-[10px] text-[#8b8d93]">Select a day for hourly detail</span>
+            <span class="strip-title text-[10px] font-semibold uppercase tracking-wide text-[#a6aab2]">Swell &amp; wind &middot; 16 day outlook &middot; <span id="forecastTimezone"></span></span>
+            <span id="stripReadout" class="text-[10px] text-[#8b9099]">Select a day for hourly detail</span>
         </div>
         <div id="swellStrip"></div>
         <div id="stripHoverLine" class="strip-hover-line" aria-hidden="true"></div>
@@ -960,8 +1014,12 @@
     </div>
     <div id="forecastContainer"></div>
     <div class="swell-detail">
-        <div class="px-1">
-            <div class="swell-detail-heading text-[9px] font-semibold uppercase tracking-wide text-[#7f8187]">Hourly swell · height & direction</div>
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
+            <div class="swell-detail-heading text-[10px] font-semibold uppercase tracking-wide text-[#a6aab2]">Hourly swell · height &amp; direction</div>
+            <!-- Key for the four swell trains; only the trains present in the
+                 selected day are listed, so it never claims data that is not
+                 on the chart. -->
+            <div id="swellLegend" class="swell-legend" aria-label="Chart series key"></div>
         </div>
         <!-- log line: the selected day, then that day at a glance -->
         <div class="flex flex-wrap items-baseline justify-between gap-x-4 px-1 mt-2 mb-1">

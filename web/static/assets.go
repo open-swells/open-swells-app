@@ -9,3 +9,10 @@ import _ "embed"
 //
 //go:embed firebase-auth.js
 var FirebaseAuthJS []byte
+
+// ThemeCSS carries the shared design tokens and primitives every page links.
+// It is embedded for the same reason as the auth bootstrap: a deploy without
+// it would render every page unstyled.
+//
+//go:embed theme.css
+var ThemeCSS []byte

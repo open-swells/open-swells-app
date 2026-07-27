@@ -31,58 +31,8 @@
         };
         initializeSwellDirection();
     </script>
-    <style>
-        .report-cards {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 8px;
-        }
-        @media (max-width: 719px) {
-            .report-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        }
-        .report-card {
-            min-width: 0;
-            padding: 12px;
-            background: #202125;
-            border: 1px solid #34363b;
-            transition: border-color 120ms ease;
-        }
-        .report-card:hover { border-color: #45474d; }
-        .report-card h2 {
-            margin: 0 0 10px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            color: #8b8d93;
-        }
-        .report-row { display: flex; align-items: center; gap: 10px; }
-        .report-value { min-width: 0; }
-        .report-value .main {
-            color: #f0f0f1;
-            font-size: 13px;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-        .report-value .sub {
-            margin-top: 3px;
-            color: #8b8d93;
-            font-size: 10px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .compass { width: 40px; height: 40px; flex: none; }
-        .compass .ring { fill: none; stroke: #3b3d42; stroke-width: 1; }
-        .compass .tick { stroke: #45474d; stroke-width: 1; }
-        .compass .needle {
-            fill: #8f9bff;
-            transform-box: view-box;
-            transform-origin: 50% 50%;
-        }
-    </style>
-
+    <!-- Card, compass, and value styling live in /assets/theme.css so the
+         buoy report and the spot report cannot drift apart. -->
     <div class="report-cards">
         <div class="report-card">
             <h2>Primary swell</h2>

@@ -6,76 +6,67 @@
     <title>Favorites · OpenSwells</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/theme.css">
     <style>
-        :root { color-scheme: dark; }
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Inter', sans-serif; background: #0f1012; color: #e6e6e6; }
-        button, input { font: inherit; }
-        .mono { font-family: 'JetBrains Mono', monospace; }
-        .surface { background: #18191c; border: 1px solid #34363b; }
-        .icon-button { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: #a7a9ae; border: 1px solid transparent; }
-        .icon-button:hover { color: #fff; background: #2a2c30; border-color: #3b3d42; }
-        .button { height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 1px solid #3b3d42; background: #202125; color: #d6d7da; font-size: 12px; font-weight: 500; }
-        .button:hover { background: #2a2c30; color: #fff; }
-        .button-primary { background: #5e6ad2; border-color: #6d78de; color: #fff; }
-        .button-primary:hover { background: #6d78de; }
+        .button { height: 34px; padding: 0 12px; }
         .view-switch { width: 162px; height: 36px; padding: 4px; }
-        .view-switch a { width: 76px; height: 28px; flex: none; }
+        .view-switch a { width: 76px; height: 28px; flex: none; transition: background 120ms ease, color 120ms ease; }
+        .view-switch-active { background: var(--accent); color: #fff; }
         .profile-button.is-user { width: 32px; padding: 0; border-color: transparent; background: transparent; }
-        .profile-button.is-user:hover { border-color: transparent; background: #202125; }
+        .profile-button.is-user:hover { border-color: transparent; background: #1f2026; }
         #favoritesGrid { display: block; }
-        .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 64px; border-bottom: 1px solid #2b2d31; }
+        .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 64px; border-bottom: 1px solid #2f3137; }
         .search-row:last-child { border-bottom: 0; }
-        .add-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #45474d; background: #202125; color: #fff; font-size: 19px; line-height: 1; }
-        .add-button:hover { background: #34363b; }
+        .add-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #565961; background: #1f2026; color: #fff; font-size: 19px; line-height: 1; }
+        .add-button:hover { background: #2f3137; }
         .add-button.is-added { color: #6fcf97; border-color: #406b53; cursor: default; }
-        .location-badge { display: inline-flex; align-items: center; height: 17px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-        .location-badge-buoy { color: #8e97e8; }
-        .location-badge-beach { color: #f0a05a; }
+        .location-badge { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid currentColor; font-size: 9px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+        .location-badge-buoy { color: #98a0ec; }
+        .location-badge-beach { color: #f4a967; }
         .favorites-filter { display: inline-flex; align-items: center; }
         .favorites-filter-button {
             position: relative; min-width: 92px; height: 32px;
             display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-            border: 1px solid #3b3d42; background: transparent;
-            color: #8b8d93; font-size: 11px; font-weight: 500;
+            border: 1px solid #43454c; background: transparent;
+            color: #a6aab2; font-size: 11px; font-weight: 500;
         }
         .favorites-filter-button + .favorites-filter-button { margin-left: -1px; }
-        .favorites-filter-button:hover { z-index: 1; color: #fff; background: #202125; }
-        #filterBuoys[aria-pressed="true"] { z-index: 2; color: #c8ceff; border-color: #8e97e8; background: #252641; }
-        #filterBeaches[aria-pressed="true"] { z-index: 2; color: #ffc38f; border-color: #f0a05a; background: #34271d; }
+        .favorites-filter-button:hover { z-index: 1; color: #fff; background: #1f2026; }
+        #filterBuoys[aria-pressed="true"] { z-index: 2; color: #c8ceff; border-color: #98a0ec; background: #252641; }
+        #filterBeaches[aria-pressed="true"] { z-index: 2; color: #ffc38f; border-color: #f4a967; background: #34271d; }
         .mobile-favorites-filter { display: none; position: relative; }
         .mobile-filter-trigger {
             width: 34px; height: 34px; position: relative;
             display: inline-flex; align-items: center; justify-content: center;
-            border: 1px solid #3b3d42; background: #202125; color: #a7a9ae;
+            border: 1px solid #43454c; background: #1f2026; color: #b7bac1;
         }
         .mobile-filter-trigger:hover, .mobile-filter-trigger[aria-expanded="true"], .mobile-filter-trigger.has-filters {
-            color: #fff; border-color: #565961; background: #2a2c30;
+            color: #fff; border-color: #565961; background: #292a30;
         }
         .mobile-filter-count {
             position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px;
             display: none; place-items: center; padding: 0 4px;
-            border: 2px solid #0f1012; border-radius: 999px;
-            background: #6d78de; color: #fff; font: 600 8px/1 'JetBrains Mono', monospace;
+            border: 2px solid #0e0f12; border-radius: 999px;
+            background: #6d78de; color: #fff; font: 600 9px/1 var(--font-mono);
         }
         .mobile-filter-trigger.has-filters .mobile-filter-count { display: grid; }
         .mobile-filter-menu {
             position: absolute; top: calc(100% + 8px); left: 0; z-index: 35;
             width: min(280px, calc(100vw - 32px)); padding: 5px;
-            background: #18191c; border: 1px solid #3b3d42;
+            background: #17181b; border: 1px solid #43454c;
             box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
         }
         .mobile-filter-menu[hidden] { display: none; }
         .mobile-filter-menu-head {
             height: 36px; padding: 0 8px 0 9px;
             display: flex; align-items: center; justify-content: space-between;
-            border-bottom: 1px solid #2b2d31;
+            border-bottom: 1px solid #2f3137;
         }
         .mobile-filter-section { padding: 10px 8px 8px; }
-        .mobile-filter-section + .mobile-filter-section { border-top: 1px solid #2b2d31; }
+        .mobile-filter-section + .mobile-filter-section { border-top: 1px solid #2f3137; }
         .mobile-filter-label {
             display: block; margin-bottom: 7px;
-            color: #777a81; font-size: 9px; font-weight: 600;
+            color: #9096a0; font-size: 9px; font-weight: 600;
             letter-spacing: .08em; text-transform: uppercase;
         }
         .mobile-filter-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -83,21 +74,21 @@
         .mobile-filter-option {
             min-height: 34px; margin-left: -1px;
             display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-            border: 1px solid #3b3d42; background: transparent;
-            color: #92949a; font-size: 11px; font-weight: 500;
+            border: 1px solid #43454c; background: transparent;
+            color: #a6aab2; font-size: 11px; font-weight: 500;
         }
         .mobile-filter-option:first-child { margin-left: 0; }
-        .mobile-filter-option:hover { position: relative; z-index: 1; color: #fff; background: #202125; }
+        .mobile-filter-option:hover { position: relative; z-index: 1; color: #fff; background: #1f2026; }
         .mobile-filter-option[aria-pressed="true"] {
             position: relative; z-index: 2; color: #fff;
             border-color: #6d78de; background: #292c4d;
         }
-        .mobile-filter-option.option-buoy[aria-pressed="true"] { color: #c8ceff; border-color: #8e97e8; background: #252641; }
-        .mobile-filter-option.option-beach[aria-pressed="true"] { color: #ffc38f; border-color: #f0a05a; background: #34271d; }
+        .mobile-filter-option.option-buoy[aria-pressed="true"] { color: #c8ceff; border-color: #98a0ec; background: #252641; }
+        .mobile-filter-option.option-beach[aria-pressed="true"] { color: #ffc38f; border-color: #f4a967; background: #34271d; }
         .mobile-filter-clear { color: #8f9bff; font-size: 10px; font-weight: 500; }
         .mobile-filter-clear:hover { color: #b9c0ff; }
         .favorite-filter-hidden { display: none !important; }
-        .skeleton { height: 132px; border: 1px solid #34363b; background: linear-gradient(90deg, #18191c 25%, #202125 50%, #18191c 75%); background-size: 200% 100%; animation: pulse 1.4s infinite; }
+        .skeleton { height: 132px; border: 1px solid #2f3137; background: linear-gradient(90deg, #17181b 25%, #1f2026 50%, #17181b 75%); background-size: 200% 100%; animation: pulse 1.4s infinite; }
         .skeleton + .skeleton { border-top: 0; }
         @keyframes pulse { to { background-position: -200% 0; } }
         @media (max-width: 760px) {
@@ -117,25 +108,26 @@
     </style>
 </head>
 <body class="min-h-screen">
-    <header class="sticky top-0 z-30 h-16 border-b border-[#26272b] bg-[#0f1012]/95 backdrop-blur">
-        <div class="relative max-w-6xl h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
+    <header class="sticky top-0 z-30 h-16 border-b border-[#2f3137] bg-[#0e0f12]/95 backdrop-blur">
+        <!-- same container as <main> so the logo lines up with the content -->
+        <div class="relative max-w-[1440px] h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
             <a href="/" class="flex items-center gap-2 text-sm font-semibold text-white">
                 <span class="text-[#8f9bff]">◒</span><span class="brand-word">OpenSwells</span>
             </a>
 
             <nav class="surface view-switch absolute left-1/2 -translate-x-1/2 flex items-center" aria-label="Primary view">
-                <a href="/map" class="flex items-center justify-center text-[11px] font-medium text-[#8b8d93] hover:text-white">Map</a>
-                <a href="/favorites" aria-current="page" class="flex items-center justify-center bg-[#34363b] text-[11px] font-semibold text-white shadow-sm">Favorites</a>
+                <a href="/map" class="flex items-center justify-center text-[11px] font-medium text-[#a6aab2] hover:text-white hover:bg-[#292a30]">Map</a>
+                <a href="/favorites" aria-current="page" class="view-switch-active flex items-center justify-center text-[11px] font-semibold">Favorites</a>
             </nav>
 
             <div class="relative flex items-center">
                 <button id="signInBtn" class="button profile-button">Sign in</button>
                 <div id="userMenu" class="surface absolute top-full right-0 mt-2 w-60 hidden overflow-hidden">
-                    <div class="px-3 py-3 border-b border-[#34363b]">
+                    <div class="px-3 py-3 border-b border-[#2f3137]">
                         <div id="userName" class="text-xs font-medium text-white truncate"></div>
-                        <div id="userEmail" class="mt-0.5 text-[10px] text-[#8b8d93] truncate"></div>
+                        <div id="userEmail" class="mt-0.5 text-[10px] text-[#a6aab2] truncate"></div>
                     </div>
-                    <button id="signOutBtn" class="w-full px-3 py-2.5 text-left text-xs text-[#d6d7da] hover:bg-[#2a2c30]">Sign out</button>
+                    <button id="signOutBtn" class="w-full px-3 py-2.5 text-left text-xs text-[#d5d7dc] hover:bg-[#292a30]">Sign out</button>
                 </div>
             </div>
         </div>
@@ -145,7 +137,7 @@
         <section>
             <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap items-center gap-3">
-                    <p id="favoriteCount" class="mono text-[10px] uppercase tracking-wide text-[#8b8d93]">Loading saved locations…</p>
+                    <p id="favoriteCount" class="mono text-[11px] uppercase tracking-wide text-[#a6aab2]">Loading saved locations…</p>
                     <div id="favoritesFilters" class="hidden relative">
                         <div class="favorites-filter desktop-favorites-filter" role="group" aria-label="Filter saved locations">
                             <button id="filterBuoys" class="favorites-filter-button" type="button" aria-pressed="false" aria-controls="favoritesGrid" onclick="setFavoritesFilter('buoy')">
@@ -174,10 +166,10 @@
                                     <div class="mobile-filter-options" role="group" aria-label="Location type">
                                         <button id="mobileFilterAll" class="mobile-filter-option" type="button" aria-pressed="true" onclick="setFavoritesFilter('all')">All</button>
                                         <button id="mobileFilterBuoys" class="mobile-filter-option option-buoy" type="button" aria-pressed="false" onclick="setFavoritesFilter('buoy')">
-                                            Buoys <span id="mobileFilterBuoyCount" class="mono text-[8px]">0</span>
+                                            Buoys <span id="mobileFilterBuoyCount" class="mono text-[9px]">0</span>
                                         </button>
                                         <button id="mobileFilterBeaches" class="mobile-filter-option option-beach" type="button" aria-pressed="false" onclick="setFavoritesFilter('spot')">
-                                            Beaches <span id="mobileFilterBeachCount" class="mono text-[8px]">0</span>
+                                            Beaches <span id="mobileFilterBeachCount" class="mono text-[9px]">0</span>
                                         </button>
                                     </div>
                                 </div>
@@ -197,32 +189,32 @@
                 </button>
             </div>
             <div id="signedOutState" class="surface hidden py-14 px-6 text-center">
-                <div class="mx-auto w-9 h-9 border border-[#45474d] grid place-items-center text-[#8f9bff]">☆</div>
+                <div class="mx-auto w-9 h-9 border border-[#565961] grid place-items-center text-[#8f9bff]">☆</div>
                 <h2 class="mt-4 text-sm font-semibold text-white">Sign in to see your outlook</h2>
-                <p class="mt-2 text-xs text-[#8b8d93]">Favorites stay synced to your OpenSwells account.</p>
+                <p class="mt-2 text-xs text-[#a6aab2]">Favorites stay synced to your OpenSwells account.</p>
                 <button class="button button-primary mt-5" onclick="googleSignIn()">Sign in with Google</button>
             </div>
             <div id="favoritesGrid">
                 <div class="skeleton"></div><div class="skeleton"></div>
             </div>
-            <div id="favoritesFilterEmpty" class="surface hidden py-12 px-5 text-center text-xs text-[#8b8d93]" role="status"></div>
+            <div id="favoritesFilterEmpty" class="surface hidden py-12 px-5 text-center text-xs text-[#a6aab2]" role="status"></div>
         </section>
     </main>
 
     <div id="searchModal" class="fixed inset-0 z-40 hidden bg-black/65 backdrop-blur-[5px] items-start justify-center pt-[10vh] sm:pt-[14vh] px-3" role="dialog" aria-modal="true" aria-labelledby="searchTitle">
         <div class="surface w-full max-w-2xl max-h-[76vh] flex flex-col shadow-2xl">
-            <div class="h-12 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
-                <div><h2 id="searchTitle" class="text-sm font-semibold text-white">Add location</h2><p class="text-[10px] text-[#8b8d93]">Buoys and surf spots</p></div>
+            <div class="h-12 px-4 border-b border-[#2f3137] flex items-center justify-between shrink-0">
+                <div><h2 id="searchTitle" class="text-sm font-semibold text-white">Add location</h2><p class="text-[10px] text-[#a6aab2]">Buoys and surf spots</p></div>
                 <button class="icon-button" onclick="closeLocationSearch()" aria-label="Close search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
             </div>
-            <label class="h-12 flex items-center border-b border-[#34363b] focus-within:bg-[#1c1d21] shrink-0">
-                <svg class="ml-4 shrink-0 text-[#8b8d93]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-                <input id="locationSearch" type="search" autocomplete="off" class="w-full h-full px-3 bg-transparent outline-none text-[13px] text-white placeholder-[#6f7177]" placeholder="Search by beach, region, buoy name, or station ID">
-                <kbd class="mono mr-4 text-[9px] text-[#6f7177]">ESC</kbd>
+            <label class="h-12 flex items-center border-b border-[#2f3137] focus-within:bg-[#1f2026] shrink-0">
+                <svg class="ml-4 shrink-0 text-[#a6aab2]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                <input id="locationSearch" type="search" autocomplete="off" class="w-full h-full px-3 bg-transparent outline-none text-[13px] text-white placeholder-[#8b9099]" placeholder="Search by beach, region, buoy name, or station ID">
+                <kbd class="mono mr-4 text-[9px] text-[#8b9099]">ESC</kbd>
             </label>
-            <div class="h-9 px-4 border-b border-[#34363b] flex items-center justify-between shrink-0">
-                <span class="text-[9px] font-semibold uppercase tracking-wide text-[#8b8d93]">Results</span>
-                <span id="resultCount" class="mono text-[9px] text-[#6f7177]">Loading directory…</span>
+            <div class="h-9 px-4 border-b border-[#2f3137] flex items-center justify-between shrink-0">
+                <span class="text-[10px] font-semibold uppercase tracking-wide text-[#a6aab2]">Results</span>
+                <span id="resultCount" class="mono text-[10px] text-[#8b9099]">Loading directory…</span>
             </div>
             <div id="searchResults" class="px-4 overflow-y-auto overscroll-contain"></div>
         </div>
@@ -230,13 +222,13 @@
 
     <div id="signInModal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-[2px] items-start justify-center pt-[20vh] px-4" role="dialog" aria-modal="true" aria-labelledby="signInTitle">
         <div class="surface w-full max-w-[320px]">
-            <div class="h-11 px-4 border-b border-[#34363b] flex items-center justify-between">
+            <div class="h-11 px-4 border-b border-[#2f3137] flex items-center justify-between">
                 <h2 id="signInTitle" class="text-sm font-semibold text-white">Sign in</h2>
                 <button class="icon-button" onclick="closeSignIn()" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
             </div>
             <div class="p-4">
                 <button onclick="googleSignIn()" class="button w-full">Sign in with Google</button>
-                <p class="mt-3 text-[11px] leading-4 text-[#8b8d93]">Save locations and keep your forecast list available across devices.</p>
+                <p class="mt-3 text-[11px] leading-4 text-[#a6aab2]">Save locations and keep your forecast list available across devices.</p>
             </div>
         </div>
     </div>
@@ -293,7 +285,7 @@
                 renderSearchResults();
             } catch (error) {
                 document.getElementById('resultCount').textContent = 'Unavailable';
-                document.getElementById('searchResults').innerHTML = '<div class="py-10 text-center text-xs text-[#8b8d93]">Could not load the location directory. Try again shortly.</div>';
+                document.getElementById('searchResults').innerHTML = '<div class="py-10 text-center text-xs text-[#a6aab2]">Could not load the location directory. Try again shortly.</div>';
             }
         }
 
@@ -304,7 +296,7 @@
             const matches = directory.filter(item => terms.every(term => `${item.name} ${item.meta} ${item.id}`.toLowerCase().includes(term))).slice(0, 40);
             document.getElementById('resultCount').textContent = query ? `${matches.length}${matches.length === 40 ? '+' : ''} matches` : `${directory.length} locations`;
             if (!matches.length) {
-                document.getElementById('searchResults').innerHTML = '<div class="py-10 text-center text-xs text-[#8b8d93]">No matching locations.</div>';
+                document.getElementById('searchResults').innerHTML = '<div class="py-10 text-center text-xs text-[#a6aab2]">No matching locations.</div>';
                 return;
             }
             document.getElementById('searchResults').innerHTML = matches.map(item => {
@@ -313,8 +305,8 @@
                 const href = item.type === 'buoy' ? `/forecast/${encodeURIComponent(item.id)}` : `/spot/${encodeURIComponent(item.id)}`;
                 return `<div class="search-row items-center gap-4 py-3">
                     <a href="${href}" class="min-w-0 group">
-                        <div class="flex items-center gap-2"><span class="location-badge ${item.type === 'buoy' ? 'location-badge-buoy' : 'location-badge-beach'}">${kind}</span><span class="mono text-[9px] text-[#6f7177] truncate">${escapeHTML(item.meta)}</span></div>
-                        <div class="mt-1 text-[13px] font-medium text-[#e6e6e6] group-hover:text-white truncate">${escapeHTML(item.name)}</div>
+                        <div class="flex items-center gap-2"><span class="location-badge ${item.type === 'buoy' ? 'location-badge-buoy' : 'location-badge-beach'}">${kind}</span><span class="mono text-[10px] text-[#8b9099] truncate">${escapeHTML(item.meta)}</span></div>
+                        <div class="mt-1 text-[13px] font-medium text-[#edeef1] group-hover:text-white truncate">${escapeHTML(item.name)}</div>
                     </a>
                     <button class="add-button ${added ? 'is-added' : ''}" ${added ? 'disabled' : ''} data-add-type="${item.type}" data-add-id="${escapeHTML(item.id)}" aria-label="${added ? 'Already in favorites' : `Add ${escapeHTML(item.name)} to favorites`}">${added ? '✓' : '+'}</button>
                 </div>`;
@@ -437,7 +429,7 @@
             } catch (error) {
                 filters.classList.add('hidden');
                 filterEmpty.classList.add('hidden');
-                grid.innerHTML = '<div class="surface py-12 px-5 text-center text-xs text-[#8b8d93]">Could not load your forecast outlook. Please try again.</div>';
+                grid.innerHTML = '<div class="surface py-12 px-5 text-center text-xs text-[#a6aab2]">Could not load your forecast outlook. Please try again.</div>';
             }
         }
 
@@ -511,7 +503,7 @@
             const area = withArea
                 ? `<polygon points="0,${height} ${points.join(' ')} ${w},${height}" fill="${color}" opacity="0.1"/>` : '';
             const grid = dayBreaks.map(x =>
-                `<line x1="${x}" x2="${x}" y1="0" y2="${height}" stroke="#45474d" stroke-width="1" vector-effect="non-scaling-stroke" opacity="0.55"/>`
+                `<line x1="${x}" x2="${x}" y1="0" y2="${height}" stroke="#565961" stroke-width="1" vector-effect="non-scaling-stroke" opacity="0.55"/>`
             ).join('');
             return `<svg viewBox="0 0 ${w} ${height}" preserveAspectRatio="none" aria-hidden="true">${grid}${area}
                 <polyline points="${points.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
@@ -607,7 +599,7 @@
                         : 'Unavailable';
                     const conditionColor = {
                         epic: '#b48cff', good: '#45c4b0', fair: '#e2b86b', poor: '#e06c75'
-                    }[condition.toLowerCase()] || '#a7a9ae';
+                    }[condition.toLowerCase()] || '#b7bac1';
                     panelTooltip.innerHTML = `
                         <div class="forecast-tooltip-date">${escapeHTML(labels[index])}</div>
                         <div class="forecast-tooltip-row" style="--tooltip-color: #8f9bff;">

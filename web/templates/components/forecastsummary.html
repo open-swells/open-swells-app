@@ -1,99 +1,102 @@
-{{ define "condcolor" }}{{if eq . "epic"}}#b48cff{{else if eq . "good"}}#45c4b0{{else if eq . "fair"}}#e2b86b{{else}}#e06c75{{end}}{{ end }}
+{{/* The one place the surf-condition ramp is defined for server-rendered
+     markup; the client-side charts read the same values from the
+     --cond-* custom properties in theme.css. */}}
+{{ define "condcolor" }}{{if eq . "epic"}}#bb97ff{{else if eq . "good"}}#4fd1bc{{else if eq . "fair"}}#eec478{{else}}#ef7a83{{end}}{{ end }}
 {{ define "forecastsummary" }}
 <style>
-    .favorite-row { padding: 18px 20px 16px; background: #17181b; border: 1px solid #2e3035; }
+    .favorite-row { padding: 18px 20px 16px; background: var(--panel); border: 1px solid var(--line); }
     .favorites-detailed .favorite-row { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 16px 28px; align-items: stretch; }
     .favorites-detailed .favorite-row + .favorite-row { margin-top: 14px; }
     .favorite-left { min-width: 0; }
     .favorite-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     .favorite-name { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: #fff; }
     .favorite-now { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
-    .offline-flag { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #e2b86b; white-space: nowrap; }
-    .location-meta { margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: #75777e; }
+    .offline-flag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--warn); white-space: nowrap; }
+    .location-meta { margin-top: 4px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
     .favorite-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-    .link-button { height: 30px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 600; color: #d6d7da; background: #24252a; border: 1px solid #3b3d42; cursor: pointer; }
-    .link-button:hover { color: #fff; background: #26272b; border-color: #34363b; }
-    .open-button { color: #fff; background: #5e6ad2; border-color: #737ee3; box-shadow: 0 3px 10px rgba(94, 106, 210, .2); }
-    .open-button:hover { background: #6d78de; border-color: #8f9bff; }
+    .link-button { height: 30px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-1); background: var(--raised); border: 1px solid var(--line-strong); cursor: pointer; }
+    .link-button:hover { color: #fff; background: var(--line); border-color: var(--line); }
+    .open-button { color: #fff; background: var(--accent); border-color: var(--accent-hover); box-shadow: 0 3px 10px rgba(94, 106, 210, .2); }
+    .open-button:hover { background: var(--accent-hover); border-color: var(--swell); }
     .full-forecast-link { width: 30px; padding: 0; }
     .action-icon { width: 13px; height: 13px; flex: none; }
-    .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: #e06c75; background: #281f22; border: 1px solid #553137; font-size: 18px; line-height: 1; cursor: pointer; }
+    .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: var(--negative); background: #281f22; border: 1px solid #553137; font-size: 18px; line-height: 1; cursor: pointer; }
     .remove-button:hover { color: #ff9299; background: #382429; border-color: #8f4952; }
     .stat-row { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 16px; }
     .stat-row > div { min-width: 0; }
-    .stat-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
-    .stat-value { margin-top: 3px; font-size: 13px; font-weight: 600; color: #f0f0f1; white-space: nowrap; }
-    .stat-sub { margin-top: 1px; font-size: 10px; color: #8b8d93; white-space: nowrap; }
+    .stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
+    .stat-value { margin-top: 3px; font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; }
+    .stat-sub { margin-top: 1px; font-size: 10px; color: var(--text-2); white-space: nowrap; }
     .hour-block { margin-top: 16px; }
-    .hour-strip { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 38px; align-items: end; border-bottom: 1px solid #2e3035; }
+    .hour-strip { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 38px; align-items: end; border-bottom: 1px solid var(--line); }
     .hour-candle { position: relative; height: 100%; display: flex; align-items: flex-end; }
     .hour-candle i { display: block; width: 100%; min-height: 2px; opacity: .85; }
-    .hour-candle.is-unavailable i { background: #2a2c30; opacity: .55; }
+    .hour-candle.is-unavailable i { background: var(--hover); opacity: .55; }
     .hour-candle.is-now i { opacity: 1; }
-    .hour-candle.is-now::after { content: ''; position: absolute; left: 50%; top: -7px; bottom: -1px; width: 1px; background: #c6ccff; }
-    .hour-scale { display: flex; justify-content: space-between; margin-top: 4px; font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; letter-spacing: .04em; color: #6f7177; }
-    .favorite-outlook { position: relative; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid #26272b; padding-left: 24px; }
+    .hour-candle.is-now::after { content: ''; position: absolute; left: 50%; top: -7px; bottom: -1px; width: 1px; background: var(--accent-soft); }
+    .hour-scale { display: flex; justify-content: space-between; margin-top: 5px; font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
+    .favorite-outlook { position: relative; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); padding-left: 24px; }
     .outlook-scroll { min-width: 0; display: flex; flex: 1; flex-direction: column; }
-    .outlook-hover-line { position: absolute; z-index: 2; top: 0; width: 1px; background: #c6ccff; pointer-events: none; display: none; }
+    .outlook-hover-line { position: absolute; z-index: 2; top: 0; width: 1px; background: var(--accent-soft); pointer-events: none; display: none; }
     .outlook-panel-tooltip {
         position: absolute; z-index: 4; display: none; min-width: 136px;
-        padding: 8px 9px; border: 1px solid #575c75; border-left: 2px solid #8f9bff;
+        padding: 8px 9px; border: 1px solid #575c75; border-left: 2px solid var(--swell);
         background: linear-gradient(145deg, rgba(37, 39, 49, .98), rgba(20, 21, 25, .98));
         box-shadow: 0 10px 24px rgba(0, 0, 0, .42);
-        color: #dfe1e7; font-family: 'JetBrains Mono', monospace;
-        font-size: 8px; line-height: 1.4; pointer-events: none;
+        color: var(--text); font-family: var(--font-mono);
+        font-size: 10px; line-height: 1.45; pointer-events: none;
     }
-    .forecast-tooltip-date { margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid #3b3e49; color: #f0f0f1; font-weight: 600; white-space: nowrap; }
+    .forecast-tooltip-date { margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid #3b3e49; color: #fff; font-weight: 600; white-space: nowrap; }
     .forecast-tooltip-row { display: grid; grid-template-columns: 8px 42px 1fr; align-items: center; gap: 5px; margin-top: 4px; white-space: nowrap; }
     .forecast-tooltip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tooltip-color); }
-    .forecast-tooltip-label { color: #858891; font-size: 7px; letter-spacing: .04em; }
+    .forecast-tooltip-label { color: var(--text-3); font-size: 9px; letter-spacing: .04em; }
     .forecast-tooltip-value { color: var(--tooltip-color); font-weight: 600; text-align: right; text-transform: capitalize; }
     .outlook-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-    .outlook-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #7f8187; }
-    .outlook-note { font-family: 'JetBrains Mono', monospace; font-size: 8px; text-transform: uppercase; color: #6f7177; }
+    .outlook-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
+    .outlook-note { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--text-3); }
     .day-ticks { flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; margin-top: 10px; }
     .day-tick { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
     .day-tick-track { flex: 1; width: 100%; min-height: 40px; display: flex; align-items: flex-end; }
     .day-tick-track i { display: block; width: 100%; min-height: 2px; opacity: .5; }
     .day-tick:hover .day-tick-track i { opacity: 1; }
-    .day-tick span { height: 9px; line-height: 9px; font-family: 'JetBrains Mono', monospace; font-size: 7px; color: #6f7177; }
-    .day-tick .day-wave-height { color: #aeb4ed; }
-    .day-tick .day-date-label { color: #8b8d93; white-space: nowrap; letter-spacing: -.02em; }
+    .day-tick span { height: 11px; line-height: 11px; font-family: var(--font-mono); font-size: 9px; color: var(--text-2); }
+    .day-tick .day-wave-height { color: var(--accent-soft); }
+    .day-tick .day-date-label { color: var(--text-2); white-space: nowrap; letter-spacing: -.02em; }
     .lane-swell { position: relative; height: 56px; margin-top: 10px; }
     .lane-swell svg { display: block; width: 100%; height: 100%; }
     .swell-graph { position: relative; height: 56px; }
-    .swell-unit-label { position: absolute; z-index: 1; top: 2px; left: 2px; font-family: 'JetBrains Mono', monospace; font-size: 7px; line-height: 8px; color: #777caa; pointer-events: none; }
-    .swell-peak { position: absolute; color: #8f9bff; pointer-events: none; }
-    .swell-peak::after { content: ''; position: absolute; top: -2px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px #17181b; }
-    .swell-peak span { position: absolute; top: var(--peak-label-top, -12px); left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: 'JetBrains Mono', monospace; font-size: 7px; line-height: 8px; white-space: nowrap; color: #c8ceff; }
+    .swell-unit-label { position: absolute; z-index: 1; top: 2px; left: 2px; font-family: var(--font-mono); font-size: 9px; line-height: 10px; color: var(--text-3); pointer-events: none; }
+    .swell-peak { position: absolute; color: var(--swell); pointer-events: none; }
+    .swell-peak::after { content: ''; position: absolute; top: -2px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px var(--panel); }
+    .swell-peak span { position: absolute; top: var(--peak-label-top, -12px); left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: var(--font-mono); font-size: 9px; line-height: 10px; white-space: nowrap; color: var(--accent-soft); }
     .lane-wind { position: relative; margin-top: 8px; }
     .wind-graph { position: relative; height: 38px; padding-top: 8px; }
     .wind-graph svg { display: block; width: 100%; height: 30px; }
-    .wind-peak { position: absolute; top: 0; color: #6fcf97; pointer-events: none; }
-    .wind-peak::after { content: ''; position: absolute; top: 9px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px #17181b; }
-    .wind-peak span { position: absolute; top: 0; left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: 'JetBrains Mono', monospace; font-size: 7px; line-height: 8px; white-space: nowrap; color: currentColor; }
-    .lane-labels { display: flex; justify-content: space-between; padding-top: 5px; font-family: 'JetBrains Mono', monospace; font-size: 7px; text-transform: uppercase; color: #6f7177; }
-    .spot-forecast-levels { padding-bottom: 10px; border-bottom: 1px solid #26272b; }
+    .wind-peak { position: absolute; top: 0; color: var(--positive); pointer-events: none; }
+    .wind-peak::after { content: ''; position: absolute; top: 9px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px var(--panel); }
+    .wind-peak span { position: absolute; top: 0; left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: var(--font-mono); font-size: 9px; line-height: 10px; white-space: nowrap; color: currentColor; }
+    .lane-labels { display: flex; justify-content: space-between; padding-top: 6px; font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--text-3); }
+    .spot-forecast-levels { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
     .spot-forecast-levels .lane-swell { margin-top: 8px; }
     .spot-conditions-head { margin-top: 10px; }
-    .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 8px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-    .location-badge-buoy { color: #8e97e8; }
-    .location-badge-beach { color: #f0a05a; }
+    .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 9px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .location-badge-buoy { color: var(--kind-buoy); }
+    .location-badge-beach { color: var(--kind-beach); }
     .favorite-condition-card {
         padding: 7px 8px; border: 1px solid var(--condition-color);
-        background: color-mix(in srgb, var(--condition-color) 9%, #202125);
+        background: color-mix(in srgb, var(--condition-color) 12%, var(--raised));
     }
-    .favorite-condition-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--condition-color); }
+    .favorite-condition-label { font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--condition-color); }
     .favorite-condition-main { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; white-space: nowrap; }
     .favorite-condition-rating { color: var(--condition-color); font-size: 11px; font-weight: 700; text-transform: uppercase; }
-    .favorite-condition-height { color: #f0f0f1; font-size: 11px; font-weight: 600; }
+    .favorite-condition-height { color: #fff; font-size: 11px; font-weight: 600; }
     .spot-stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
-    .compact-condition { margin-top: 12px; padding-top: 9px; border-top: 1px solid #34363b; display: flex; align-items: center; justify-content: space-between; }
-    .forecast-unavailable { justify-content: center; text-align: center; color: #8b8d93; }
-    .forecast-unavailable strong { display: block; color: #d6d7da; font-size: 12px; font-weight: 600; }
+    .compact-condition { margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+    .forecast-unavailable { justify-content: center; text-align: center; color: var(--text-2); }
+    .forecast-unavailable strong { display: block; color: var(--text-1); font-size: 12px; font-weight: 600; }
     .forecast-unavailable span { display: block; margin-top: 5px; font-size: 10px; line-height: 1.45; }
-    .unavailable-label { color: #a7a9ae; }
-    .favorites-compact .favorite-row { padding: 12px; background: #202125; border: 1px solid #34363b; }
+    .unavailable-label { color: var(--text-2); }
+    .favorites-compact .favorite-row { padding: 12px; background: var(--raised); border: 1px solid var(--line); }
     .favorites-compact .favorite-row + .favorite-row { margin-top: 8px; }
     .favorites-compact .favorite-name { font-size: 12px; }
     .favorites-compact .stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-top: 12px; }
@@ -101,17 +104,17 @@
     @media (max-width: 900px) {
         .favorites-detailed .favorite-row { grid-template-columns: minmax(0, 1fr); }
         .favorites-detailed .spot-stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-        .favorite-outlook { border-left: 0; padding-left: 0; border-top: 1px solid #26272b; padding-top: 12px; }
+        .favorite-outlook { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; }
         .spot-forecast-levels { display: none; }
         .spot-conditions-head { margin-top: 0; }
         .day-tick .day-wave-height { display: none; }
         .day-tick .day-date-label { font-size: 0; }
-        .day-tick .day-date-label::after { content: attr(data-short-label); font-size: 7px; }
+        .day-tick .day-date-label::after { content: attr(data-short-label); font-size: 9px; }
     }
     @media (max-width: 640px) {
         .favorite-row { padding: 14px; }
         .favorites-detailed .stat-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
-        .favorites-detailed .stat-label { font-size: 8px; white-space: nowrap; }
+        .favorites-detailed .stat-label { font-size: 9px; white-space: nowrap; }
         .favorites-detailed .stat-value { font-size: 11px; }
         .favorites-detailed .stat-sub { font-size: 9px; }
         .favorites-detailed .spot-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
@@ -126,9 +129,9 @@
 </style>
 <div class="{{if .Detailed}}favorites-detailed{{else}}favorites-compact{{end}}">
 {{if and (eq (len .Buoys) 0) (eq (len .Spots) 0)}}
-<div class="border border-[#34363b] bg-[#18191c] py-14 px-5 text-center">
+<div class="border border-[#2f3137] bg-[#17181b] py-14 px-5 text-center">
     <p class="text-sm font-medium text-white">No favorites yet</p>
-    <p class="mt-1 text-[11px] text-[#8b8d93]">Add a buoy or beach to build your forecast list.</p>
+    <p class="mt-1 text-[11px] text-[#a6aab2]">Add a buoy or beach to build your forecast list.</p>
 </div>
 {{else}}
     {{range .Buoys}}

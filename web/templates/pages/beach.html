@@ -8,48 +8,40 @@
         <script>
             tailwind.config = { darkMode: 'class', theme: { extend: {} } }
         </script>
+        <link rel="stylesheet" href="/assets/theme.css">
         <style>
-            :root { color-scheme: dark; }
-            * { box-sizing: border-box; }
-            body { font-family: Inter, sans-serif !important; background: #18191c !important; color: #e6e6e6; letter-spacing: 0; }
-            .mono { font-family: 'JetBrains Mono', monospace; }
-            .station-shell { max-width: 1120px; margin: 0 auto; padding: 20px 24px 48px; }
-            .station-header { min-height: 48px; border-bottom: 1px solid #34363b; }
-            .station-action { height: 30px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid #3b3d42; background: #202125; color: #c6c7ca; font-size: 11px; }
-            .station-action:hover { background: #2a2c30; color: white; }
             .srf-headline {
                 display: inline-block; margin: 0 6px 6px 0; padding: 3px 8px;
-                border: 1px solid #e2b86b; color: #e2b86b;
+                border: 1px solid var(--warn); color: var(--cond-fair);
+                background: color-mix(in srgb, var(--warn) 10%, transparent);
                 font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
             }
             .srf-periods { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; margin-top: 12px; }
-            .srf-period { background: #202125; border: 1px solid #34363b; padding: 12px 14px 14px; }
+            .srf-period { background: var(--raised); border: 1px solid var(--line); padding: 12px 14px 14px; }
             .srf-period-name {
-                font-family: 'JetBrains Mono', monospace;
-                font-size: 10px; font-weight: 600; color: #8b8d93;
-                text-transform: uppercase; margin-bottom: 8px;
-                padding-bottom: 8px; border-bottom: 1px solid #2c2e33;
+                font-family: var(--font-mono);
+                font-size: 10px; font-weight: 600; color: var(--text-2);
+                letter-spacing: .05em; text-transform: uppercase; margin-bottom: 8px;
+                padding-bottom: 8px; border-bottom: 1px solid var(--line);
             }
+            /* Label/value rows: the label recedes, the reading stays bright,
+               so a period card can be skimmed down the right-hand column. */
             .srf-row { display: flex; justify-content: space-between; gap: 16px; font-size: 12px; line-height: 1.9; }
-            .srf-row .k { color: #8b8d93; flex: none; }
-            .srf-row .v { text-align: right; }
-            .srf-remarks { margin-top: 8px; font-size: 11px; color: #a7a9ae; }
-            .srf-tides { margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #8b8d93; line-height: 1.7; }
-            .srf-raw { margin-top: 14px; background: #202125; border: 1px solid #34363b; }
+            .srf-row .k { color: var(--text-3); flex: none; }
+            .srf-row .v { color: var(--text); font-weight: 500; text-align: right; }
+            .srf-remarks { margin-top: 8px; font-size: 11.5px; line-height: 1.55; color: var(--text-2); }
+            .srf-tides { margin-top: 8px; font-family: var(--font-mono); font-size: 10px; color: var(--text-2); line-height: 1.7; }
+            .srf-raw { margin-top: 14px; background: var(--raised); border: 1px solid var(--line); }
             .srf-raw summary {
                 cursor: pointer; padding: 10px 14px;
-                font-size: 10px; font-weight: 600; text-transform: uppercase; color: #7f8187;
+                font-size: 10px; font-weight: 600; letter-spacing: .05em;
+                text-transform: uppercase; color: var(--text-2);
             }
-            .srf-raw summary:hover { color: #c6c7ca; }
+            .srf-raw summary:hover { color: #fff; }
             .srf-raw pre {
                 margin: 0; padding: 4px 14px 14px; overflow-x: auto;
-                font-family: 'JetBrains Mono', monospace; font-size: 10px;
-                line-height: 1.6; color: #a7a9ae; white-space: pre-wrap;
-            }
-            body.embedded .standalone-only { display: none !important; }
-            body.embedded .station-shell { padding-top: 14px; }
-            @media (max-width: 767px) {
-                .station-shell { padding: 12px; }
+                font-family: var(--font-mono); font-size: 11px;
+                line-height: 1.65; color: var(--text-2); white-space: pre-wrap;
             }
         </style>
         <script>
@@ -73,12 +65,12 @@
                 <a href="/map" class="station-action">&#8592; Map</a>
             </div>
             <div class="w-full min-w-0">
-                <h1 class="text-base font-semibold text-white truncate">{{.ZoneName}}</h1>
-                <div class="mono text-[10px] text-[#8b8d93] mt-1">SURF ZONE {{.ZoneID}} &middot; NWS {{.Office}} &middot; ISSUED <span data-local-time="{{.Issued.UnixMilli}}">{{.Issued.Format "Jan 2 15:04"}} UTC</span></div>
+                <h1 class="station-title truncate">{{.ZoneName}}</h1>
+                <div class="station-meta">SURF ZONE {{.ZoneID}} &middot; NWS {{.Office}} &middot; ISSUED <span data-local-time="{{.Issued.UnixMilli}}">{{.Issued.Format "Jan 2 15:04"}} UTC</span></div>
             </div>
         </div>
 
-        {{if .Beaches}}<div class="text-[11px] text-[#8b8d93] mb-2">{{.Beaches}}</div>{{end}}
+        {{if .Beaches}}<div class="text-[11.5px] leading-relaxed text-[#a6aab2] mb-2">{{.Beaches}}</div>{{end}}
         {{range .Headlines}}<span class="srf-headline">{{.}}</span>{{end}}
 
         <div class="srf-periods">
@@ -87,7 +79,7 @@
                 <div class="srf-period-name">{{.Name}}</div>
                 {{if .RipRisk}}
                 <div class="srf-row"><span class="k">Rip current risk</span>
-                    <span class="v" style="color: {{if eq .RipRisk "High"}}#e06c75{{else if eq .RipRisk "Moderate"}}#e2b86b{{else if eq .RipRisk "Low"}}#6fcf97{{else}}#8b8d93{{end}};">{{.RipRisk}}</span></div>
+                    <span class="v" style="color: {{ripcolor .RipRisk}};">{{.RipRisk}}</span></div>
                 {{end}}
                 {{if .SurfHeight}}<div class="srf-row"><span class="k">Surf height</span><span class="v">{{.SurfHeight}}</span></div>{{end}}
                 {{if .WaterTemp}}<div class="srf-row"><span class="k">Water temperature</span><span class="v">{{.WaterTemp}}</span></div>{{end}}
@@ -105,7 +97,7 @@
             <pre>{{.Raw}}</pre>
         </details>
 
-        <div class="mono text-[9px] text-[#6f7177] mt-3">
+        <div class="mono text-[10px] leading-relaxed text-[#8b9099] mt-3">
             SOURCE: NATIONAL WEATHER SERVICE SURF ZONE FORECAST ({{.Office}}) &middot; EXPIRES <span data-local-time="{{.Expires.UnixMilli}}">{{.Expires.Format "Jan 2 15:04"}} UTC</span>
         </div>
       </main>

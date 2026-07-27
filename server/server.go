@@ -813,12 +813,12 @@ func ripRiskColor(risk string) template.CSS {
 		case "low":
 			return "#6fcf97"
 		case "moderate":
-			return "#e2b86b"
+			return "#eec478"
 		case "high":
-			return "#e06c75"
+			return "#ef7a83"
 		}
 	}
-	return "#8b8d93"
+	return "#a6aab2"
 }
 
 func jsonForTemplate(v interface{}) (template.JS, error) {
@@ -1129,6 +1129,10 @@ func run() {
 	router.GET("/assets/firebase-auth.js", staticLimiter.middleware(clientIPKey), func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=3600")
 		c.Data(http.StatusOK, "application/javascript; charset=utf-8", webstatic.FirebaseAuthJS)
+	})
+	router.GET("/assets/theme.css", staticLimiter.middleware(clientIPKey), func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=3600")
+		c.Data(http.StatusOK, "text/css; charset=utf-8", webstatic.ThemeCSS)
 	})
 	router.GET("/static/*filepath", staticLimiter.middleware(clientIPKey), staticHandler(forecastDir))
 	// Dynamic pages and APIs share a per-client ceiling. Expensive and

@@ -185,8 +185,8 @@ func TestLoadTemplates(t *testing.T) {
 	for _, want := range [][]byte{
 		[]byte(".search-favorite-star"),
 		[]byte(".favorite-map-marker"),
-		[]byte(".favorite-star-buoy { color: #8e97e8; }"),
-		[]byte(".favorite-star-beach { color: #f0a05a; }"),
+		[]byte(".favorite-star-buoy { color: #98a0ec; }"),
+		[]byte(".favorite-star-beach { color: #f4a967; }"),
 		[]byte("fill=\"currentColor\""),
 		[]byte("const favoriteMapMarkers = new Map();"),
 		[]byte("favorite: userBuoys.includes"),
@@ -243,7 +243,7 @@ func TestLoadTemplates(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("spot template failed to render: %v", err)
 	}
-	for _, want := range []string{"Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #45c4b0", "stripHoverLine", "stripTooltip", "forecast-tooltip-row", "detail-tooltip-row"} {
+	for _, want := range []string{"Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #4fd1bc", "stripHoverLine", "stripTooltip", "forecast-tooltip-row", "detail-tooltip-row"} {
 		if !bytes.Contains(spotPage.Bytes(), []byte(want)) {
 			t.Errorf("spot condition summary is missing %q", want)
 		}
@@ -352,6 +352,37 @@ func TestEmbeddedFirebaseAuthAsset(t *testing.T) {
 	}
 	if !bytes.Contains(recorder.Body.Bytes(), []byte("window.openSwellsAuth")) {
 		t.Fatal("asset response is missing the Firebase auth bootstrap")
+	}
+}
+
+// Every page links /assets/theme.css for its palette and primitives, so a
+// missing or unlinked stylesheet renders the whole app unstyled.
+func TestEmbeddedThemeAsset(t *testing.T) {
+	if len(webstatic.ThemeCSS) == 0 {
+		t.Fatal("embedded theme stylesheet is empty")
+	}
+	for _, want := range []string{"--cond-good: #4fd1bc", "--text-2:", ".report-card", ".station-shell"} {
+		if !bytes.Contains(webstatic.ThemeCSS, []byte(want)) {
+			t.Errorf("theme stylesheet is missing %q", want)
+		}
+	}
+
+	tmpl := loadTemplates("../web/templates")
+	pages := map[string]interface{}{
+		"landing.html":   LandingPageData{SpotCount: 1, BuoyCount: 1},
+		"about.html":     nil,
+		"map.html":       MapPageData{},
+		"favorites.html": gin.H{"SearchView": false},
+		"beach.html":     SurfZoneForecast{ZoneID: "caz043"},
+	}
+	for name, data := range pages {
+		var page bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&page, name, data); err != nil {
+			t.Fatalf("%s failed to render: %v", name, err)
+		}
+		if !bytes.Contains(page.Bytes(), []byte(`href="/assets/theme.css"`)) {
+			t.Errorf("%s does not link the shared theme stylesheet", name)
+		}
 	}
 }
 

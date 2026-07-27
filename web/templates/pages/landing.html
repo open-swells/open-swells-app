@@ -6,58 +6,25 @@
     <title>OpenSwells</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/theme.css">
     <style>
-        :root { color-scheme: dark; }
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #0f1012;
-            color: #e6e6e6;
-            letter-spacing: 0;
-        }
-        .mono { font-family: 'JetBrains Mono', monospace; }
-        .surface { background: #18191c; border: 1px solid #34363b; }
         .feature-card {
-            background: #18191c;
-            border: 1px solid #34363b;
+            background: var(--panel);
+            border: 1px solid var(--line);
             padding: 20px;
             transition: border-color 120ms ease, background 120ms ease;
         }
-        .feature-card:hover { border-color: #45474d; background: #1c1d21; }
-        .cta-button {
-            height: 36px;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 0 16px;
-            background: #5e6ad2;
-            border: 1px solid #6d78de;
-            color: #fff;
-            font-size: 13px;
-            font-weight: 500;
-            transition: background 120ms ease;
-        }
-        .cta-button:hover { background: #6d78de; }
+        .feature-card:hover { border-color: var(--line-strong); background: var(--raised); }
+        .cta-button, .ghost-button { height: 36px; padding: 0 16px; font-size: 13px; }
         .ghost-button {
-            height: 36px;
-            display: inline-flex;
-            align-items: center;
-            padding: 0 16px;
-            background: #202125;
-            border: 1px solid #3b3d42;
-            color: #d6d7da;
-            font-size: 13px;
+            display: inline-flex; align-items: center;
+            background: var(--raised);
+            border: 1px solid var(--line-strong);
+            color: var(--text-1);
             font-weight: 500;
             transition: background 120ms ease, color 120ms ease;
         }
-        .ghost-button:hover { background: #2a2c30; color: #fff; }
-        .icon-button {
-            width: 32px; height: 32px;
-            display: inline-flex; align-items: center; justify-content: center;
-            border: 1px solid transparent; color: #a7a9ae;
-            transition: background 120ms ease, color 120ms ease;
-        }
-        .icon-button:hover { color: #fff; background: #2a2c30; border-color: #3b3d42; }
+        .ghost-button:hover { background: var(--hover); color: #fff; }
 
         /* --- Synoptic chart background ------------------------------------
            An animated contour field, like the swell-height charts on the map
@@ -67,22 +34,22 @@
         .chart-field svg { width: 100%; height: 100%; display: block; }
         .hero-shade {
             position: absolute; inset: 0;
-            background: radial-gradient(ellipse 58% 52% at 50% 44%, rgba(15, 16, 18, 0.88) 0%, rgba(15, 16, 18, 0.45) 55%, transparent 78%);
+            background: radial-gradient(ellipse 58% 52% at 50% 44%, rgba(14, 15, 18, 0.9) 0%, rgba(14, 15, 18, 0.5) 55%, transparent 78%);
             pointer-events: none;
         }
         .chart-note {
             position: absolute;
-            font-family: 'JetBrains Mono', monospace;
+            font-family: var(--font-mono);
             font-size: 10px;
             letter-spacing: 0.08em;
-            color: #55575d;
+            color: #6c6f77;
             pointer-events: none;
         }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
     <!-- Header -->
-    <header class="w-full border-b border-[#26272b] relative z-20 bg-[#0f1012]">
+    <header class="w-full border-b border-[#2f3137] relative z-20 bg-[#0e0f12]">
         <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
             <a href="/" class="flex items-center gap-2 text-sm font-semibold text-white">
                 <span class="text-[#8f9bff]">◒</span> OpenSwells
@@ -116,17 +83,17 @@
         </div>
 
         <div class="relative z-10 max-w-2xl w-full text-center">
-            <div class="mono inline-flex items-center gap-2 px-3 py-1 mb-8 text-[11px] text-[#8b8d93] border border-[#34363b] bg-[#18191c]">
+            <div class="mono inline-flex items-center gap-2 px-3 py-1 mb-8 text-[11px] text-[#a6aab2] border border-[#2f3137] bg-[#17181b]">
                 <span class="w-1.5 h-1.5 rounded-full bg-[#6fcf97]"></span>
                 LIVE &middot; UPDATED EVERY 6 HOURS
             </div>
             <h1 class="text-5xl md:text-6xl font-semibold tracking-tight text-white">
                 OpenSwells<span class="text-[#8f9bff]">;</span>
             </h1>
-            <div class="mono mt-4 text-[12px] uppercase tracking-[0.25em] text-[#8b8d93]">
+            <div class="mono mt-4 text-[12px] uppercase tracking-[0.25em] text-[#a6aab2]">
                 Free 16-day swell forecast
             </div>
-            <p class="mt-5 text-base text-[#a7a9ae] leading-relaxed max-w-xl mx-auto">
+            <p class="mt-5 text-base text-[#b7bac1] leading-relaxed max-w-xl mx-auto">
                 Global wave model forecasts for {{formatcount .SpotCount}} surf spots and real-time reports from {{formatcount .BuoyCount}} buoy stations.
                 Open source, no subscription.
             </p>
@@ -142,31 +109,31 @@
         <!-- Features -->
         <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3 mt-16 max-w-3xl w-full">
             <div class="feature-card">
-                <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Coverage</div>
+                <div class="mono text-[10px] font-medium uppercase text-[#a6aab2] mb-2">Coverage</div>
                 <h2 class="text-sm font-semibold text-white mb-1.5">{{formatcount .SpotCount}} surf spots</h2>
-                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">Explore global model forecasts for every location in our spot directory, alongside {{formatcount .BuoyCount}} live buoy stations.</p>
+                <p class="text-[13px] leading-relaxed text-[#b7bac1]">Explore global model forecasts for every location in our spot directory, alongside {{formatcount .BuoyCount}} live buoy stations.</p>
             </div>
             <div class="feature-card">
-                <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Reports</div>
+                <div class="mono text-[10px] font-medium uppercase text-[#a6aab2] mb-2">Reports</div>
                 <h2 class="text-sm font-semibold text-white mb-1.5">Real-time buoy data</h2>
-                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">Readings are available as soon as they are received by <a href="https://www.ndbc.noaa.gov/faq/realtime.shtml" class="text-[#8f9bff] hover:text-white underline underline-offset-2 decoration-[#45474d]">NDBC</a>.</p>
+                <p class="text-[13px] leading-relaxed text-[#b7bac1]">Readings are available as soon as they are received by <a href="https://www.ndbc.noaa.gov/faq/realtime.shtml" class="text-[#8f9bff] hover:text-white underline underline-offset-2 decoration-[#565961]">NDBC</a>.</p>
             </div>
             <div class="feature-card">
-                <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Forecast</div>
+                <div class="mono text-[10px] font-medium uppercase text-[#a6aab2] mb-2">Forecast</div>
                 <h2 class="text-sm font-semibold text-white mb-1.5">16-day global outlook</h2>
-                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">Extended wave predictions from NOAA wave models, refreshed every 6 hours.</p>
+                <p class="text-[13px] leading-relaxed text-[#b7bac1]">Extended wave predictions from NOAA wave models, refreshed every 6 hours.</p>
             </div>
             <div class="feature-card">
-                <div class="mono text-[10px] font-medium uppercase text-[#8b8d93] mb-2">Pricing</div>
+                <div class="mono text-[10px] font-medium uppercase text-[#a6aab2] mb-2">Pricing</div>
                 <h2 class="text-sm font-semibold text-white mb-1.5">Free</h2>
-                <p class="text-[13px] leading-relaxed text-[#a7a9ae]">No subscription. Sign in with Google to save your favorite spots.</p>
+                <p class="text-[13px] leading-relaxed text-[#b7bac1]">No subscription. Sign in with Google to save your favorite spots.</p>
             </div>
         </div>
     </main>
 
     <!-- Footer -->
-    <footer class="w-full border-t border-[#26272b] relative z-20 bg-[#0f1012]">
-        <div class="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between text-[11px] text-[#6f7177]">
+    <footer class="w-full border-t border-[#2f3137] relative z-20 bg-[#0e0f12]">
+        <div class="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between text-[11px] text-[#8b9099]">
             <span>OpenSwells &middot; open source</span>
             <span class="mono">DATA: NOAA / NDBC / EMC</span>
         </div>
@@ -211,7 +178,7 @@
         for (const [x, txt] of lonLabels) {
             const t = document.createElementNS(SVG_NS, 'text');
             t.setAttribute('x', x + 5); t.setAttribute('y', H - 10);
-            t.setAttribute('fill', '#494b51'); t.setAttribute('font-size', '10');
+            t.setAttribute('fill', '#5f6269'); t.setAttribute('font-size', '10');
             t.setAttribute('font-family', "'JetBrains Mono', monospace");
             t.textContent = txt;
             grat.appendChild(t);
@@ -219,7 +186,7 @@
         for (const [y, txt] of latLabels) {
             const t = document.createElementNS(SVG_NS, 'text');
             t.setAttribute('x', 8); t.setAttribute('y', y - 6);
-            t.setAttribute('fill', '#494b51'); t.setAttribute('font-size', '10');
+            t.setAttribute('fill', '#5f6269'); t.setAttribute('font-size', '10');
             t.setAttribute('font-family', "'JetBrains Mono', monospace");
             t.textContent = txt;
             grat.appendChild(t);
