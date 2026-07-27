@@ -15,16 +15,8 @@
             transition: border-color 120ms ease, background 120ms ease;
         }
         .feature-card:hover { border-color: var(--line-strong); background: var(--raised); }
+        /* Hero buttons are a size up from the app-wide 32px control height. */
         .cta-button, .ghost-button { height: 36px; padding: 0 16px; font-size: 13px; }
-        .ghost-button {
-            display: inline-flex; align-items: center;
-            background: var(--raised);
-            border: 1px solid var(--line-strong);
-            color: var(--text-1);
-            font-weight: 500;
-            transition: background 120ms ease, color 120ms ease;
-        }
-        .ghost-button:hover { background: var(--hover); color: #fff; }
 
         /* --- Synoptic chart background ------------------------------------
            An animated contour field, like the swell-height charts on the map
