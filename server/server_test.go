@@ -124,9 +124,21 @@ func TestNDBCValue(t *testing.T) {
 
 func TestLoadTemplates(t *testing.T) {
 	tmpl := loadTemplates(filepath.Join("..", "web", "templates"))
-	for _, name := range []string{"landing.html", "about.html", "map.html", "favorites.html", "buoy.html", "report", "forecastsummary"} {
+	for _, name := range []string{"landing.html", "about.html", "map.html", "favorites.html", "buoy.html", "report", "forecastsummary", "analytics"} {
 		if tmpl.Lookup(name) == nil {
 			t.Errorf("template %q not found", name)
+		}
+	}
+	var analytics bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&analytics, "analytics", nil); err != nil {
+		t.Fatalf("analytics template failed to render: %v", err)
+	}
+	for _, want := range [][]byte{
+		[]byte("https://static.cloudflareinsights.com/beacon.min.js"),
+		[]byte(`"token": "656a17dec9fa459ea1aa0e0861f179fb"`),
+	} {
+		if !bytes.Contains(analytics.Bytes(), want) {
+			t.Errorf("analytics template is missing Cloudflare configuration %q", want)
 		}
 	}
 	var favorites bytes.Buffer
