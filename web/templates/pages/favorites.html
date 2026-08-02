@@ -22,7 +22,7 @@
         .add-button:hover { background: #2f3137; }
         .add-button.is-added { color: #6fcf97; border-color: #406b53; cursor: default; }
         .location-badge { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid currentColor; font-size: 9px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-        .location-badge-buoy { color: #98a0ec; }
+        .location-badge-buoy { color: #5eb4a6; }
         .location-badge-beach { color: #f4a967; }
         .favorites-filter { display: inline-flex; align-items: center; }
         .favorites-filter-button {
@@ -33,7 +33,7 @@
         }
         .favorites-filter-button + .favorites-filter-button { margin-left: -1px; }
         .favorites-filter-button:hover { z-index: 1; color: #fff; background: #1f2026; }
-        #filterBuoys[aria-pressed="true"] { z-index: 2; color: #c8ceff; border-color: #98a0ec; background: #252641; }
+        #filterBuoys[aria-pressed="true"] { z-index: 2; color: #9bdad7; border-color: #5eb4a6; background: #16312e; }
         #filterBeaches[aria-pressed="true"] { z-index: 2; color: #ffc38f; border-color: #f4a967; background: #34271d; }
         .mobile-favorites-filter { display: none; position: relative; }
         .mobile-filter-trigger {
@@ -48,7 +48,7 @@
             position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px;
             display: none; place-items: center; padding: 0 4px;
             border: 2px solid #0e0f12; border-radius: 999px;
-            background: #6d78de; color: #fff; font: 600 9px/1 var(--font-mono);
+            background: #076469; color: #fff; font: 600 9px/1 var(--font-mono);
         }
         .mobile-filter-trigger.has-filters .mobile-filter-count { display: grid; }
         .mobile-filter-menu {
@@ -82,12 +82,12 @@
         .mobile-filter-option:hover { position: relative; z-index: 1; color: #fff; background: #1f2026; }
         .mobile-filter-option[aria-pressed="true"] {
             position: relative; z-index: 2; color: #fff;
-            border-color: #6d78de; background: #292c4d;
+            border-color: #076469; background: #173a35;
         }
-        .mobile-filter-option.option-buoy[aria-pressed="true"] { color: #c8ceff; border-color: #98a0ec; background: #252641; }
+        .mobile-filter-option.option-buoy[aria-pressed="true"] { color: #9bdad7; border-color: #5eb4a6; background: #16312e; }
         .mobile-filter-option.option-beach[aria-pressed="true"] { color: #ffc38f; border-color: #f4a967; background: #34271d; }
-        .mobile-filter-clear { color: #8f9bff; font-size: 10px; font-weight: 500; }
-        .mobile-filter-clear:hover { color: #b9c0ff; }
+        .mobile-filter-clear { color: #48aaa8; font-size: 10px; font-weight: 500; }
+        .mobile-filter-clear:hover { color: #b6e6de; }
         .favorite-filter-hidden { display: none !important; }
         .skeleton { height: 132px; border: 1px solid #2f3137; background: linear-gradient(90deg, #17181b 25%, #1f2026 50%, #17181b 75%); background-size: 200% 100%; animation: pulse 1.4s infinite; }
         .skeleton + .skeleton { border-top: 0; }
@@ -113,7 +113,7 @@
         <!-- same container as <main> so the logo lines up with the content -->
         <div class="relative max-w-[1440px] h-full mx-auto px-4 sm:px-6 flex items-center justify-between">
             <a href="/" class="flex items-center gap-2 text-sm font-semibold text-white">
-                <span class="text-[#8f9bff]">◒</span><span class="brand-word">OpenSwells</span>
+                <span class="text-[#48aaa8]">◒</span><span class="brand-word">OpenSwells</span>
             </a>
 
             <nav class="surface view-switch absolute left-1/2 -translate-x-1/2 flex items-center" aria-label="Primary view">
@@ -190,7 +190,7 @@
                 </button>
             </div>
             <div id="signedOutState" class="surface hidden py-14 px-6 text-center">
-                <div class="mx-auto w-9 h-9 border border-[#565961] grid place-items-center text-[#8f9bff]">☆</div>
+                <div class="mx-auto w-9 h-9 border border-[#565961] grid place-items-center text-[#48aaa8]">☆</div>
                 <h2 class="mt-4 text-sm font-semibold text-white">Sign in to see your outlook</h2>
                 <p class="mt-2 text-xs text-[#a6aab2]">Favorites stay synced to your OpenSwells account.</p>
                 <button class="button button-primary mt-5" onclick="googleSignIn()">Sign in with Google</button>
@@ -541,11 +541,11 @@
                 const peakLeft = peakIndex / (heights.length - 1) * 100;
                 const peakTop = 3;
                 const labelShift = peakLeft < 5 ? '0%' : peakLeft > 95 ? '-100%' : '-50%';
-                swellLane.innerHTML = `<div class="swell-graph"><span class="swell-unit-label">SWELL (FT)</span>${laneSVG(heights, 56, '#8f9bff', true, dayBreaks)}
+                swellLane.innerHTML = `<div class="swell-graph"><span class="swell-unit-label">SWELL (FT)</span>${laneSVG(heights, 56, '#4f6fae', true, dayBreaks)}
                     <div class="swell-peak" style="left: ${peakLeft}%; top: ${peakTop}px; --peak-label-shift: ${labelShift}; --peak-label-top: 6px;"><span>${peak.toFixed(1)} ft</span></div>
                 </div>`;
             } else {
-                swellLane.innerHTML = laneSVG(heights, 56, '#8f9bff', true);
+                swellLane.innerHTML = laneSVG(heights, 56, '#4f6fae', true);
             }
             const note = el.querySelector('[data-swell-note]');
             const minFt = Math.min(...heights), maxFt = Math.max(...heights);
@@ -599,11 +599,11 @@
                         ? `${hourlyWindMph[index].toFixed(0)} mph`
                         : 'Unavailable';
                     const conditionColor = {
-                        epic: '#b48cff', good: '#45c4b0', fair: '#e2b86b', poor: '#e06c75'
+                        epic: '#86d4c6', good: '#45c4b0', fair: '#e2b86b', poor: '#e06c75'
                     }[condition.toLowerCase()] || '#b7bac1';
                     panelTooltip.innerHTML = `
                         <div class="forecast-tooltip-date">${escapeHTML(labels[index])}</div>
-                        <div class="forecast-tooltip-row" style="--tooltip-color: #8f9bff;">
+                        <div class="forecast-tooltip-row" style="--tooltip-color: #4f6fae;">
                             <i class="forecast-tooltip-dot"></i><span class="forecast-tooltip-label">SWELL</span><strong class="forecast-tooltip-value">${heights[index].toFixed(1)} ft</strong>
                         </div>
                         <div class="forecast-tooltip-row" style="--tooltip-color: #e2b86b;">

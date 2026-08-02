@@ -9,15 +9,15 @@
                 getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
             const CHART = {
-                linePrimary: themeColor('--swell', '#8f9bff'),
+                linePrimary: themeColor('--swell-trend', '#4f6fae'),
                 lineSecondary: themeColor('--swell-2', '#e2b86b'),
                 lineTertiary: themeColor('--swell-3', '#6fcf97'),
-                lineQuaternary: themeColor('--swell-4', '#b89cff'),
+                lineQuaternary: themeColor('--swell-4', '#73c4b6'),
                 wind: themeColor('--wind', '#eec37c'),
                 axis: themeColor('--text-3', '#8b9099'),
                 grid: themeColor('--line', '#2f3137'),
                 gridStrong: themeColor('--line-strong', '#43454c'),
-                verticalLine: themeColor('--accent-bright', '#8f9bff'),
+                verticalLine: themeColor('--accent-bright', '#48aaa8'),
                 label: themeColor('--text-3', '#8b9099'),
             };
             const getChartColors = () => CHART;
@@ -196,7 +196,7 @@
             dataGroupedByDay = groupDataByDay(data);
             const dayStats = {}; // key -> {avgFt, cond}, feeds the day log line
             const CONDITION_COLORS = {
-                epic: themeColor('--cond-epic', '#bb97ff'),
+                epic: themeColor('--cond-epic', '#86d4c6'),
                 good: themeColor('--cond-good', '#4fd1bc'),
                 fair: themeColor('--cond-fair', '#eec478'),
                 poor: themeColor('--cond-poor', '#ef7a83'),
@@ -270,7 +270,7 @@
             buildDayCards();
 
             // --- 16-day strip: swell height + wind speed lanes ------------
-            // Two lanes on one shared day grid: swell (indigo, ft) on top,
+            // Two lanes on one shared day grid: swell (green-blue, ft) on top,
             // wind (amber, mph) beneath. Hover reads out both; clicking
             // jumps to that day's hourly detail.
             const stripHost = document.getElementById('swellStrip');
@@ -345,7 +345,7 @@
                 // selected-day band spans both lanes
                 stripSel = svg.append('rect')
                     .attr('y', swTop - 6).attr('height', gridBase - swTop + 6)
-                    .attr('fill', 'rgba(94, 106, 210, 0.16)').attr('display', 'none');
+                    .attr('fill', 'rgba(0, 77, 80, 0.24)').attr('display', 'none');
 
                 // day grid: hairlines through both lanes, labels at the bottom
                 const labelStep = width < 520 ? 4 : 2;
@@ -503,7 +503,7 @@
                         stripTooltip.style.left = `${placeLeft ? panelX - tooltipWidth - 10 : panelX + 10}px`;
                         stripTooltip.style.top = `${Math.max(6, Math.min(stripPanel.clientHeight - tooltipHeight - 6, event.clientY - panelRect.top - tooltipHeight / 2))}px`;
                         stripReadout.textContent = text;
-                        stripReadout.style.color = '#c8ceff';
+                        stripReadout.style.color = '#9bdad7';
                     })
                     .on('mouseleave', () => {
                         stripHoverLine.style.display = 'none';
@@ -883,13 +883,13 @@
         .swell-strip { position: relative; margin-top: 12px; background: var(--raised); border: 1px solid var(--line); }
         .swell-strip .strip-title, .swell-strip #stripReadout { font-family: var(--font-mono); }
         .swell-strip svg { display: block; }
-        .strip-hover-line { position: absolute; z-index: 3; top: 0; bottom: 0; display: none; width: 1px; background: var(--accent-soft); box-shadow: 0 0 7px rgba(143, 155, 255, .45); pointer-events: none; }
+        .strip-hover-line { position: absolute; z-index: 3; top: 0; bottom: 0; display: none; width: 1px; background: var(--accent-soft); box-shadow: 0 0 7px rgba(72, 170, 168, .45); pointer-events: none; }
         /* Hover tooltips are the fastest way to read an exact value off any
            chart here, so they are sized for reading, not for minimalism:
            10px values, a full-contrast header, and a solid backdrop. */
         .strip-panel-tooltip {
             position: absolute; z-index: 5; display: none; min-width: 152px;
-            padding: 9px 10px; border: 1px solid #5a5f78; border-left: 2px solid var(--swell);
+            padding: 9px 10px; border: 1px solid #426c65; border-left: 2px solid var(--swell);
             background: rgba(20, 21, 26, .98);
             box-shadow: var(--shadow-pop);
             color: var(--text); font-family: var(--font-mono);
@@ -925,7 +925,7 @@
            all four sides plus a top rule so it reads at a glance in a row of
            sixteen otherwise identical cards. */
         .forecastcard.selectedforecast {
-            background: #262941;
+            background: #14332f;
             border-color: var(--accent);
             box-shadow: inset 0 2px 0 var(--accent-bright);
         }
@@ -975,7 +975,7 @@
             min-width: 214px;
             padding: 9px 10px;
             background: rgba(20, 21, 26, .98);
-            border: 1px solid #5a5f78;
+            border: 1px solid #426c65;
             border-left: 2px solid var(--swell);
             color: var(--text);
             font-family: var(--font-mono);

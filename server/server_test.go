@@ -197,7 +197,7 @@ func TestLoadTemplates(t *testing.T) {
 	for _, want := range [][]byte{
 		[]byte(".search-favorite-star"),
 		[]byte(".favorite-map-marker"),
-		[]byte(".favorite-star-buoy { color: #98a0ec; }"),
+		[]byte(".favorite-star-buoy { color: #5eb4a6; }"),
 		[]byte(".favorite-star-beach { color: #f4a967; }"),
 		[]byte("fill=\"currentColor\""),
 		[]byte("const favoriteMapMarkers = new Map();"),
