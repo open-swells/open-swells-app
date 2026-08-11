@@ -201,7 +201,7 @@
                     <button onclick="openSpot('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
                     {{else}}
                     <button onclick="showFavoriteOnMap('spot', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
-                    <a href="/spot/{{.ID}}" target="_top" class="link-button full-forecast-link" title="Open full forecast" aria-label="Open full forecast for {{.Name}}">
+                    <a href="/surf-spots/{{.ID}}" target="_top" class="link-button full-forecast-link" title="Open full forecast" aria-label="Open full forecast for {{.Name}}">
                         <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
                     </a>
                     {{end}}

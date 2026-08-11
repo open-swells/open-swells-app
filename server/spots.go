@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,6 +56,8 @@ func (s Spot) samplePoint() (lat, lon float64) {
 
 type SpotStore struct {
 	byID     map[string]Spot
+	spots    []Spot
+	seoNames map[string]string
 	listJSON []byte // pre-marshaled /api/spots payload
 	listGzip []byte
 }
@@ -70,12 +73,18 @@ func NewSpotStore(path string) (*SpotStore, error) {
 	}
 
 	byID := make(map[string]Spot, len(spots))
+	validSpots := make([]Spot, 0, len(spots))
+	nameCounts := make(map[string]int, len(spots))
+	nameKeys := make(map[string]int, len(spots))
 	list := make([]gin.H, 0, len(spots))
 	for _, s := range spots {
 		if s.ID == "" || s.Name == "" {
 			continue
 		}
 		byID[s.ID] = s
+		validSpots = append(validSpots, s)
+		nameCounts[strings.ToLower(strings.TrimSpace(s.Name))]++
+		nameKeys[spotNameKey(s)]++
 		list = append(list, gin.H{
 			"id": s.ID, "name": s.Name, "lat": s.Lat, "lon": s.Lon, "region": s.Region,
 		})
@@ -92,7 +101,33 @@ func NewSpotStore(path string) (*SpotStore, error) {
 	if err := zw.Close(); err != nil {
 		return nil, err
 	}
-	return &SpotStore{byID: byID, listJSON: listJSON, listGzip: buf.Bytes()}, nil
+	sort.Slice(validSpots, func(i, j int) bool { return validSpots[i].ID < validSpots[j].ID })
+	seoNames := make(map[string]string, len(validSpots))
+	coordinateCounts := make(map[string]int)
+	for _, s := range validSpots {
+		if nameKeys[spotNameKey(s)] > 1 {
+			coordinateCounts[spotNameKey(s)+"\x00"+coordinateLabel(s.Lat, s.Lon)]++
+		}
+	}
+	coordinateSequence := make(map[string]int)
+	for _, s := range validSpots {
+		if nameCounts[strings.ToLower(strings.TrimSpace(s.Name))] <= 1 {
+			seoNames[s.ID] = s.Name
+			continue
+		}
+		if nameKeys[spotNameKey(s)] <= 1 && strings.TrimSpace(s.Region) != "" {
+			seoNames[s.ID] = fmt.Sprintf("%s (%s)", s.Name, s.Region)
+			continue
+		}
+		coordinates := coordinateLabel(s.Lat, s.Lon)
+		coordinateKey := spotNameKey(s) + "\x00" + coordinates
+		seoNames[s.ID] = fmt.Sprintf("%s (%s)", s.Name, coordinates)
+		if coordinateCounts[coordinateKey] > 1 {
+			coordinateSequence[coordinateKey]++
+			seoNames[s.ID] = fmt.Sprintf("%s (%s, location %d)", s.Name, coordinates, coordinateSequence[coordinateKey])
+		}
+	}
+	return &SpotStore{byID: byID, spots: validSpots, seoNames: seoNames, listJSON: listJSON, listGzip: buf.Bytes()}, nil
 }
 
 func (s *SpotStore) Get(id string) (Spot, bool) {
@@ -108,6 +143,89 @@ func (s *SpotStore) Count() int {
 		return 0
 	}
 	return len(s.byID)
+}
+
+func (s *SpotStore) All() []Spot {
+	if s == nil {
+		return nil
+	}
+	return s.spots
+}
+
+func spotNameKey(spot Spot) string {
+	return strings.ToLower(strings.TrimSpace(spot.Name)) + "\x00" + strings.ToLower(strings.TrimSpace(spot.Region))
+}
+
+func coordinateLabel(lat, lon float64) string {
+	latHemisphere, lonHemisphere := "N", "E"
+	if lat < 0 {
+		latHemisphere = "S"
+		lat = -lat
+	}
+	if lon < 0 {
+		lonHemisphere = "W"
+		lon = -lon
+	}
+	return fmt.Sprintf("%.3f°%s, %.3f°%s", lat, latHemisphere, lon, lonHemisphere)
+}
+
+// SEOName is normally the human name. Region and coordinates only
+// disambiguate source records whose names collide.
+func (s *SpotStore) SEOName(spot Spot) string {
+	if s != nil && s.seoNames[spot.ID] != "" {
+		return s.seoNames[spot.ID]
+	}
+	return spot.Name
+}
+
+type NearbySpot struct {
+	ID       string
+	Name     string
+	Region   string
+	Distance float64
+}
+
+func haversineMiles(aLat, aLon, bLat, bLon float64) float64 {
+	const earthRadiusMiles = 3958.8
+	toRadians := math.Pi / 180
+	dLat := (bLat - aLat) * toRadians
+	dLon := (bLon - aLon) * toRadians
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(aLat*toRadians)*math.Cos(bLat*toRadians)*math.Sin(dLon/2)*math.Sin(dLon/2)
+	return 2 * earthRadiusMiles * math.Asin(math.Sqrt(a))
+}
+
+func (s *SpotStore) Nearby(spot Spot, limit int) []NearbySpot {
+	if s == nil || limit <= 0 {
+		return nil
+	}
+	nearby := make([]NearbySpot, 0, limit)
+	less := func(i, j int) bool {
+		if nearby[i].Distance == nearby[j].Distance {
+			return nearby[i].ID < nearby[j].ID
+		}
+		return nearby[i].Distance < nearby[j].Distance
+	}
+	for _, candidate := range s.spots {
+		if candidate.ID == spot.ID {
+			continue
+		}
+		entry := NearbySpot{
+			ID: candidate.ID, Name: candidate.Name, Region: candidate.Region,
+			Distance: haversineMiles(spot.Lat, spot.Lon, candidate.Lat, candidate.Lon),
+		}
+		if len(nearby) < limit {
+			nearby = append(nearby, entry)
+			sort.Slice(nearby, less)
+			continue
+		}
+		last := nearby[len(nearby)-1]
+		if entry.Distance < last.Distance || (entry.Distance == last.Distance && entry.ID < last.ID) {
+			nearby[len(nearby)-1] = entry
+			sort.Slice(nearby, less)
+		}
+	}
+	return nearby
 }
 
 func (s *SpotStore) handleList(c *gin.Context) {
@@ -711,6 +829,7 @@ func spotReport(staticDir string, lat, lon float64, forecastData ForecastData) (
 }
 
 type SpotPageData struct {
+	SEO             SEOPage
 	ForecastData    ForecastData
 	SwellReport     SwellReport // StationId feeds the template's wind fetch
 	SpotName        string
@@ -724,6 +843,11 @@ type SpotPageData struct {
 	Conditions      []HourlyCondition
 	HasConditions   bool
 	Facing          string // e.g. "SW 225°", empty when unknown
+	PageHeading     string
+	Coordinates     string
+	Latitude        float64
+	Longitude       float64
+	NearbySpots     []NearbySpot
 }
 
 // facingLabel renders a facing bearing as "SW 225°" for the page header.
@@ -733,9 +857,9 @@ func facingLabel(deg float64) string {
 	return fmt.Sprintf("%s %.0f°", cardinals[idx], deg)
 }
 
-func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneStore) gin.HandlerFunc {
+func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneStore, siteURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		spot, ok := spotStore.Get(c.Param("id"))
+		spot, ok := spotStore.Get(c.Param("slug"))
 		if !ok {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Unknown spot"})
 			return
@@ -753,7 +877,9 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 		// The NWS surf zone report is matched on the spot itself (not the
 		// offshore sample point): zones cover the coastal strip.
 		zone, hasZone := zones.ZoneForPoint(spot.Lat, spot.Lon)
+		seo := spotSEOPage(siteURL, spotStore, spot)
 		data := SpotPageData{
+			SEO:             seo,
 			ForecastData:    forecastData,
 			SwellReport:     SwellReport{StationId: spot.ID},
 			SpotName:        spot.Name,
@@ -767,6 +893,11 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 			Conditions:      conditions,
 			HasConditions:   len(conditions) > 0,
 			Facing:          facing,
+			PageHeading:     seo.OpenGraphTitle,
+			Coordinates:     coordinateLabel(spot.Lat, spot.Lon),
+			Latitude:        spot.Lat,
+			Longitude:       spot.Lon,
+			NearbySpots:     spotStore.Nearby(spot, 6),
 		}
 		renderTemplate(c, tmpl, "spot.html", data)
 	}

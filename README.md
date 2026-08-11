@@ -31,6 +31,7 @@ Configuration (all optional except Firebase credentials):
 | `FORECAST_DIR` | `./data/forecast` | Generated forecast GeoJSON, PNG, tide, and metadata files |
 | `SPOTS_PATH` | `./data/spots.json` | Tracked surf-spot reference data |
 | `TEMPLATE_DIR` | `./web/templates` | Go HTML page and component templates |
+| `SITE_URL` | `https://openswells.com` | Public origin used for canonical URLs, Open Graph metadata, robots.txt, and sitemaps |
 | `TRUSTED_PROXIES` | `127.0.0.1,::1` | Comma-separated reverse proxy IPs |
 | `GIN_MODE` | `release` | Set `debug` for verbose gin output |
 | `RATE_LIMIT_RPM` / `RATE_LIMIT_BURST` | `120` / `30` | Per-client limit for dynamic pages and APIs |

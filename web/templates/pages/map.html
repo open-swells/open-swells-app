@@ -1,10 +1,15 @@
 <!DOCTYPE html>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<html class="dark">
+<html lang="en" class="dark">
     <head>
-
-
-        <title>OpenSwells;</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+        <title>{{.SEO.Title}}</title>
+        <meta name="description" content="{{.SEO.Description}}">
+        <link rel="canonical" href="{{.SEO.Canonical}}">
+        <meta property="og:title" content="{{.SEO.OpenGraphTitle}}">
+        <meta property="og:description" content="{{.SEO.Description}}">
+        <meta property="og:url" content="{{.SEO.Canonical}}">
+        <meta property="og:type" content="website">
         {{template "analytics"}}
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
@@ -550,7 +555,7 @@
 
                 function openSpot(spotId, spotName = '', region = '') {
                     if (!spotId) return;
-                    openModalFrame(`/spot/${encodeURIComponent(spotId)}`,
+                    openModalFrame(`/surf-spots/${encodeURIComponent(spotId)}`,
                         spotName || 'Spot forecast', region ? region.toUpperCase() : 'SURF SPOT',
                         { type: 'spot', id: spotId });
                 }
@@ -2242,6 +2247,18 @@
                     };
                     if (map.isStyleLoaded()) addSpotLayers(fc);
                     else map.once('load', () => addSpotLayers(fc));
+
+                    const requestedSpotID = new URLSearchParams(window.location.search).get('spot');
+                    if (requestedSpotID) {
+                        const requestedSpot = spots.find(spot => spot.id === requestedSpotID);
+                        if (requestedSpot && typeof requestedSpot.lat === 'number' && typeof requestedSpot.lon === 'number') {
+                            map.flyTo({ center: [requestedSpot.lon, requestedSpot.lat], zoom: 11 });
+                            new maplibregl.Popup({ offset: 10, maxWidth: '280px' })
+                                .setLngLat([requestedSpot.lon, requestedSpot.lat])
+                                .setHTML(spotPopupHTML(requestedSpot))
+                                .addTo(map);
+                        }
+                    }
                 } catch (error) {
                     console.warn('Surf spots unavailable:', error);
                 }

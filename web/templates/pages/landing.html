@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OpenSwells</title>
+    <title>{{.SEO.Title}}</title>
+    <meta name="description" content="{{.SEO.Description}}">
+    <link rel="canonical" href="{{.SEO.Canonical}}">
+    <meta property="og:title" content="{{.SEO.OpenGraphTitle}}">
+    <meta property="og:description" content="{{.SEO.Description}}">
+    <meta property="og:url" content="{{.SEO.Canonical}}">
+    <meta property="og:type" content="website">
     {{template "analytics"}}
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">

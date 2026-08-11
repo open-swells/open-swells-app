@@ -68,12 +68,14 @@ type ReportData struct {
 }
 
 type MapPageData struct {
+	SEO          SEOPage
 	ForecastData ForecastData
 	WindReport   WindReport
 	SwellReport  SwellReport
 }
 
 type LandingPageData struct {
+	SEO       SEOPage
 	SpotCount int
 	BuoyCount int
 }
@@ -1069,8 +1071,15 @@ func run() {
 
 	spotStore, err = NewSpotStore(getenvDefault("SPOTS_PATH", "./data/spots.json"))
 	if err != nil {
-		// The map degrades to no spot layer; everything else still works.
-		log.Printf("warning: failed to load surf spots: %v", err)
+		log.Fatalf("failed to load surf spots: %v", err)
+	}
+	siteURL, err := canonicalSiteURL(getenvDefault("SITE_URL", "https://openswells.com"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	seoIndex, err := NewSEOIndex(siteURL, spotStore)
+	if err != nil {
+		log.Fatalf("failed to build SEO index: %v", err)
 	}
 
 	surfZoneStore := NewSurfZoneStore(db, strings.Split(getenvDefault("SURF_ZONE_STATES", "ca"), ","))
@@ -1135,6 +1144,9 @@ func run() {
 		c.Data(http.StatusOK, "text/css; charset=utf-8", webstatic.ThemeCSS)
 	})
 	router.GET("/static/*filepath", staticLimiter.middleware(clientIPKey), staticHandler(forecastDir))
+	router.GET("/robots.txt", seoIndex.handleRobots)
+	router.GET("/sitemap.xml", seoIndex.handleSitemapIndex)
+	router.GET("/sitemaps/:name", seoIndex.handleSitemap)
 	// Dynamic pages and APIs share a per-client ceiling. Expensive and
 	// authenticated routes below have additional, tighter buckets.
 	router.Use(publicLimiter.middleware(clientIPKey))
@@ -1146,10 +1158,15 @@ func run() {
 	router.GET("/api/beaches", surfZoneStore.handleList)
 	router.GET("/api/beach/:zoneId", surfZoneStore.handleZone)
 	router.GET("/api/spots", spotStore.handleList)
-	router.GET("/spot/:id", expensiveLimiter.middleware(clientIPKey), expensiveConcurrency, spotPageHandler(tmpl, forecastDir, surfZoneStore))
+	router.GET("/surf-spots/:slug", expensiveConcurrency, spotPageHandler(tmpl, forecastDir, surfZoneStore, siteURL))
 
 	router.GET("/", func(c *gin.Context) {
 		renderTemplate(c, tmpl, "landing.html", LandingPageData{
+			SEO: SEOPage{
+				Title:       "OpenSwells | Free 16-Day Surf Forecasts",
+				Description: "Explore free 16-day swell forecasts and current conditions for thousands of surf spots worldwide.",
+				Canonical:   siteURL + "/", OpenGraphTitle: "OpenSwells Surf Forecasts",
+			},
 			SpotCount: spotStore.Count(),
 			BuoyCount: stationStore.ActiveCount(),
 		})
@@ -1166,7 +1183,14 @@ func run() {
 			log.Printf("Warning: failed to get default forecast for map: %v", err)
 			forecastdata = ForecastData{}
 		}
-		renderTemplate(c, tmpl, "map.html", MapPageData{ForecastData: forecastdata})
+		renderTemplate(c, tmpl, "map.html", MapPageData{
+			SEO: SEOPage{
+				Title:       "Interactive Surf Forecast Map | OpenSwells",
+				Description: "Explore swell, wind, tide, buoy, and surf-spot forecasts on the OpenSwells interactive map.",
+				Canonical:   siteURL + "/map", OpenGraphTitle: "OpenSwells Interactive Surf Forecast Map",
+			},
+			ForecastData: forecastdata,
+		})
 	})
 
 	renderFavoritesPage := func(c *gin.Context) {

@@ -208,6 +208,8 @@ func TestLoadTemplates(t *testing.T) {
 		[]byte("refreshFavoriteMapMarkers();"),
 		[]byte("id=\"mobileAccountBtn\""),
 		[]byte("onclick=\"openMobileAccount()\""),
+		[]byte("`/surf-spots/${encodeURIComponent(spotId)}`"),
+		[]byte("new URLSearchParams(window.location.search).get('spot')"),
 	} {
 		if !bytes.Contains(mapPage.Bytes(), want) {
 			t.Errorf("map favorites search/marker integration is missing %q", want)
@@ -263,6 +265,9 @@ func TestLoadTemplates(t *testing.T) {
 	if bytes.Contains(spotPage.Bytes(), []byte("Current outlook")) {
 		t.Error("spot page still renders the detached current outlook tag")
 	}
+	if bytes.Contains(spotPage.Bytes(), []byte("seo-forecast-table")) || bytes.Contains(spotPage.Bytes(), []byte("multi-day surf forecast")) {
+		t.Error("spot page renders an extra SEO forecast table before the interactive forecast")
+	}
 	if !bytes.Contains(spotPage.Bytes(), []byte("travelBearing(d.PrimaryDegrees)")) ||
 		!bytes.Contains(spotPage.Bytes(), []byte("travelBearing(direction)")) {
 		t.Error("hourly forecast arrows do not convert marine from-directions to travel bearings")
@@ -314,7 +319,7 @@ func TestLoadTemplates(t *testing.T) {
 	if !bytes.Contains(compact.Bytes(), []byte("Show on map")) {
 		t.Error("compact forecast summary is missing its map action")
 	}
-	for _, want := range []string{"href=\"/forecast/46221\"", "href=\"/spot/el-porto\"", "Open full forecast"} {
+	for _, want := range []string{"href=\"/forecast/46221\"", "href=\"/surf-spots/el-porto\"", "Open full forecast"} {
 		if !bytes.Contains(compact.Bytes(), []byte(want)) {
 			t.Errorf("compact forecast summary is missing %q", want)
 		}

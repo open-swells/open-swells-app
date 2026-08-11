@@ -303,7 +303,7 @@
             document.getElementById('searchResults').innerHTML = matches.map(item => {
                 const added = item.type === 'buoy' ? userBuoys.includes(item.id) : userSpots.includes(item.id);
                 const kind = item.type === 'buoy' ? 'Buoy' : 'Beach';
-                const href = item.type === 'buoy' ? `/forecast/${encodeURIComponent(item.id)}` : `/spot/${encodeURIComponent(item.id)}`;
+                const href = item.type === 'buoy' ? `/forecast/${encodeURIComponent(item.id)}` : `/surf-spots/${encodeURIComponent(item.id)}`;
                 return `<div class="search-row items-center gap-4 py-3">
                     <a href="${href}" class="min-w-0 group">
                         <div class="flex items-center gap-2"><span class="location-badge ${item.type === 'buoy' ? 'location-badge-buoy' : 'location-badge-beach'}">${kind}</span><span class="mono text-[10px] text-[#8b9099] truncate">${escapeHTML(item.meta)}</span></div>
@@ -718,7 +718,7 @@
         }
 
         function openForecast(id) { window.location.assign(`/forecast/${encodeURIComponent(id)}`); }
-        function openSpot(id) { window.location.assign(`/spot/${encodeURIComponent(id)}`); }
+        function openSpot(id) { window.location.assign(`/surf-spots/${encodeURIComponent(id)}`); }
         function openSignIn() { const modal = document.getElementById('signInModal'); modal.classList.remove('hidden'); modal.classList.add('flex'); }
         function closeSignIn() { const modal = document.getElementById('signInModal'); modal.classList.add('hidden'); modal.classList.remove('flex'); }
         function googleSignIn() { openSwellsAuth.signIn().then(closeSignIn).catch(console.error); }

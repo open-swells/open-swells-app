@@ -1,7 +1,17 @@
 <!DOCTYPE html>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<html class="dark">
+<html lang="en" class="dark">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{{.SEO.Title}}</title>
+        <meta name="description" content="{{.SEO.Description}}">
+        <link rel="canonical" href="{{.SEO.Canonical}}">
+        <meta property="og:title" content="{{.SEO.OpenGraphTitle}}">
+        <meta property="og:description" content="{{.SEO.Description}}">
+        <meta property="og:url" content="{{.SEO.Canonical}}">
+        <meta property="og:type" content="website">
+        <script type="application/ld+json">{{json .SEO.StructuredData}}</script>
+        <script>if (window.self !== window.top) document.documentElement.classList.add('embedded');</script>
         {{template "analytics"}}
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
@@ -21,6 +31,17 @@
             #tooltip { border-radius: 4px !important; background: var(--panel) !important; border-color: var(--line-strong) !important; }
             .popup-only { display: none; }
             body.embedded .popup-only { display: inline-flex; }
+            .spot-breadcrumbs { margin-bottom: 12px; color: var(--text-3); font-size: 11px; }
+            .spot-breadcrumbs a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+            html.embedded .spot-breadcrumbs { display: none; }
+            .spot-location { margin-top: 16px; padding: 14px; border: 1px solid var(--line); background: var(--raised); }
+            .spot-location h2, .nearby-spots h2 { color: #fff; font-size: 13px; font-weight: 600; }
+            .spot-location p { margin-top: 5px; color: var(--text-2); font-size: 12px; }
+            .spot-location a, .nearby-spots a { color: var(--accent-soft); text-decoration: underline; text-underline-offset: 2px; }
+            .nearby-spots { margin-top: 16px; }
+            .nearby-spots ul { margin-top: 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
+            .nearby-spots li { min-width: 0; color: var(--text-3); font-size: 11px; }
+            @media (max-width: 560px) { .nearby-spots ul { grid-template-columns: 1fr; } }
         </style>
         <script>
             if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));
@@ -38,15 +59,18 @@
 
     <body>
       <main class="station-shell">
+        <nav class="spot-breadcrumbs" aria-label="Breadcrumb">
+            <a href="/map?spot={{.SwellReport.StationId}}">Map</a> <span aria-hidden="true">›</span> <span aria-current="page">{{.SpotName}}</span>
+        </nav>
         <div class="station-header flex items-start justify-between gap-4 mb-4">
             <!-- Spot Name -->
             <div class="w-full min-w-0">
-                <h1 class="station-title truncate">{{.SpotName}}</h1>
-                <div class="station-meta truncate">{{if .Region}}{{.Region}} &middot; {{end}}GFS-WAVE MODEL FORECAST{{if .Facing}} &middot; FACES {{.Facing}}{{end}}</div>
+                <h1 class="station-title">{{.PageHeading}}</h1>
+                <div class="station-meta">{{if .Region}}{{.Region}} &middot; {{end}}{{.Coordinates}} &middot; GFS-WAVE MODEL FORECAST{{if .Facing}} &middot; FACES {{.Facing}}{{end}}</div>
             </div>
 
             <div class="flex items-center gap-2 flex-none">
-                <a class="page-header-action page-open-button popup-only" href="/spot/{{.SwellReport.StationId}}" target="_top" aria-label="Open full forecast" title="Open full forecast">
+                <a class="page-header-action page-open-button popup-only" href="/surf-spots/{{.SwellReport.StationId}}" target="_top" aria-label="Open full forecast" title="Open full forecast">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
                 </a>
                 <button type="button" class="page-header-action page-favorite-button" data-forecast-favorite data-favorite-type="spot" data-favorite-id="{{.SwellReport.StationId}}" aria-label="Add to favorites">+</button>
@@ -100,6 +124,7 @@
                         {{if $p.SurfHeight}}<div class="zone-row"><span class="k">Surf</span><span class="v">{{$p.SurfHeight}}</span></div>{{end}}
                         {{if $p.WaterTemp}}<div class="zone-row"><span class="k">Water</span><span class="v">{{$p.WaterTemp}}</span></div>{{end}}
                         {{if $p.Winds}}<div class="zone-row"><span class="k">Wind</span><span class="v">{{$p.Winds}}</span></div>{{end}}
+                        {{range $p.Tides}}<div class="zone-row"><span class="k">Tide</span><span class="v">{{.}}</span></div>{{end}}
                         {{if notnone $p.Remarks}}<div class="zone-remarks">{{$p.Remarks}}</div>{{end}}
                     </div>
                     {{end}}{{end}}
@@ -226,6 +251,19 @@
                 No model forecast is available for this spot right now — the wave grid
                 has no data near it, or the forecast files are still being generated.
             </div>
+        {{end}}
+        <section class="spot-location" aria-labelledby="spot-location-heading">
+            <h2 id="spot-location-heading">{{.SpotName}} location</h2>
+            <p>{{if .Region}}{{.Region}} &middot; {{end}}Latitude {{printf "%.6f" .Latitude}}, longitude {{printf "%.6f" .Longitude}}</p>
+            <p><a href="/map?spot={{.SwellReport.StationId}}" target="_top">View {{.SpotName}} on the interactive surf forecast map</a></p>
+        </section>
+        {{if .NearbySpots}}
+        <nav class="nearby-spots" aria-labelledby="nearby-spots-heading">
+            <h2 id="nearby-spots-heading">Nearby surf spots</h2>
+            <ul>
+            {{range .NearbySpots}}<li><a href="/surf-spots/{{.ID}}" target="_top">{{.Name}} surf forecast</a> &middot; {{printf "%.1f" .Distance}} mi</li>{{end}}
+            </ul>
+        </nav>
         {{end}}
       </main>
     </body>
