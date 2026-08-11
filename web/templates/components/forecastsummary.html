@@ -16,7 +16,7 @@
     .favorite-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
     .link-button { height: 30px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-1); background: var(--raised); border: 1px solid var(--line-strong); cursor: pointer; }
     .link-button:hover { color: #fff; background: var(--line); border-color: var(--line); }
-    .open-button { color: #fff; background: var(--accent); border-color: var(--accent-hover); box-shadow: 0 3px 10px rgba(0, 77, 80, .28); }
+    .open-button { color: #fff; background: var(--accent); border-color: var(--accent-hover); box-shadow: 0 3px 10px rgba(29, 78, 216, .28); }
     .open-button:hover { background: var(--accent-hover); border-color: var(--swell); }
     .full-forecast-link { width: 30px; padding: 0; }
     .action-icon { width: 13px; height: 13px; flex: none; }
@@ -40,7 +40,7 @@
     .outlook-hover-line { position: absolute; z-index: 2; top: 0; width: 1px; background: var(--accent-soft); pointer-events: none; display: none; }
     .outlook-panel-tooltip {
         position: absolute; z-index: 4; display: none; min-width: 136px;
-        padding: 8px 9px; border: 1px solid #3f655f; border-left: 2px solid var(--swell);
+        padding: 8px 9px; border: 1px solid #355a78; border-left: 2px solid var(--swell);
         background: linear-gradient(145deg, rgba(37, 39, 49, .98), rgba(20, 21, 25, .98));
         box-shadow: 0 10px 24px rgba(0, 0, 0, .42);
         color: var(--text); font-family: var(--font-mono);
@@ -141,7 +141,7 @@
                 <div class="min-w-0">
                     <div class="flex items-baseline gap-3 min-w-0">
                         <h3 class="favorite-name truncate">{{.Name}}</h3>
-                        {{if gt (len .Summary) 0}}{{$current := index .Summary 0}}<span class="favorite-now" style="color: #48aaa8;">{{$current.WaveHeight}} swell</span>{{end}}
+                        {{if gt (len .Summary) 0}}{{$current := index .Summary 0}}<span class="favorite-now" style="color: #3b82f6;">{{$current.WaveHeight}} swell</span>{{end}}
                         {{if .Offline}}<span class="offline-flag">Offline since {{.OfflineSince}}</span>{{end}}
                     </div>
                     <div class="location-meta"><span class="location-badge location-badge-buoy" style="margin-right: 6px;">Buoy</span>{{.ID}}</div>
@@ -181,7 +181,7 @@
         {{else if and (not $.Detailed) .HasError}}
         <div class="compact-condition"><span class="stat-label">Outlook</span><span class="text-[9px] font-semibold uppercase unavailable-label">{{.ErrorMsg}}</span></div>
         {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}
-        <div class="compact-condition"><span class="stat-label">Current swell</span><span class="text-[9px] font-semibold uppercase" style="color: #48aaa8;">{{$current.WaveHeight}}</span></div>
+        <div class="compact-condition"><span class="stat-label">Current swell</span><span class="text-[9px] font-semibold uppercase" style="color: #3b82f6;">{{$current.WaveHeight}}</span></div>
         {{end}}
     </article>
     {{end}}

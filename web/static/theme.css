@@ -28,14 +28,14 @@
     --text-3: #8b9099;
 
     /* Brand / interactive */
-    --accent: #004d50;
-    --accent-hover: #076469;
-    --accent-bright: #48aaa8;
-    --accent-soft: #9bdad7;
+    --accent: #1e3a8a;
+    --accent-hover: #1d4ed8;
+    --accent-bright: #3b82f6;
+    --accent-soft: #bfdbfe;
 
     /* Data series. Swell trends use deep blue while other swell indicators
        retain the brand green-blue; wind stays amber across the app. */
-    --swell: #48aaa8;
+    --swell: #3b82f6;
     --swell-trend: #4f6fae;
     --swell-2: #e2b86b;
     --swell-3: #6fcf97;
@@ -51,7 +51,7 @@
     --cond-epic: #86d4c6;
 
     /* Entity accents used by badges, markers, and filters */
-    --kind-buoy: #5eb4a6;
+    --kind-buoy: #60a5fa;
     --kind-beach: #f4a967;
     --positive: #6fcf97;
     --negative: #e06c75;

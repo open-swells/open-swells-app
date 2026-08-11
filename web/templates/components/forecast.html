@@ -17,7 +17,7 @@
                 axis: themeColor('--text-3', '#8b9099'),
                 grid: themeColor('--line', '#2f3137'),
                 gridStrong: themeColor('--line-strong', '#43454c'),
-                verticalLine: themeColor('--accent-bright', '#48aaa8'),
+                verticalLine: themeColor('--accent-bright', '#3b82f6'),
                 label: themeColor('--text-3', '#8b9099'),
             };
             const getChartColors = () => CHART;
@@ -345,7 +345,7 @@
                 // selected-day band spans both lanes
                 stripSel = svg.append('rect')
                     .attr('y', swTop - 6).attr('height', gridBase - swTop + 6)
-                    .attr('fill', 'rgba(0, 77, 80, 0.24)').attr('display', 'none');
+                    .attr('fill', 'rgba(29, 78, 216, 0.24)').attr('display', 'none');
 
                 // day grid: hairlines through both lanes, labels at the bottom
                 const labelStep = width < 520 ? 4 : 2;
@@ -503,7 +503,7 @@
                         stripTooltip.style.left = `${placeLeft ? panelX - tooltipWidth - 10 : panelX + 10}px`;
                         stripTooltip.style.top = `${Math.max(6, Math.min(stripPanel.clientHeight - tooltipHeight - 6, event.clientY - panelRect.top - tooltipHeight / 2))}px`;
                         stripReadout.textContent = text;
-                        stripReadout.style.color = '#9bdad7';
+                        stripReadout.style.color = '#bfdbfe';
                     })
                     .on('mouseleave', () => {
                         stripHoverLine.style.display = 'none';
@@ -889,7 +889,7 @@
            10px values, a full-contrast header, and a solid backdrop. */
         .strip-panel-tooltip {
             position: absolute; z-index: 5; display: none; min-width: 152px;
-            padding: 9px 10px; border: 1px solid #426c65; border-left: 2px solid var(--swell);
+            padding: 9px 10px; border: 1px solid #365d7c; border-left: 2px solid var(--swell);
             background: rgba(20, 21, 26, .98);
             box-shadow: var(--shadow-pop);
             color: var(--text); font-family: var(--font-mono);
@@ -925,7 +925,7 @@
            all four sides plus a top rule so it reads at a glance in a row of
            sixteen otherwise identical cards. */
         .forecastcard.selectedforecast {
-            background: #14332f;
+            background: #14283a;
             border-color: var(--accent);
             box-shadow: inset 0 2px 0 var(--accent-bright);
         }
@@ -975,7 +975,7 @@
             min-width: 214px;
             padding: 9px 10px;
             background: rgba(20, 21, 26, .98);
-            border: 1px solid #426c65;
+            border: 1px solid #365d7c;
             border-left: 2px solid var(--swell);
             color: var(--text);
             font-family: var(--font-mono);

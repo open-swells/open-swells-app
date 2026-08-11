@@ -95,10 +95,10 @@
             font-size: 9px; font-weight: 600; text-transform: uppercase;
             padding: 1px 5px; border: 1px solid currentColor; line-height: 14px;
         }
-        .search-badge-buoy { color: #5eb4a6; }
+        .search-badge-buoy { color: #60a5fa; }
         .search-badge-beach { color: #f4a967; }
         .search-favorite-star { font-size: 14px; line-height: 1; }
-        .favorite-star-buoy { color: #5eb4a6; }
+        .favorite-star-buoy { color: #60a5fa; }
         .favorite-star-beach { color: #f4a967; }
         /* Favorites are a small, final DOM-marker pass above MapLibre's
            canvas layers and ordinary markers. */
@@ -137,7 +137,7 @@
             border-radius: 0;
         }
         .maplibregl-popup-close-button:hover { color: #fff; background: #292a30; }
-        input[type="range"] { accent-color: #004d50; }
+        input[type="range"] { accent-color: #2563eb; }
         /* iOS Safari auto-zooms the page when a focused input's font-size
            is under 16px; keep the search at 16px on touch devices so
            focusing it never zooms */
@@ -155,14 +155,14 @@
         .buoy-marker-dot {
             width: 12px; height: 12px;
             border-radius: 50%;
-            background: #004d50;
+            background: #1e3a8a;
             border: 2px solid rgba(255, 255, 255, 0.95);
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
             transition: transform 120ms ease, background 120ms ease;
         }
         .buoy-marker:hover .buoy-marker-dot {
             transform: scale(1.35);
-            background: #076469;
+            background: #1d4ed8;
         }
         /* Tide stations: bright teal diamonds, distinct from the dark green-blue buoy dots.
            Same outer/inner split as .buoy-marker (MapLibre owns the outer
@@ -230,7 +230,7 @@
             position: absolute; left: 0; right: 0; bottom: 15px;
             height: 1px; background: #2f3137;
         }
-        .timeline-track:focus-within { outline: 1px solid #004d50; outline-offset: 3px; }
+        .timeline-track:focus-within { outline: 1px solid #3b82f6; outline-offset: 3px; }
         .timeline-tick {
             position: absolute; bottom: 15px;
             width: 1px; height: 7px;
@@ -248,12 +248,12 @@
         }
         .timeline-progress {
             position: absolute; left: 0; bottom: 15px;
-            height: 1px; background: #004d50;
+            height: 1px; background: #2563eb;
             pointer-events: none;
         }
         .timeline-playhead {
             position: absolute; top: 4px; bottom: 12px;
-            width: 2px; background: #48aaa8;
+            width: 2px; background: #60a5fa;
             transform: translateX(-1px);
             pointer-events: none;
         }
@@ -262,7 +262,7 @@
             position: absolute; top: -3px; left: 50%;
             transform: translateX(-50%);
             width: 7px; height: 7px;
-            background: #48aaa8;
+            background: #60a5fa;
         }
         .timeline-input {
             position: absolute; inset: 0;
@@ -336,7 +336,7 @@
           <!-- Logo -->
           <div class="title hidden sm:block justify-self-start min-w-fit">
                 <h1 class="text-sm font-semibold text-white">
-                    <a href="/" class="surface h-9 px-3 flex items-center gap-2"><span class="text-[#48aaa8]">◒</span> OpenSwells</a>
+                    <a href="/" class="surface h-9 px-3 flex items-center gap-2"><span class="text-[#3b82f6]">◒</span> OpenSwells</a>
                 </h1>
             </div>
 
@@ -348,7 +348,7 @@
 
             <!-- Search -->
             <div id="searchBox" class="searchbox relative w-full max-w-[440px]">
-                <div class="surface relative h-9 flex items-center focus-within:border-[#004d50]">
+                <div class="surface relative h-9 flex items-center focus-within:border-[#1e3a8a]">
                     <svg class="absolute left-3 pointer-events-none text-[#a6aab2]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                     <input
                      type="text"
@@ -493,7 +493,7 @@
                     </button>
                     <div class="flex flex-col shrink-0 min-w-[92px] pr-3 border-r border-[#2f3137]">
                         <span id="timeDay" class="text-[13px] font-semibold leading-tight text-white">--</span>
-                        <span id="timeClock" class="mono text-[11px] leading-tight text-[#48aaa8] mt-0.5">--:--</span>
+                        <span id="timeClock" class="mono text-[11px] leading-tight text-[#60a5fa] mt-0.5">--:--</span>
                     </div>
                     <div class="timeline-track">
                         <div id="timelineTicks" class="absolute inset-0 pointer-events-none"></div>
@@ -1990,7 +1990,7 @@
                     const line = pts => pts.map((p, j) => `${j ? 'L' : 'M'}${xOf(p.t).toFixed(1)} ${yOf(p.v).toFixed(1)}`).join(' ');
                     const nowX = xOf(now).toFixed(1);
                     html += `<svg width="${W}" height="${H}" class="mt-2" style="display:block;">
-                        <line x1="${nowX}" y1="0" x2="${nowX}" y2="${H}" stroke="#004d50" stroke-dasharray="3,3"/>
+                        <line x1="${nowX}" y1="0" x2="${nowX}" y2="${H}" stroke="#1e3a8a" stroke-dasharray="3,3"/>
                         ${window_.obs.length > 1 ? `<path d="${line(window_.obs.filter((_, j) => j % 5 === 0))}" fill="none" stroke="#a6aab2" stroke-width="1"/>` : ''}
                         <path d="${line(window_.preds)}" fill="none" stroke="#15a3a3" stroke-width="1.5"/>
                         <circle cx="${nowX}" cy="${yOf(level).toFixed(1)}" r="2.5" fill="#fff"/>
