@@ -140,13 +140,13 @@ func windForecastStart(staticDir string) string {
 func windForecastHandler(staticDir string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		stationId := c.Param("stationId")
-		var lat, lon float64
+		var samples []WindSample
 		if loc, ok := stationStore.Location(stationId); ok {
-			lat, lon = loc.Latitude, loc.Longitude
+			samples = windSeriesFor(staticDir, loc.Latitude, loc.Longitude)
 		} else if spot, ok := spotStore.Get(stationId); ok {
 			// Spot pages reuse the buoy forecast template, whose wind
 			// lane fetches by the id it was rendered with.
-			lat, lon = spot.samplePoint()
+			samples = spotWind(staticDir, spot)
 		} else {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Unknown station"})
 			return
@@ -154,7 +154,7 @@ func windForecastHandler(staticDir string) gin.HandlerFunc {
 		c.Header("Cache-Control", "public, max-age=1800")
 		c.JSON(http.StatusOK, gin.H{
 			"start":   windForecastStart(staticDir),
-			"samples": windSeriesFor(staticDir, lat, lon),
+			"samples": samples,
 		})
 	}
 }

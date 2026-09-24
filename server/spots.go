@@ -569,27 +569,119 @@ func swellComps(p swellPoint) []SwellComponent {
 	return comps
 }
 
-// spotForecast builds a buoy-bulletin-shaped forecast for a location by
-// sampling every 3-hourly partitions grid and interpolating to hourly rows
-// (the forecast chart assumes consecutive hourly rows, like bulletins).
-// Only the leading gap-free run of hours is used: rows after a missing
-// file would land on the wrong timeline slot.
+// spotSample is one model hour at a spot: the swell partitions plus the
+// NWPS nearshore sea state when the spot lies inside a domain.
+type spotSample struct {
+	hour int
+	p    swellPoint
+	nwps *nwpsPoint
+}
+
+// spotForecast builds a buoy-bulletin-shaped forecast for a spot, with
+// hourly rows (the forecast chart assumes consecutive hourly rows, like
+// bulletins). It reads the spot's full-resolution series from
+// spot_forecasts.json.gz and falls back to the coarse map grids when the
+// file doesn't cover the spot.
 // The second return is the same hourly timeline as raw swell trains
 // (partitions only — NWPS combined seas would double-count wind chop),
 // feeding the condition classifier.
-func spotForecast(staticDir string, lat, lon float64) (ForecastData, []hourSwells) {
+func spotForecast(staticDir string, spot Spot) (ForecastData, []hourSwells) {
+	lat, lon := spot.samplePoint()
+	if set, series, ok := spotSeriesFor(staticDir, spot.ID); ok {
+		if forecast, hours := fileSpotForecast(staticDir, set, series, lat, lon); len(forecast.Forecast) > 0 {
+			return forecast, hours
+		}
+	}
+	return gridSpotForecast(staticDir, lat, lon)
+}
+
+// fileSpotForecast uses the spot's own series. Only the leading gap-free
+// run of hours is used, as with the grids: a failed hour is null in the
+// file and rows past it would bridge a hole in the forecast.
+func fileSpotForecast(staticDir string, set *spotForecastSet, series *spotSeries, lat, lon float64) (ForecastData, []hourSwells) {
+	start, err := time.Parse("20060102_15Z", set.ForecastStart)
+	if err != nil {
+		return ForecastData{}, nil
+	}
+	var samples []spotSample
+	for i, hour := range set.Hours {
+		p, ok := series.point(i)
+		if !ok {
+			break
+		}
+		samples = append(samples, spotSample{hour: hour, p: p})
+	}
+	attachNwps(staticDir, samples, lat, lon)
+	return buildSpotForecast(start, samples)
+}
+
+// attachNwps adds the nearshore sample to each hour. NWPS point grids are
+// 3-hourly, so hours between them interpolate the neighboring samples.
+func attachNwps(staticDir string, samples []spotSample, lat, lon float64) {
+	domains := nwpsPointDomains(staticDir)
+	if len(domains) == 0 {
+		return
+	}
+	byHour := map[int]*nwpsPoint{}
+	nwpsAt := func(hour int) *nwpsPoint {
+		n, ok := byHour[hour]
+		if !ok {
+			n = nwpsSample(staticDir, domains, hour, lat, lon)
+			byHour[hour] = n
+		}
+		return n
+	}
+	for i := range samples {
+		hour := samples[i].hour
+		base := hour - hour%3
+		if base == hour {
+			samples[i].nwps = nwpsAt(hour)
+			continue
+		}
+		samples[i].nwps = lerpNwps(nwpsAt(base), nwpsAt(base+3), float64(hour-base)/3)
+	}
+}
+
+// buildSpotForecast interpolates model samples (hourly or 3-hourly) to
+// hourly forecast rows.
+func buildSpotForecast(start time.Time, samples []spotSample) (ForecastData, []hourSwells) {
+	if len(samples) == 0 {
+		return ForecastData{}, nil
+	}
+	var rows []ForecastRow
+	var hours []hourSwells
+	for i := 0; i < len(samples)-1; i++ {
+		gap := samples[i+1].hour - samples[i].hour
+		for sub := 0; sub < gap; sub++ {
+			hour := samples[i].hour + sub
+			frac := float64(sub) / float64(gap)
+			p := lerpSwell(samples[i].p, samples[i+1].p, frac)
+			n := lerpNwps(samples[i].nwps, samples[i+1].nwps, frac)
+			t := start.Add(time.Duration(hour) * time.Hour)
+			rows = append(rows, swellRow(p, n, t))
+			hours = append(hours, hourSwells{Time: t, Comps: swellComps(p)})
+		}
+	}
+	last := samples[len(samples)-1]
+	lastT := start.Add(time.Duration(last.hour) * time.Hour)
+	rows = append(rows, swellRow(last.p, last.nwps, lastT))
+	hours = append(hours, hourSwells{Time: lastT, Comps: swellComps(last.p)})
+
+	return ForecastData{Forecast: rows, Date: start.Format("2006010215")}, hours
+}
+
+// gridSpotForecast is the coarse fallback: the nearest point of every
+// 3-hourly ~1.67 deg swell_partitions grid.
+// Only the leading gap-free run of hours is used: rows after a missing
+// file would land on the wrong timeline slot.
+func gridSpotForecast(staticDir string, lat, lon float64) (ForecastData, []hourSwells) {
 	start, err := time.Parse("20060102_15Z", windForecastStart(staticDir))
 	if err != nil {
 		return ForecastData{}, nil
 	}
 
-	type sample struct {
-		hour int
-		p    swellPoint
-		nwps *nwpsPoint
-	}
 	nwpsDomains := nwpsPointDomains(staticDir)
-	var samples []sample
+	var samples []spotSample
 	for hour := 0; hour <= windMaxHour; hour += 3 {
 		path := filepath.Join(staticDir, fmt.Sprintf("swell_partitions_%03d.geojson", hour))
 		points, err := swellGridPoints(path)
@@ -608,43 +700,40 @@ func spotForecast(staticDir string, lat, lon float64) (ForecastData, []hourSwell
 		if len(samples) > 0 && hour != samples[len(samples)-1].hour+3 {
 			break
 		}
-		samples = append(samples, sample{
+		samples = append(samples, spotSample{
 			hour: hour,
 			p:    p,
 			nwps: nwpsSample(staticDir, nwpsDomains, hour, lat, lon),
 		})
 	}
-	if len(samples) == 0 {
-		return ForecastData{}, nil
-	}
+	return buildSpotForecast(start, samples)
+}
 
-	var rows []ForecastRow
-	var hours []hourSwells
-	for i := 0; i < len(samples)-1; i++ {
-		for sub := 0; sub < 3; sub++ {
-			hour := samples[i].hour + sub
-			frac := float64(sub) / 3
-			p := lerpSwell(samples[i].p, samples[i+1].p, frac)
-			n := lerpNwps(samples[i].nwps, samples[i+1].nwps, frac)
-			t := start.Add(time.Duration(hour) * time.Hour)
-			rows = append(rows, swellRow(p, n, t))
-			hours = append(hours, hourSwells{Time: t, Comps: swellComps(p)})
+// spotWind is the spot's wind series: hourly from its own full-resolution
+// cell when the spot file covers it, else the coarse wind grids.
+func spotWind(staticDir string, spot Spot) []WindSample {
+	if set, series, ok := spotSeriesFor(staticDir, spot.ID); ok {
+		if samples := series.wind(set.Hours); len(samples) > 0 {
+			return samples
 		}
 	}
-	last := samples[len(samples)-1]
-	lastT := start.Add(time.Duration(last.hour) * time.Hour)
-	rows = append(rows, swellRow(last.p, last.nwps, lastT))
-	hours = append(hours, hourSwells{Time: lastT, Comps: swellComps(last.p)})
-
-	return ForecastData{Forecast: rows, Date: start.Format("2006010215")}, hours
+	lat, lon := spot.samplePoint()
+	return windSeriesFor(staticDir, lat, lon)
 }
 
 // spotFacing is the bearing (degrees true) from the beach toward open
 // water: the middle of a curated swell window when the spot has one,
-// otherwise estimated as the bearing to the nearest wet wave-grid cell.
+// otherwise estimated as the bearing to the nearest wet wave-grid cell:
+// the spot's full-resolution cell first, then the coarse grid when that
+// cell sits too close to the spot to give a direction.
 func spotFacing(staticDir string, spot Spot) (float64, bool) {
 	if len(spot.SwellWindow) == 2 {
 		return circularMid(spot.SwellWindow[0], spot.SwellWindow[1]), true
+	}
+	if _, series, ok := spotSeriesFor(staticDir, spot.ID); ok {
+		if deg, ok := bearingToCell(spot, series.Cell[0], series.Cell[1]); ok {
+			return deg, true
+		}
 	}
 	points, err := swellGridPoints(filepath.Join(staticDir, "swell_partitions_000.geojson"))
 	if err != nil {
@@ -654,14 +743,20 @@ func spotFacing(staticDir string, spot Spot) (float64, bool) {
 	if !ok {
 		return 0, false
 	}
-	dLon := p.Lon - spot.Lon
+	return bearingToCell(spot, p.Lat, p.Lon)
+}
+
+// bearingToCell is the bearing (degrees true) from the spot to a grid cell,
+// false when the cell is on top of the spot and carries no direction.
+func bearingToCell(spot Spot, lat, lon float64) (float64, bool) {
+	dLon := lon - spot.Lon
 	if dLon > 180 {
 		dLon -= 360
 	} else if dLon < -180 {
 		dLon += 360
 	}
 	dx := dLon * math.Cos(spot.Lat*math.Pi/180)
-	dy := p.Lat - spot.Lat
+	dy := lat - spot.Lat
 	if math.Hypot(dx, dy) < 0.05 { // grid cell on top of the spot: no direction signal
 		return 0, false
 	}
@@ -677,8 +772,7 @@ func spotConditions(staticDir string, spot Spot, hours []hourSwells) []HourlyCon
 	windStart, err := time.Parse("20060102_15Z", windForecastStart(staticDir))
 	var wind []WindSample
 	if err == nil {
-		lat, lon := spot.samplePoint()
-		wind = windSeriesFor(staticDir, lat, lon)
+		wind = spotWind(staticDir, spot)
 	}
 	return conditionSeries(hours, wind, windStart, err == nil, facing, hasFacing, spot.SwellWindow)
 }
@@ -703,8 +797,7 @@ type SpotFavorite struct {
 
 func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 	entry := SpotFavorite{ID: spot.ID, Name: spot.Name, Region: spot.Region, Latitude: spot.Lat, Longitude: spot.Lon}
-	lat, lon := spot.samplePoint()
-	forecastData, hours := spotForecast(staticDir, lat, lon)
+	forecastData, hours := spotForecast(staticDir, spot)
 	if len(forecastData.Forecast) == 0 {
 		entry.HasError = true
 		return entry
@@ -714,7 +807,7 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 	conditions := spotConditions(staticDir, spot, hours)
 	applyConditionSummary(entry.Summary, conditions)
 	entry.CurrentConditions = currentConditionCandles(conditions)
-	if report, ok := spotReport(staticDir, lat, lon, forecastData); ok && report.HasWind {
+	if report, ok := spotReport(staticDir, spot, forecastData); ok && report.HasWind {
 		entry.WindSpeed = report.WindSpeed
 		entry.WindDir = report.WindDir
 		entry.HasWind = true
@@ -755,7 +848,8 @@ type SpotReport struct {
 // spotReport picks the forecast row whose valid time is closest to now
 // (rows are hourly, so there is almost always one on the current hour) and
 // the wind sample likewise.
-func spotReport(staticDir string, lat, lon float64, forecastData ForecastData) (SpotReport, bool) {
+func spotReport(staticDir string, spot Spot, forecastData ForecastData) (SpotReport, bool) {
+	lat, lon := spot.samplePoint()
 	now := time.Now().UTC()
 	var report SpotReport
 
@@ -809,7 +903,7 @@ func spotReport(staticDir string, lat, lon float64, forecastData ForecastData) (
 	if err == nil {
 		bestWind := -1
 		var bestWindDiff time.Duration
-		samples := windSeriesFor(staticDir, lat, lon)
+		samples := spotWind(staticDir, spot)
 		for i, s := range samples {
 			diff := start.Add(time.Duration(s.Hour) * time.Hour).Sub(now)
 			if diff < 0 {
@@ -864,9 +958,8 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 			c.JSON(http.StatusNotFound, gin.H{"error": "Unknown spot"})
 			return
 		}
-		lat, lon := spot.samplePoint()
-		forecastData, hours := spotForecast(staticDir, lat, lon)
-		report, hasReport := spotReport(staticDir, lat, lon, forecastData)
+		forecastData, hours := spotForecast(staticDir, spot)
+		report, hasReport := spotReport(staticDir, spot, forecastData)
 		conditions := spotConditions(staticDir, spot, hours)
 		summary := generateForecastSummary(forecastData)
 		applyConditionSummary(summary, conditions)

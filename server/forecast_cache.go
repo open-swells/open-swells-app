@@ -12,8 +12,8 @@ import (
 const forecastCacheWarmEvery = time.Minute
 
 type forecastCacheWarmResult struct {
-	swell, wind, nwps int
-	elapsed           time.Duration
+	swell, wind, nwps, spots int
+	elapsed                  time.Duration
 }
 
 // runForecastCacheWarmer moves the expensive GeoJSON decoding out of the
@@ -22,8 +22,8 @@ type forecastCacheWarmResult struct {
 func runForecastCacheWarmer(ctx context.Context, forecastDir string) {
 	result := warmForecastCachesOnce(forecastDir)
 	log.Printf(
-		"forecast cache warm: %d swell, %d wind, %d nearshore grids in %s",
-		result.swell, result.wind, result.nwps, result.elapsed.Round(time.Millisecond),
+		"forecast cache warm: %d swell, %d wind, %d nearshore grids, %d spot series in %s",
+		result.swell, result.wind, result.nwps, result.spots, result.elapsed.Round(time.Millisecond),
 	)
 
 	ticker := time.NewTicker(forecastCacheWarmEvery)
@@ -36,8 +36,8 @@ func runForecastCacheWarmer(ctx context.Context, forecastDir string) {
 			result := warmForecastCachesOnce(forecastDir)
 			if result.elapsed >= time.Second {
 				log.Printf(
-					"forecast cache refresh: %d swell, %d wind, %d nearshore grids in %s",
-					result.swell, result.wind, result.nwps, result.elapsed.Round(time.Millisecond),
+					"forecast cache refresh: %d swell, %d wind, %d nearshore grids, %d spot series in %s",
+					result.swell, result.wind, result.nwps, result.spots, result.elapsed.Round(time.Millisecond),
 				)
 			}
 		}
@@ -48,7 +48,14 @@ func warmForecastCachesOnce(forecastDir string) forecastCacheWarmResult {
 	started := time.Now()
 	var result forecastCacheWarmResult
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
+
+	go func() {
+		defer wg.Done()
+		if set, err := loadSpotForecasts(forecastDir); err == nil {
+			result.spots = len(set.Spots)
+		}
+	}()
 
 	go func() {
 		defer wg.Done()

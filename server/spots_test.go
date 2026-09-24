@@ -22,7 +22,7 @@ func TestSpotForecastKeepsLeadingRunWhenLaterGridMisses(t *testing.T) {
 	writeGrid("000", `[0,0]`)
 	writeGrid("003", `[10,10]`)
 
-	forecast, hours := spotForecast(dir, 0, 0)
+	forecast, hours := gridSpotForecast(dir, 0, 0)
 	if got := len(forecast.Forecast); got != 1 {
 		t.Fatalf("forecast rows = %d, want the valid leading row", got)
 	}
@@ -41,7 +41,7 @@ func TestSpotForecastRejectsInitialDistantGrid(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	forecast, hours := spotForecast(dir, 0, 0)
+	forecast, hours := gridSpotForecast(dir, 0, 0)
 	if len(forecast.Forecast) != 0 || len(hours) != 0 {
 		t.Fatal("forecast should be empty when the first grid has no nearby ocean cell")
 	}
