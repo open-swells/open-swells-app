@@ -249,6 +249,15 @@ type swellPoint struct {
 	Lon, Lat float64
 	H, P, D  [3]float64
 	Has      [3]bool
+	// Wind sea is only in the per-spot file; the coarse grids lack it.
+	WindSea    waveTrain
+	HasWindSea bool
+}
+
+// waveTrain is one wave system: height (m), mean period (s), and the
+// direction it comes from (degrees true).
+type waveTrain struct {
+	H, P, D float64
 }
 
 type swellGridEntry struct {
@@ -504,6 +513,13 @@ func lerpSwell(a, b swellPoint, frac float64) swellPoint {
 			out.D[i] = lerpAngle(a.D[i], b.D[i], frac)
 		}
 	}
+	if a.HasWindSea && b.HasWindSea {
+		out.WindSea = waveTrain{
+			H: a.WindSea.H + (b.WindSea.H-a.WindSea.H)*frac,
+			P: a.WindSea.P + (b.WindSea.P-a.WindSea.P)*frac,
+			D: lerpAngle(a.WindSea.D, b.WindSea.D, frac),
+		}
+	}
 	return out
 }
 
@@ -554,17 +570,25 @@ func swellRow(p swellPoint, n *nwpsPoint, t time.Time) ForecastRow {
 		*slots[next][2] = fmt.Sprintf("%.0f", p.D[i])
 		next++
 	}
+	if p.HasWindSea {
+		row.WindSeaHeight = fmt.Sprintf("%.1f", p.WindSea.H)
+		row.WindSeaPeriod = fmt.Sprintf("%.1f", p.WindSea.P)
+		row.WindSeaDegrees = fmt.Sprintf("%.0f", p.WindSea.D)
+	}
 	return row
 }
 
-// swellComps extracts the trains present in a grid sample, for the
-// condition classifier.
+// swellComps extracts the trains present in a grid sample, wind sea
+// included, for the condition classifier.
 func swellComps(p swellPoint) []SwellComponent {
-	comps := make([]SwellComponent, 0, 3)
+	comps := make([]SwellComponent, 0, 4)
 	for i := 0; i < 3; i++ {
 		if p.Has[i] {
 			comps = append(comps, SwellComponent{HeightM: p.H[i], PeriodS: p.P[i], DirDeg: p.D[i]})
 		}
+	}
+	if p.HasWindSea && p.WindSea.H > 0 {
+		comps = append(comps, SwellComponent{HeightM: p.WindSea.H, PeriodS: p.WindSea.P, DirDeg: p.WindSea.D, WindSea: true})
 	}
 	return comps
 }
@@ -582,9 +606,9 @@ type spotSample struct {
 // bulletins). It reads the spot's full-resolution series from
 // spot_forecasts.json.gz and falls back to the coarse map grids when the
 // file doesn't cover the spot.
-// The second return is the same hourly timeline as raw swell trains
-// (partitions only — NWPS combined seas would double-count wind chop),
-// feeding the condition classifier.
+// The second return is the same hourly timeline as raw wave trains
+// (swell partitions plus wind sea — not NWPS combined seas, which would
+// count the wind sea twice), feeding the condition classifier.
 func spotForecast(staticDir string, spot Spot) (ForecastData, []hourSwells) {
 	lat, lon := spot.samplePoint()
 	if set, series, ok := spotSeriesFor(staticDir, spot.ID); ok {
@@ -823,6 +847,10 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 	}
 	entry.Primary, entry.PrimarySub = format(row.PrimaryWaveHeight, row.PrimaryPeriod, row.PrimaryDegrees)
 	entry.Secondary, entry.SecondarySub = format(row.SecondaryWaveHeight, row.SecondaryPeriod, row.SecondaryDegrees)
+	if entry.Primary == "" {
+		// No swell running: the wind sea is the whole sea state.
+		entry.Primary, entry.PrimarySub = format(row.WindSeaHeight, row.WindSeaPeriod, row.WindSeaDegrees)
+	}
 	return entry
 }
 
@@ -843,6 +871,14 @@ type SpotReport struct {
 	// height is then combined seas (wind waves + swell) and SwellHeight
 	// is the true swell with wind sea excluded, in feet.
 	SwellHeight string
+	// Local wind sea, feet / seconds / degrees true.
+	WindSeaHeight, WindSeaPeriod, WindSeaDegrees string
+	HasWindSea                                   bool
+	// Set when no swell is running and the primary card shows the
+	// wind sea instead (enclosed seas, onshore blows).
+	PrimaryIsWindSea bool
+	// Breaking surf range at the beach this hour, e.g. "3–4ft".
+	Surf string
 }
 
 // spotReport picks the forecast row whose valid time is closest to now
@@ -885,8 +921,17 @@ func spotReport(staticDir string, spot Spot, forecastData ForecastData) (SpotRep
 	report.SecondaryPeriod = row.SecondaryPeriod
 	report.SecondaryDegrees = row.SecondaryDegrees
 	report.HasSecondary = report.SecondaryHeight != ""
+	report.WindSeaHeight = toFeet(row.WindSeaHeight)
+	report.WindSeaPeriod = row.WindSeaPeriod
+	report.WindSeaDegrees = row.WindSeaDegrees
+	report.HasWindSea = report.WindSeaHeight != ""
 	if report.PrimaryHeight == "" {
-		return report, false
+		if !report.HasWindSea {
+			return report, false
+		}
+		report.PrimaryHeight, report.PrimaryPeriod, report.PrimaryDegrees =
+			report.WindSeaHeight, report.WindSeaPeriod, report.WindSeaDegrees
+		report.PrimaryIsWindSea = true
 	}
 
 	start, err := time.Parse("20060102_15Z", windForecastStart(staticDir))
@@ -920,6 +965,16 @@ func spotReport(staticDir string, spot Spot, forecastData ForecastData) (SpotRep
 		}
 	}
 	return report, true
+}
+
+// conditionNear is the classified hour at unixMs, if the series has it.
+func conditionNear(conds []HourlyCondition, unixMs int64) (HourlyCondition, bool) {
+	for _, c := range conds {
+		if c.UnixMs == unixMs {
+			return c, true
+		}
+	}
+	return HourlyCondition{}, false
 }
 
 type SpotPageData struct {
@@ -961,6 +1016,9 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 		forecastData, hours := spotForecast(staticDir, spot)
 		report, hasReport := spotReport(staticDir, spot, forecastData)
 		conditions := spotConditions(staticDir, spot, hours)
+		if c, ok := conditionNear(conditions, report.ValidUnixMs); ok && hasReport {
+			report.Surf = c.Surf
+		}
 		summary := generateForecastSummary(forecastData)
 		applyConditionSummary(summary, conditions)
 		facing := ""

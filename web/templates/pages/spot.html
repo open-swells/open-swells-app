@@ -164,13 +164,13 @@
                             <span class="condition-rating" data-current-condition>{{$current.Condition}}</span>
                             <span class="condition-height" data-current-height>{{$current.WaveHeight}}</span>
                         </div>
-                        <div class="condition-summary-sub">Wave height</div>
+                        <div class="condition-summary-sub" data-current-height-label>{{if .HasConditions}}Surf height &middot; best of today{{if .Report.Surf}} &middot; now {{.Report.Surf}}{{end}}{{else}}Wave height{{end}}</div>
                     </div>
                 </div>
                 {{end}}
 
                 <div class="report-card">
-                    <h2>{{if .Report.SwellHeight}}Seas &middot; nearshore{{else}}Primary swell{{end}}</h2>
+                    <h2>{{if .Report.SwellHeight}}Seas &middot; nearshore{{else if .Report.PrimaryIsWindSea}}Wind sea{{else}}Primary swell{{end}}</h2>
                     <div class="report-row">
                         <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
                             <circle class="ring" cx="20" cy="20" r="16"/>
@@ -183,7 +183,7 @@
                         </svg>
                         <div class="report-value">
                             <div class="main">{{.Report.PrimaryHeight}}ft @ {{.Report.PrimaryPeriod}}s</div>
-                            <div class="sub">{{.Report.PrimaryDegrees}}&deg;{{if .Report.SwellHeight}} &middot; swell {{.Report.SwellHeight}}ft{{end}}</div>
+                            <div class="sub">{{.Report.PrimaryDegrees}}&deg;{{if .Report.SwellHeight}} &middot; swell {{.Report.SwellHeight}}ft{{end}}{{if and .Report.HasWindSea (not .Report.PrimaryIsWindSea)}} &middot; wind sea {{.Report.WindSeaHeight}}ft @ {{.Report.WindSeaPeriod}}s{{end}}</div>
                         </div>
                     </div>
                 </div>
@@ -238,7 +238,8 @@
             {{if .HasConditions}}
             <script>
                 // Hourly surf-condition classifier output (t = epoch ms UTC,
-                // score 0-100, rating, ft effective swell, wmph/wdir wind).
+                // score 0-100, rating, ft_lo/ft_hi/surf breaking surf range,
+                // wmph/wdir wind).
                 // The forecast component renders it as lanes aligned with the
                 // swell and wind timelines.
                 window.SPOT_CONDITIONS = {{json .Conditions}};

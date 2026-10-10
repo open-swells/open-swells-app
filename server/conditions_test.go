@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -125,5 +126,83 @@ func TestApplyConditionSummary(t *testing.T) {
 	first := windowed[0].UnixMs
 	if first != nowHour.Add(-24*time.Hour).UnixMilli() {
 		t.Errorf("windowed candles should start 24 hours before now, got %d", first)
+	}
+}
+
+func TestBreakerHeightKomarGaughan(t *testing.T) {
+	// Hb = 0.39 g^0.2 (T H0^2)^0.4: 1 m at 10 s breaks at ~1.55 m.
+	if got := breakerHeightM(1, 10); math.Abs(got-1.547) > 0.005 {
+		t.Errorf("breakerHeightM(1, 10) = %.3f, want ~1.547", got)
+	}
+	// Same offshore height, longer period: bigger surf.
+	if breakerHeightM(1, 16) <= breakerHeightM(1, 8) {
+		t.Error("longer period should break bigger")
+	}
+	if breakerHeightM(0, 12) != 0 || breakerHeightM(1, 0) != 0 {
+		t.Error("no height or no period means no surf")
+	}
+}
+
+func TestSurfLabel(t *testing.T) {
+	cases := []struct {
+		lo, hi float64
+		want   string
+	}{
+		{0.3, 0.5, "<1ft"},
+		{0.7, 1.0, "1–2ft"},
+		{2.8, 3.1, "3–4ft"},
+		{3.2, 4.6, "3–5ft"},
+	}
+	for _, c := range cases {
+		if got := surfLabel(c.lo, c.hi); got != c.want {
+			t.Errorf("surfLabel(%v, %v) = %q, want %q", c.lo, c.hi, got, c.want)
+		}
+	}
+}
+
+func TestSurfRangeBlocksAndBreaks(t *testing.T) {
+	lo, hi, _ := surfRange([]SwellComponent{{HeightM: 1, PeriodS: 14, DirDeg: 270}}, 270, true, nil)
+	// 1 m @ 14 s head-on: ~1.77 m breaking, so ~4-6 ft.
+	if hi < 5.5 || hi > 6.1 || math.Abs(lo-hi*surfLowFactor) > 1e-9 {
+		t.Errorf("1m@14s head-on = %.1f-%.1f ft, want ~4.1-5.8", lo, hi)
+	}
+	if _, hi, _ := surfRange([]SwellComponent{{HeightM: 2, PeriodS: 15, DirDeg: 90}}, 270, true, nil); hi != 0 {
+		t.Errorf("swell from behind the beach should not break, got %.1f ft", hi)
+	}
+}
+
+func TestWindSeaMakesSurf(t *testing.T) {
+	// An enclosed sea with no swell, only a local wind sea, still has surf.
+	comps := []SwellComponent{{HeightM: 0.8, PeriodS: 4.5, DirDeg: 270, WindSea: true}}
+	_, surf := classifyHour(comps, 270, true, nil, 2, 90, true)
+	if surf.HiFt < 2 {
+		t.Errorf("0.8 m wind sea should make surf, got %.1f ft", surf.HiFt)
+	}
+}
+
+func TestWindSeaIsNotTheSeawardStandIn(t *testing.T) {
+	// No facing: the swell (from the west) marks the sea. A bigger wind
+	// sea runs east-to-west with an easterly wind, which is offshore here;
+	// using the wind sea as the stand-in would score it onshore.
+	swell := SwellComponent{HeightM: 1.2, PeriodS: 13, DirDeg: 270}
+	windSea := SwellComponent{HeightM: 1.5, PeriodS: 5, DirDeg: 90, WindSea: true}
+	flagged, _ := classifyHour([]SwellComponent{swell, windSea}, 0, false, nil, 7, 90, true)
+	windSea.WindSea = false
+	unflagged, _ := classifyHour([]SwellComponent{swell, windSea}, 0, false, nil, 7, 90, true)
+	if flagged <= unflagged {
+		t.Errorf("easterly wind should score as offshore (%.1f) not onshore (%.1f)", flagged, unflagged)
+	}
+}
+
+func TestApplyConditionSummaryUsesSurfRange(t *testing.T) {
+	day := time.Date(2026, 7, 17, 8, 0, 0, 0, time.UTC)
+	summary := []ForecastSummary{{Date: "2026-07-17", WaveHeight: "2.1ft"}}
+	conds := []HourlyCondition{
+		{UnixMs: day.UnixMilli(), Score: 40, Rating: "fair", Surf: "2–3ft", SurfHiFt: 2.6},
+		{UnixMs: day.Add(3 * time.Hour).UnixMilli(), Score: 60, Rating: "good", Surf: "3–4ft", SurfHiFt: 3.8},
+	}
+	applyConditionSummary(summary, conds)
+	if summary[0].WaveHeight != "3–4ft" || summary[0].HeightFt != 3.8 {
+		t.Errorf("day height should be the best hour's surf, got %q (%.1f)", summary[0].WaveHeight, summary[0].HeightFt)
 	}
 }

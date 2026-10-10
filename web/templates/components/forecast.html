@@ -13,6 +13,8 @@
                 lineSecondary: themeColor('--swell-2', '#e2b86b'),
                 lineTertiary: themeColor('--swell-3', '#6fcf97'),
                 lineQuaternary: themeColor('--swell-4', '#73c4b6'),
+                lineWindSea: themeColor('--wind-sea', '#b98ad6'),
+                surf: themeColor('--surf', '#3b82f6'),
                 wind: themeColor('--wind', '#eec37c'),
                 axis: themeColor('--text-3', '#8b9099'),
                 grid: themeColor('--line', '#2f3137'),
@@ -77,7 +79,7 @@
                 if (!el || !date) return;
                 const st = dayStats[date];
                 if (!st) { el.innerHTML = ''; return; }
-                let html = `${st.avgFt.toFixed(1)} ft avg &middot; <span style="color: ${CONDITION_COLORS[st.cond]};">${st.cond}</span>`;
+                let html = `${st.surf ? `${st.label} surf` : `${st.avgFt.toFixed(1)} ft avg`} &middot; <span style="color: ${CONDITION_COLORS[st.cond]};">${st.cond}</span>`;
                 if (windState === 'loading') {
                     html += ' &middot; <span class="wind-loading">wind &hellip;</span>';
                 } else if (windState === 'ready') {
@@ -206,6 +208,9 @@
             // page (buoy pages have none). Rendered as a lane in the 16-day
             // strip and in the hourly detail chart, on their shared x scales.
             const CONDS = (window.SPOT_CONDITIONS || []).map(c => ({ ...c, t: new Date(c.t) }));
+            // Spot pages carry a breaking surf range per hour; the outlook
+            // then charts surf height rather than the primary swell.
+            const SURF_MODE = CONDS.length > 0 && typeof CONDS[0].surf === 'string';
 
             // a day rates as its best hour; without classifier data, fall
             // back to mirroring determineCondition in main.go
@@ -222,7 +227,7 @@
             }
             if (CONDS.length) {
                 const title = document.querySelector('.strip-title');
-                if (title) title.innerHTML = `Swell · wind · conditions · 16 day outlook · <span title="${resolvedTimeZone}">${zoneName}</span>`;
+                if (title) title.innerHTML = `${SURF_MODE ? 'Surf' : 'Swell'} · wind · conditions · 16 day outlook · <span title="${resolvedTimeZone}">${zoneName}</span>`;
             }
 
             const cardDayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
@@ -239,7 +244,10 @@
                         ? (heights.reduce((a, b) => a + b, 0) / heights.length) * 3.28084
                         : 0;
                     const cond = conditionFor(key, avgFt);
-                    dayStats[key] = { avgFt, cond };
+                    // with surf ranges, a day shows its best hour's surf
+                    const best = condDayBest[key];
+                    const label = SURF_MODE && best ? best.surf : `${avgFt.toFixed(1)}ft`;
+                    dayStats[key] = { avgFt, cond, label, surf: SURF_MODE && !!best };
                     const parts = key.split('-');
                     const d = new Date(parts[0], parts[1] - 1, parts[2]);
                     const card = document.createElement('div');
@@ -247,7 +255,7 @@
                     card.setAttribute('data-date', key);
                     card.innerHTML =
                         `<div class="fc-day">${cardDayFmt.format(d)} ${d.getMonth() + 1}/${d.getDate()}</div>` +
-                        `<div class="fc-height">${avgFt.toFixed(1)}ft</div>` +
+                        `<div class="fc-height">${label}</div>` +
                         `<div class="fc-cond" style="color: ${CONDITION_COLORS[cond]};">${cond}</div>`;
                     container.appendChild(card);
                 }
@@ -264,7 +272,7 @@
                     const condition = card.querySelector('[data-current-condition]');
                     const height = card.querySelector('[data-current-height]');
                     if (condition) condition.textContent = current.cond;
-                    if (height) height.textContent = `${current.avgFt.toFixed(1)}ft`;
+                    if (height) height.textContent = current.label;
                 });
             }
             buildDayCards();
@@ -278,10 +286,16 @@
             const stripPanel = stripHost.closest('.swell-strip');
             const stripHoverLine = document.getElementById('stripHoverLine');
             const stripTooltip = document.getElementById('stripTooltip');
-            const stripPts = data.map(d => ({
-                t: d.dateObj,
-                ft: (parseFloat(d.PrimaryWaveHeight) || 0) * 3.28084,
-            }));
+            // Swell lane: the surf range's top (labeled with the range) on
+            // spot pages, the primary swell elsewhere.
+            const stripPts = SURF_MODE
+                ? CONDS
+                    .filter(c => c.t >= localToday && includedDays.has(localDateKey(c.t)))
+                    .map(c => ({ t: c.t, ft: c.ft_hi, label: c.surf }))
+                : data.map(d => {
+                    const ft = (parseFloat(d.PrimaryWaveHeight) || 0) * 3.28084;
+                    return { t: d.dateObj, ft, label: `${ft.toFixed(1)} ft` };
+                });
             let stripSel = null;
             let stripX = null;
             let stripSelectedDate = null;
@@ -374,6 +388,11 @@
                 }
 
                 // swell lane
+                if (SURF_MODE) {
+                    stripMono(svg.append('text'), 9, CHART.label)
+                        .attr('x', 2).attr('y', swTop - 5)
+                        .text('SURF (FT)');
+                }
                 svg.append('path').datum(stripPts)
                     .attr('fill', 'url(#stripFill)')
                     .attr('d', d3.area().x(p => x(p.t)).y0(swBase).y1(p => y(p.ft)).curve(d3.curveMonotoneX));
@@ -389,7 +408,7 @@
                     .attr('x', Math.max(24, Math.min(width - 24, x(peak.t))))
                     .attr('y', Math.max(y(peak.ft) - 6, 10))
                     .attr('text-anchor', 'middle')
-                    .text(`${peak.ft.toFixed(1)} ft`);
+                    .text(SURF_MODE ? peak.label : `${peak.ft.toFixed(1)} ft`);
 
                 // wind lane
                 let yw = null;
@@ -482,9 +501,9 @@
                             row.append(dot, rowLabel, rowValue);
                             stripTooltip.appendChild(row);
                         };
-                        appendTooltipRow('SWELL', `${p.ft.toFixed(1)} ft`, CHART.linePrimary);
+                        appendTooltipRow(SURF_MODE ? 'SURF' : 'SWELL', p.label, CHART.linePrimary);
 
-                        let text = `${stripTimeFmt(p.t)} · ${p.ft.toFixed(1)} ft`;
+                        let text = `${stripTimeFmt(p.t)} · ${p.label}`;
                         if (hasWind) {
                             const w = windPts[windBisect(windPts, t)];
                             const windText = `${(w.s * 2.237).toFixed(0)} mph`;
@@ -493,7 +512,7 @@
                         }
                         if (showCondLane) {
                             const condition = condPts[condBisect(condPts, t)].rating;
-                            appendTooltipRow('SURF', condition, CONDITION_COLORS[condition]);
+                            appendTooltipRow('RATING', condition, CONDITION_COLORS[condition]);
                             text += ` · ${condition}`;
                         }
                         stripTooltip.style.display = 'block';
@@ -581,7 +600,7 @@
 
             // Chart key. A train is listed only if it has height on the
             // selected day, so the key always matches what is drawn.
-            function renderSwellLegend(dayRows, hasWind) {
+            function renderSwellLegend(dayRows, hasWind, hasSurf) {
                 const host = document.getElementById('swellLegend');
                 if (!host) return;
                 const entries = [
@@ -589,7 +608,9 @@
                     ['Secondary', 'SecondaryWaveHeight', CHART.lineSecondary],
                     ['Tertiary', 'TertiaryWaveHeight', CHART.lineTertiary],
                     ['4th', 'QuaternaryWaveHeight', CHART.lineQuaternary],
+                    ['Wind sea', 'WindSeaHeight', CHART.lineWindSea],
                 ].filter(([, field]) => dayRows.some(row => parseFloat(row[field]) > 0));
+                if (hasSurf) entries.unshift(['Surf', null, CHART.surf]);
                 if (hasWind) entries.push(['Wind', null, CHART.wind]);
                 host.replaceChildren(...entries.map(([label, , color]) => {
                     const item = document.createElement('span');
@@ -663,7 +684,10 @@
                     .style("height", (chartBottom + margin.top + margin.bottom) + "px");
                 xAxisGroup.attr("transform", `translate(0,${chartBottom})`);
 
-                const maxWaveHeight = d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight, d.TertiaryWaveHeight, d.QuaternaryWaveHeight)) * 3.28084;
+                const surfDayPts = SURF_MODE ? condDayPts : [];
+                const maxWaveHeight = Math.max(
+                    d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight, d.TertiaryWaveHeight, d.QuaternaryWaveHeight, d.WindSeaHeight || 0)) * 3.28084,
+                    d3.max(surfDayPts, c => c.ft_hi) || 0);
                 y.domain([0, maxWaveHeight]);
                 yScale.domain([0, maxWaveHeight]);
                 // dedupe ticks that would render identical labels
@@ -680,12 +704,22 @@
                 const lineTertiary = d3.line().x(d => x(d.hour)).y(d => y(d.TertiaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
                 const lineQuaternary = d3.line().x(d => x(d.hour)).y(d => y(d.QuaternaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
 
+                // breaking surf range behind the swell lines it comes from
+                svg.selectAll(".surfBand").data(surfDayPts.length > 1 ? [surfDayPts] : []).join("path").attr("class", "surfBand")
+                    .attr("d", d3.area().x(c => x(c.hour)).y0(c => y(c.ft_lo)).y1(c => y(c.ft_hi)).curve(d3.curveMonotoneX))
+                    .attr("fill", chartColors.surf).attr("fill-opacity", 0.16)
+                    .attr("stroke", chartColors.surf).attr("stroke-opacity", 0.45).attr("stroke-width", 0.75);
+                const windSeaRows = data.filter(d => parseFloat(d.WindSeaHeight) > 0);
+                const lineWindSea = d3.line().defined(d => parseFloat(d.WindSeaHeight) > 0).x(d => x(d.hour)).y(d => y(d.WindSeaHeight * 3.28084)).curve(d3.curveMonotoneX);
+                svg.selectAll(".lineWindSea").data(windSeaRows.length ? [data] : []).join("path").attr("class", "lineWindSea").attr("d", lineWindSea).attr("fill", "none").attr("stroke-width", 1.25).attr("stroke-dasharray", "4,3").attr("stroke", chartColors.lineWindSea);
+                svg.selectAll(".windSeaPoint").data(windSeaRows).join("path").attr("class", "windSeaPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.WindSeaHeight * 3.28084)}) rotate(${travelBearing(d.WindSeaDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(18)).attr("fill", chartColors.lineWindSea);
+
                 svg.selectAll(".linePrimary").data([data]).join("path").attr("class", "linePrimary").attr("d", linePrimary).attr("fill", "none").attr("stroke-width", 1.5).attr("stroke", chartColors.linePrimary);
                 svg.selectAll(".lineSecondary").data([data]).join("path").attr("class", "lineSecondary").attr("d", lineSecondary).attr("fill", "none").attr("stroke-width", 1.25).attr("stroke", chartColors.lineSecondary);
                 svg.selectAll(".lineTertiary").data([data]).join("path").attr("class", "lineTertiary").attr("d", lineTertiary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineTertiary);
                 svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineQuaternary);
 
-                renderSwellLegend(data, showWind || windDayPts.length);
+                renderSwellLegend(data, showWind || windDayPts.length, surfDayPts.length > 1);
 
                 svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.PrimaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(28)).attr("fill", chartColors.linePrimary);
                 svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.SecondaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(24)).attr("fill", chartColors.lineSecondary);
@@ -820,16 +854,17 @@
                         condRow = detailTooltipRow(
                             'SURF',
                             CONDITION_COLORS[c.rating],
-                            `${c.rating} · score ${c.score}`
+                            `${SURF_MODE ? `${c.surf} · ` : ''}${c.rating} · score ${c.score}`
                         );
                     }
-                    const swellLabels = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'QUATERNARY'];
+                    const swellLabels = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'QUATERNARY', 'WIND SEA'];
                     // only trains that exist at this hour get a row
                     const swellRows = [
                         [closestData.PrimaryDegrees, chartColors.linePrimary, closestData.PrimaryWaveHeight, closestData.PrimaryPeriod],
                         [closestData.SecondaryDegrees, chartColors.lineSecondary, closestData.SecondaryWaveHeight, closestData.SecondaryPeriod],
                         [closestData.TertiaryDegrees, chartColors.lineTertiary, closestData.TertiaryWaveHeight, closestData.TertiaryPeriod],
                         [closestData.QuaternaryDegrees, chartColors.lineQuaternary, closestData.QuaternaryWaveHeight, closestData.QuaternaryPeriod],
+                        [closestData.WindSeaDegrees, chartColors.lineWindSea, closestData.WindSeaHeight, closestData.WindSeaPeriod],
                     ].map((row, index) => [...row, swellLabels[index]])
                         .filter(([, , hgt]) => parseFloat(hgt) > 0)
                         .map(([deg, color, hgt, per, label]) => detailTooltipRow(

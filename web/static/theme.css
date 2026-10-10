@@ -40,6 +40,10 @@
     --swell-2: #e2b86b;
     --swell-3: #6fcf97;
     --swell-4: #73c4b6;
+    /* local wind sea: violet, apart from both the swells and the wind */
+    --wind-sea: #b98ad6;
+    /* breaking surf height band on the forecast charts */
+    --surf: #3b82f6;
     --wind: #eec37c;
     --tide: #2ec2c2;
 

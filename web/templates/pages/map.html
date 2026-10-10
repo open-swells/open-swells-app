@@ -740,8 +740,9 @@
             // Check auth state on page load
             // Initialize MapLibre map
 
-            // Hourly to f120 (5 days), then 3-hourly to f384 — must match
-            // hour_sequence in grib-parse-collect/gfs_to_contours.py.
+            // Hourly to f120 (5 days), then 3-hourly to f384 — the fallback
+            // for runs whose metadata.json predates its "hours" list (the
+            // hours that were actually published; fetchMetadata swaps it in).
             const forecastHours = [
                 ...Array.from({ length: 121 }, (_, i) => i),
                 ...Array.from({ length: 88 }, (_, i) => 123 + i * 3),
@@ -762,7 +763,7 @@
             const timelinePlayhead = document.getElementById('timelinePlayhead');
             const timelineProgress = document.getElementById('timelineProgress');
             const timelineTicks = document.getElementById('timelineTicks');
-            const lastForecastHour = forecastHours[forecastHours.length - 1];
+            let lastForecastHour = forecastHours[forecastHours.length - 1];
 
             timeSlider.max = forecastHours.length - 1;
             timeSlider.value = 0;
@@ -772,20 +773,29 @@
             let animationInterval;
             let forecastStartTime;
 
+            // Every run reuses the same filenames, so per-run files carry the
+            // run as a query string (set by fetchMetadata). A new run is then
+            // new URLs: browsers and CDNs can cache frames for the whole run
+            // without ever mixing one run's frames into the next's timeline.
+            let runQuery = '';
+            function runUrl(path) {
+                return runQuery ? `${path}?${runQuery}` : path;
+            }
+
             function hourToFilename(hour) {
-                return `/static/contours_${String(hour).padStart(3, '0')}.geojson`;
+                return runUrl(`/static/contours_${String(hour).padStart(3, '0')}.geojson`);
             }
 
             function hourToArrowsFilename(hour) {
-                return `/static/arrows_${String(hour).padStart(3, '0')}.geojson`;
+                return runUrl(`/static/arrows_${String(hour).padStart(3, '0')}.geojson`);
             }
 
             function hourToHeatmapFilename(hour) {
-                return `/static/heatmap_${String(hour).padStart(3, '0')}.png`;
+                return runUrl(`/static/heatmap_${String(hour).padStart(3, '0')}.png`);
             }
 
             function hourToPartitionsFilename(hour) {
-                return `/static/swell_partitions_${String(hour).padStart(3, '0')}.geojson`;
+                return runUrl(`/static/swell_partitions_${String(hour).padStart(3, '0')}.geojson`);
             }
 
             // Height bands — must match FIXED_LEVELS in gfs_to_contours.py.
@@ -1031,7 +1041,7 @@
             }
 
             function nwpsFrameUrl(layer, hour) {
-                return `${layer.prefix}${String(hour).padStart(3, '0')}.png`;
+                return runUrl(`${layer.prefix}${String(hour).padStart(3, '0')}.png`);
             }
 
             // Same LRU-of-object-URLs pattern as loadImageFrame, minus the
@@ -1351,6 +1361,18 @@
                     const hour = timePart.substring(0, 2);
                     
                     forecastStartTime = new Date(Date.UTC(year, month - 1, day, hour));
+                    runQuery = `run=${encodeURIComponent(metadata.forecast_start)}`;
+
+                    // The hours this run actually published: a failed hour
+                    // has no frame, so the timeline skips it rather than
+                    // showing a gap (or, before, another run's leftover).
+                    if (Array.isArray(metadata.hours) && metadata.hours.length) {
+                        forecastHours.splice(0, forecastHours.length, ...metadata.hours);
+                        lastForecastHour = forecastHours[forecastHours.length - 1];
+                        timeSlider.max = forecastHours.length - 1;
+                        currentIndex = Math.min(currentIndex, forecastHours.length - 1);
+                        timeSlider.value = currentIndex;
+                    }
 
                     if (metadata.heatmap_bounds) {
                         heatmapBounds = metadata.heatmap_bounds;
@@ -1477,6 +1499,8 @@
             let currentArrows = EMPTY_FC; // drives the hover readout
             let updateToken = 0;
             async function updateMap(index) {
+                // Frame URLs carry the run (runUrl), so wait until it's known.
+                await metadataReady;
                 currentIndex = index;
                 const hours = forecastHours[index];
                 updateTimeDisplay(hours);
@@ -2002,7 +2026,8 @@
 
             async function loadTideStations() {
                 try {
-                    const response = await fetch('/static/tides.json');
+                    await metadataReady;
+                    const response = await fetch(runUrl('/static/tides.json'));
                     if (!response.ok) return; // older pipeline run: no tides
                     const payload = await response.json();
                     for (const st of payload.stations || []) {

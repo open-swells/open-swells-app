@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func writeSpotForecastFixture(t *testing.T, dir, metadataStart, fileStart string, spots map[string]any) {
@@ -174,5 +175,48 @@ func TestSpotFacingUsesFileCell(t *testing.T) {
 	writeSpotForecastFixture(t, other, "20260720_00Z", "20260720_00Z", map[string]any{"a": close})
 	if _, ok := spotFacing(other, Spot{ID: "a"}); ok {
 		t.Fatal("expected no facing from a cell on top of the spot")
+	}
+}
+
+func TestSpotForecastCarriesWindSea(t *testing.T) {
+	dir := t.TempDir()
+	spot := fixtureSpot()
+	spot["hw"] = []any{0.6, 0.7, nil, 0.8, 1.1}
+	spot["pw"] = []any{4.0, 4.0, nil, 4.5, 5.0}
+	spot["dw"] = []any{90, 90, nil, 100, 100}
+	writeSpotForecastFixture(t, dir, "20260720_00Z", "20260720_00Z", map[string]any{"a": spot})
+
+	forecast, hours := spotForecast(dir, Spot{ID: "a"})
+	if got := forecast.Forecast[0].WindSeaHeight; got != "0.6" {
+		t.Errorf("hour 0 wind sea = %q, want 0.6", got)
+	}
+	// A null wind sea hour leaves the row's wind sea empty, never borrowed.
+	if got := forecast.Forecast[2].WindSeaHeight; got != "" {
+		t.Errorf("hour 2 wind sea = %q, want empty", got)
+	}
+	// 3 -> 6 interpolates when both ends have it: hour 4 = 0.8 + (1.1-0.8)/3.
+	if got := forecast.Forecast[4].WindSeaHeight; got != "0.9" {
+		t.Errorf("hour 4 wind sea = %q, want 0.9", got)
+	}
+	var windSea *SwellComponent
+	for i, c := range hours[0].Comps {
+		if c.WindSea {
+			windSea = &hours[0].Comps[i]
+		}
+	}
+	if windSea == nil || math.Abs(windSea.HeightM-0.6) > 1e-6 || windSea.DirDeg != 90 {
+		t.Errorf("classifier comps should include the wind sea: %+v", hours[0].Comps)
+	}
+}
+
+func TestSpotReportFallsBackToWindSeaWithoutSwell(t *testing.T) {
+	row := ForecastRow{WindSeaHeight: "0.8", WindSeaPeriod: "4.4", WindSeaDegrees: "115"}
+	row.Time = time.Now().UTC().Truncate(time.Hour)
+	report, ok := spotReport(t.TempDir(), Spot{ID: "x"}, ForecastData{Forecast: []ForecastRow{row}})
+	if !ok {
+		t.Fatal("a wind-sea-only hour should still produce a report")
+	}
+	if !report.PrimaryIsWindSea || report.PrimaryHeight != "2.6" || report.PrimaryPeriod != "4.4" {
+		t.Errorf("report = %+v, want the wind sea as primary", report)
 	}
 }

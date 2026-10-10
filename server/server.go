@@ -49,6 +49,11 @@ type ForecastRow struct {
 	QuaternaryWaveHeight string
 	QuaternaryPeriod     string
 	QuaternaryDegrees    string
+	// Locally generated wind sea, kept apart from the swell slots (spot
+	// forecasts only). Empty when absent.
+	WindSeaHeight  string
+	WindSeaPeriod  string
+	WindSeaDegrees string
 }
 
 type ForecastData struct {
@@ -894,6 +899,51 @@ func ensureGzipSibling(full string) (string, error) {
 	return gzPath, nil
 }
 
+// staticCacheControl picks the cache policy for a forecast file. Every run
+// reuses the same filenames, so a bare URL may only be cached briefly: a
+// long-lived copy would show the last run's frames on the new run's
+// timeline. The map requests per-run files as ?run=<forecast_start>, and
+// those URLs never change content while that run is current, so they can
+// be cached for good. A run that is no longer current is not cached at
+// all: the file on disk now belongs to a newer run, and caching it under
+// the old run's URL would pin the mismatch.
+func staticCacheControl(path, requestedRun, currentRun string) string {
+	switch {
+	case strings.HasSuffix(path, "metadata.json"):
+		return "public, max-age=60"
+	case requestedRun == "":
+		return "public, max-age=300"
+	case requestedRun == currentRun:
+		return "public, max-age=604800, immutable"
+	default:
+		return "no-store"
+	}
+}
+
+var (
+	runIDMu      sync.Mutex
+	runIDPath    string
+	runIDModTime int64
+	runIDValue   string
+)
+
+// currentRunID is metadata.json's forecast_start, re-read only when the
+// file changes: it is consulted on every static request.
+func currentRunID(staticDir string) string {
+	path := filepath.Join(staticDir, "metadata.json")
+	info, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	runIDMu.Lock()
+	defer runIDMu.Unlock()
+	if mod := info.ModTime().UnixNano(); path != runIDPath || mod != runIDModTime {
+		runIDValue = windForecastStart(staticDir)
+		runIDPath, runIDModTime = path, mod
+	}
+	return runIDValue
+}
+
 // staticHandler serves the static dir with cache headers. For geojson it
 // serves a precompressed .gz sibling to gzip-capable clients, generating
 // (and caching) the sibling on demand when the pipeline didn't ship one.
@@ -902,11 +952,7 @@ func staticHandler(staticDir string) gin.HandlerFunc {
 		clean := path.Clean("/" + c.Param("filepath"))
 		full := filepath.Join(staticDir, filepath.FromSlash(clean))
 
-		if strings.HasSuffix(clean, "metadata.json") {
-			c.Header("Cache-Control", "public, max-age=60")
-		} else {
-			c.Header("Cache-Control", "public, max-age=1800")
-		}
+		c.Header("Cache-Control", staticCacheControl(clean, c.Query("run"), currentRunID(staticDir)))
 
 		// tides.json is ~100KB of hourly series; worth compressing like the
 		// geojson layers.

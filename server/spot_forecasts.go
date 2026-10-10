@@ -90,6 +90,11 @@ type spotSeries struct {
 	D3        floatSeries `json:"d3"`
 	WindSpeed floatSeries `json:"ws"`
 	WindDir   floatSeries `json:"wd"`
+	// Locally generated wind sea, which the swell partitions exclude.
+	// Absent from files written before the pipeline sampled it.
+	HW floatSeries `json:"hw"`
+	PW floatSeries `json:"pw"`
+	DW floatSeries `json:"dw"`
 }
 
 type spotForecastSet struct {
@@ -182,6 +187,10 @@ func (s *spotSeries) point(i int) (swellPoint, bool) {
 			p.H[n], p.P[n], p.D[n] = h, per, d
 			p.Has[n] = true
 		}
+	}
+	if h, per, d := s.HW.at(i), s.PW.at(i), s.DW.at(i); !math.IsNaN(h) && !math.IsNaN(per) && !math.IsNaN(d) {
+		p.WindSea = waveTrain{H: h, P: per, D: d}
+		p.HasWindSea = true
 	}
 	return p, true
 }

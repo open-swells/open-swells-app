@@ -1,9 +1,10 @@
 package main
 
-// Hourly surf-condition classifier. Each forecast hour gets a 0-100 score:
-// the energy of every swell train, filtered by how squarely it enters the
-// beach's swell window, scaled by a wind quality factor (glassy or offshore
-// up, onshore down). Scores bucket into poor / fair / good / epic.
+// Hourly surf-condition classifier. Each forecast hour gets a surf height
+// (breaking wave height from every wave train that reaches the beach) and a
+// 0-100 score: that height, scaled by the trains' period quality and a wind
+// quality factor (glassy or offshore up, onshore down). Scores bucket into
+// poor / fair / good / epic.
 //
 // Directions follow the marine convention throughout: degrees true, the
 // direction the swell or wind comes FROM. A beach's "facing" is the bearing
@@ -12,6 +13,7 @@ package main
 // offshore (land to sea).
 
 import (
+	"fmt"
 	"math"
 	"time"
 )
@@ -20,6 +22,7 @@ type SwellComponent struct {
 	HeightM float64 // significant height, meters
 	PeriodS float64
 	DirDeg  float64 // direction the swell comes from, degrees true
+	WindSea bool    // locally generated wind sea rather than swell
 }
 
 // hourSwells is one forecast hour's swell trains, sampled for a spot.
@@ -31,13 +34,17 @@ type hourSwells struct {
 // HourlyCondition is one hour of the classified forecast, shaped for the
 // spot page's condition strip (times as epoch ms for the client).
 type HourlyCondition struct {
-	UnixMs  int64   `json:"t"`
-	Score   int     `json:"score"`
-	Rating  string  `json:"rating"`
-	FaceFt  float64 `json:"ft"` // exposure-weighted combined swell height, feet
-	WindMph float64 `json:"wmph"`
-	WindDir float64 `json:"wdir"` // direction wind comes from, degrees true
-	HasWind bool    `json:"haswind"`
+	UnixMs int64  `json:"t"`
+	Score  int    `json:"score"`
+	Rating string `json:"rating"`
+	// Breaking surf height range, feet (see surfRange), and its display
+	// label, e.g. "3–4ft".
+	SurfLoFt float64 `json:"ft_lo"`
+	SurfHiFt float64 `json:"ft_hi"`
+	Surf     string  `json:"surf"`
+	WindMph  float64 `json:"wmph"`
+	WindDir  float64 `json:"wdir"` // direction wind comes from, degrees true
+	HasWind  bool    `json:"haswind"`
 }
 
 // angDiff returns the smallest absolute angle between two bearings, 0..180.
@@ -87,37 +94,97 @@ func swellExposure(dir float64, facing float64, hasFacing bool, window []float64
 	}
 }
 
-// periodQuality weights a train by its period: short wind chop breaks weak
-// and crumbly, long-period groundswell wraps in and jacks up on the bottom.
+// periodQuality weights a train's contribution to the score by period:
+// short wind chop breaks weak and crumbly, long-period groundswell lines up
+// and peels. (Period's effect on size is already in breakerHeightM; this
+// is only about shape.)
 func periodQuality(p float64) float64 {
 	switch {
 	case p <= 5:
-		return 0.5
+		return 0.6
 	case p <= 9:
-		return 0.5 + (p-5)/4*0.4 // -> 0.9
+		return 0.6 + (p-5)/4*0.25 // -> 0.85
 	case p <= 13:
-		return 0.9 + (p-9)/4*0.25 // -> 1.15
+		return 0.85 + (p-9)/4*0.15 // -> 1.0
 	default:
-		return math.Min(1.2, 1.15+(p-13)*0.0125)
+		return math.Min(1.05, 1+(p-13)*0.0125)
 	}
 }
 
-// effectiveFaceFt combines every train's exposure- and period-weighted
-// height into one number, in feet. Root-sum-square addition mirrors how
-// wave energy combines, so overlapping swells score above either alone.
-func effectiveFaceFt(comps []SwellComponent, facing float64, hasFacing bool, window []float64) float64 {
-	sum := 0.0
+const (
+	gravity    = 9.80665
+	metersToFt = 3.28084
+	// Surf ranges run from the typical wave to the sets. breakerHeightM is
+	// the breaking *significant* height (the mean of the highest third),
+	// which is what surfers call set waves; the typical wave is smaller
+	// (the Rayleigh mean height is 0.63 Hs; surfers discount the smallest
+	// waves, so 0.7). Both are tuning knobs for verification against
+	// observed surf.
+	surfLowFactor  = 0.7
+	surfHighFactor = 1.0
+)
+
+// breakerHeightM is the height (m) at which a train of deep-water
+// significant height h0 (m) and period t (s) breaks, after Komar & Gaughan
+// (1972): Hb = 0.39 g^(1/5) (T H0^2)^(2/5). Longer periods carry more
+// energy per unit height and shoal up more before breaking, so the same
+// offshore height makes bigger surf at 16 s than at 8 s.
+func breakerHeightM(h0, t float64) float64 {
+	if h0 <= 0 || t <= 0 {
+		return 0
+	}
+	return 0.39 * math.Pow(gravity, 0.2) * math.Pow(t*h0*h0, 0.4)
+}
+
+// surfRange is the beach's breaking surf height range in feet, with the
+// score's period-quality weight. Each train is first cut by how squarely
+// it enters the beach (swellExposure, treated as a height coefficient like
+// refraction), then broken with breakerHeightM; trains combine by
+// root-sum-square as their energies add. quality is the period quality
+// averaged by each train's share of breaking energy (1 when flat).
+func surfRange(comps []SwellComponent, facing float64, hasFacing bool, window []float64) (loFt, hiFt, quality float64) {
+	energy, weighted := 0.0, 0.0
 	for _, c := range comps {
-		h := c.HeightM * swellExposure(c.DirDeg, facing, hasFacing, window) * periodQuality(c.PeriodS)
-		sum += h * h
+		hb := breakerHeightM(c.HeightM*swellExposure(c.DirDeg, facing, hasFacing, window), c.PeriodS)
+		energy += hb * hb
+		weighted += hb * hb * periodQuality(c.PeriodS)
 	}
-	return math.Sqrt(sum) * 3.28084
+	if energy == 0 {
+		return 0, 0, 1
+	}
+	hb := math.Sqrt(energy) * metersToFt
+	return hb * surfLowFactor, hb * surfHighFactor, weighted / energy
 }
 
-// waveScore maps effective height to 0-100 with diminishing returns: the
-// jump from flat to chest-high matters more than overhead to well-overhead.
+// surfLabel renders a range as surfers read it: whole feet, at least a
+// foot wide ("3–4ft"), or "<1ft" when there is nothing to ride.
+func surfLabel(loFt, hiFt float64) string {
+	if hiFt < 1 {
+		return "<1ft"
+	}
+	lo, hi := math.Max(1, math.Round(loFt)), math.Round(hiFt)
+	if hi <= lo {
+		hi = lo + 1
+	}
+	return fmt.Sprintf("%.0f–%.0fft", lo, hi)
+}
+
+// waveScore maps a buoy's average swell height (ft) to 0-100 with
+// diminishing returns, for the day summaries of forecasts without the
+// classifier.
 func waveScore(ft float64) float64 {
-	anchors := [][2]float64{{0, 0}, {1, 14}, {2, 34}, {3, 50}, {4, 62}, {6, 78}, {8, 87}, {10, 92}, {14, 97}}
+	return scoreCurve(ft, [][2]float64{{0, 0}, {1, 14}, {2, 34}, {3, 50}, {4, 62}, {6, 78}, {8, 87}, {10, 92}, {14, 97}})
+}
+
+// surfScore maps breaking surf height (ft, the top of the range) to 0-100
+// with diminishing returns: the jump from flat to chest-high matters more
+// than overhead to well-overhead.
+func surfScore(ft float64) float64 {
+	return scoreCurve(ft, [][2]float64{{0, 0}, {1.5, 14}, {3, 34}, {4.5, 50}, {6, 62}, {9, 78}, {12, 87}, {15, 92}, {20, 97}})
+}
+
+// scoreCurve interpolates ft along ascending (ft, score) anchors.
+func scoreCurve(ft float64, anchors [][2]float64) float64 {
 	if ft >= anchors[len(anchors)-1][0] {
 		return anchors[len(anchors)-1][1]
 	}
@@ -202,21 +269,29 @@ func windAt(samples []WindSample, start time.Time, t time.Time) (speedMs, dir fl
 	return last.Speed, last.Dir, true
 }
 
+// surfHeight is one hour's breaking surf range, in feet.
+type surfHeight struct {
+	LoFt, HiFt float64
+}
+
 // classifyHour scores one hour of swell + wind for a beach.
 func classifyHour(comps []SwellComponent, facing float64, hasFacing bool, window []float64,
-	windSpeedMs, windDir float64, hasWind bool) (score float64, faceFt float64) {
+	windSpeedMs, windDir float64, hasWind bool) (score float64, surf surfHeight) {
 
-	faceFt = effectiveFaceFt(comps, facing, hasFacing, window)
-	score = waveScore(faceFt)
+	lo, hi, quality := surfRange(comps, facing, hasFacing, window)
+	surf = surfHeight{LoFt: lo, HiFt: hi}
+	score = surfScore(hi) * quality
 
 	// Wind is judged against the facing; without one, the dominant swell's
 	// direction stands in (swell comes from the sea, so wind opposing it
-	// is offshore-ish — the user-visible "offshore effect").
+	// is offshore-ish — the user-visible "offshore effect"). Wind sea is
+	// skipped: it runs with the local wind, so it would make any wind
+	// look onshore.
 	seaward, hasSeaward := facing, hasFacing
 	if !hasSeaward {
 		bestH := 0.0
 		for _, c := range comps {
-			if c.HeightM > bestH {
+			if !c.WindSea && c.HeightM > bestH {
 				bestH, seaward, hasSeaward = c.HeightM, c.DirDeg, true
 			}
 		}
@@ -227,7 +302,7 @@ func classifyHour(comps []SwellComponent, facing float64, hasFacing bool, window
 	case !hasWind:
 		score *= 0.92 // unknown wind: assume it isn't perfect out there
 	}
-	return math.Min(100, math.Max(0, score)), faceFt
+	return math.Min(100, math.Max(0, score)), surf
 }
 
 // conditionSeries classifies every forecast hour for a spot.
@@ -241,34 +316,41 @@ func conditionSeries(hours []hourSwells, wind []WindSample, windStart time.Time,
 		if hasWindStart {
 			speedMs, dir, hasWind = windAt(wind, windStart, h.Time)
 		}
-		score, faceFt := classifyHour(h.Comps, facing, hasFacing, window, speedMs, dir, hasWind)
+		score, surf := classifyHour(h.Comps, facing, hasFacing, window, speedMs, dir, hasWind)
 		out = append(out, HourlyCondition{
-			UnixMs:  h.Time.UnixMilli(),
-			Score:   int(math.Round(score)),
-			Rating:  ratingFor(score),
-			FaceFt:  math.Round(faceFt*10) / 10,
-			WindMph: math.Round(speedMs * 2.23694),
-			WindDir: dir,
-			HasWind: hasWind,
+			UnixMs:   h.Time.UnixMilli(),
+			Score:    int(math.Round(score)),
+			Rating:   ratingFor(score),
+			SurfLoFt: math.Round(surf.LoFt*10) / 10,
+			SurfHiFt: math.Round(surf.HiFt*10) / 10,
+			Surf:     surfLabel(surf.LoFt, surf.HiFt),
+			WindMph:  math.Round(speedMs * 2.23694),
+			WindDir:  dir,
+			HasWind:  hasWind,
 		})
 	}
 	return out
 }
 
 // applyConditionSummary upgrades the daily summary's height-only condition
-// to the classifier's view of each day: a day is as good as its best hour.
+// to the classifier's view of each day: a day is as good as its best hour,
+// and its height is that hour's surf range.
 func applyConditionSummary(summary []ForecastSummary, conds []HourlyCondition) {
-	best := map[string]int{}
+	best := map[string]HourlyCondition{}
 	for _, c := range conds {
 		day := time.UnixMilli(c.UnixMs).UTC().Format("2006-01-02")
-		if c.Score > best[day] {
-			best[day] = c.Score
+		if b, ok := best[day]; !ok || c.Score > b.Score {
+			best[day] = c
 		}
 	}
 	for i := range summary {
-		if score, ok := best[summary[i].Date]; ok {
-			summary[i].Condition = ratingFor(float64(score))
-			summary[i].Score = score
+		if c, ok := best[summary[i].Date]; ok {
+			summary[i].Condition = ratingFor(float64(c.Score))
+			summary[i].Score = c.Score
+			if c.Surf != "" {
+				summary[i].WaveHeight = c.Surf
+				summary[i].HeightFt = c.SurfHiFt
+			}
 		}
 	}
 }

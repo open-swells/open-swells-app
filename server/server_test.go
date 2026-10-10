@@ -537,3 +537,44 @@ func TestStaticHandlerServesPrecompressed(t *testing.T) {
 		t.Error("path traversal escaped static dir")
 	}
 }
+
+func TestStaticHandlerCachesByRun(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "heatmap_000.png"), []byte("png"), 0o644)
+	writeMeta := func(start string, mod time.Time) {
+		path := filepath.Join(dir, "metadata.json")
+		os.WriteFile(path, []byte(`{"forecast_start":"`+start+`"}`), 0o644)
+		// Distinct mtimes so the run-ID cache sees each rewrite.
+		os.Chtimes(path, mod, mod)
+	}
+	writeMeta("20261008_12Z", time.Now().Add(-time.Hour))
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/static/*filepath", staticHandler(dir))
+	cacheControl := func(url string) string {
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, httptest.NewRequest("GET", url, nil))
+		return w.Header().Get("Cache-Control")
+	}
+
+	if got := cacheControl("/static/heatmap_000.png?run=20261008_12Z"); got != "public, max-age=604800, immutable" {
+		t.Errorf("current-run URL: Cache-Control = %q, want immutable", got)
+	}
+	if got := cacheControl("/static/heatmap_000.png"); got != "public, max-age=300" {
+		t.Errorf("bare URL: Cache-Control = %q, want a short max-age", got)
+	}
+	if got := cacheControl("/static/metadata.json"); got != "public, max-age=60" {
+		t.Errorf("metadata: Cache-Control = %q", got)
+	}
+
+	// A new run lands: the old run's URL now serves the new run's file
+	// and must not be cached under the old name.
+	writeMeta("20261008_18Z", time.Now())
+	if got := cacheControl("/static/heatmap_000.png?run=20261008_12Z"); got != "no-store" {
+		t.Errorf("superseded-run URL: Cache-Control = %q, want no-store", got)
+	}
+	if got := cacheControl("/static/heatmap_000.png?run=20261008_18Z"); got != "public, max-age=604800, immutable" {
+		t.Errorf("new-run URL: Cache-Control = %q, want immutable", got)
+	}
+}
