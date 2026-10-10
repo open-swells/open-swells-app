@@ -45,6 +45,11 @@ def _data(height_value=2.0, land_east_of=236.0):
         "height": height,
         "height_mask": land,
         "swell_partitions": partitions,
+        "wind_sea": {
+            "height": np.full(LAT2D.shape, 0.8, dtype=np.float32),
+            "period": np.full(LAT2D.shape, 4.5, dtype=np.float32),
+            "direction": np.full(LAT2D.shape, 300.2, dtype=np.float32),
+        },
         "valid_date": dt.datetime(2026, 8, 10, 18),
     }
 
@@ -110,10 +115,20 @@ class SampleSpotsTests(unittest.TestCase):
         self.assertAlmostEqual(first["p3"], 13.0)
         self.assertAlmostEqual(first["ws"], 5.0)
         self.assertAlmostEqual(first["wd"], 270.0)
+        self.assertAlmostEqual(first["hw"], 0.8)
+        self.assertAlmostEqual(first["pw"], 4.5)
         self.assertAlmostEqual(float(sample["cell_lon"][0]), -125.0)
         # The inland spot has no cell within range: all NaN, index -1.
         self.assertEqual(sample["cells"][1], -1)
         self.assertTrue(np.isnan(sample["values"][1]).all())
+
+    def test_wind_sea_omitted_when_hour_lacks_it(self):
+        data = _data()
+        data["wind_sea"] = None
+        sample = sample_spots(data, _wind(), np.array([35.0]), np.array([-125.0]))
+        values = dict(zip(FIELDS, sample["values"][0]))
+        self.assertTrue(np.isnan(values["hw"]))
+        self.assertAlmostEqual(values["h1"], 0.5)
 
     def test_wind_omitted_when_lattice_differs(self):
         wind = {
@@ -159,6 +174,8 @@ class WriteSpotForecastsTests(unittest.TestCase):
         # Directions are integers wrapped into 0..359.
         self.assertEqual(coast["d1"], [0, None, 0])
         self.assertEqual(coast["wd"], [270, None, 270])
+        self.assertEqual(coast["hw"], [0.8, None, 0.8])
+        self.assertEqual(coast["dw"], [300, None, 300])
 
 
 class LoadSpotsTests(unittest.TestCase):

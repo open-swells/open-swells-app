@@ -267,6 +267,34 @@ def _write_geojson(payload: str, geojson_path: str) -> None:
         f.write(payload)
 
 
+WIND_SEA_FIELDS = {
+    "height": "Significant height of wind waves",
+    "period": "Mean period of wind waves",
+    "direction": "Direction of wind waves",
+}
+
+
+def _extract_wind_sea(grbs, valid_date) -> dict | None:
+    """The locally generated wind sea, separate from the three swells.
+
+    Where the wind is blowing, much of the sea state is wind sea rather
+    than swell (often all of it in enclosed seas), so spot forecasts that
+    only read the swell partitions miss it. Optional: None when the file
+    lacks the fields, so an hour degrades to swell-only instead of failing.
+    """
+    wind_sea = {}
+    for key, name in WIND_SEA_FIELDS.items():
+        try:
+            message = grbs.select(name=name)[0]
+        except (KeyError, IndexError, ValueError):
+            logger.warning("Wind sea field %r missing; spot wind sea omitted", name)
+            return None
+        if message.validDate != valid_date:
+            raise ValueError("Mismatched valid times between GRIB fields")
+        wind_sea[key] = np.ma.filled(message.values, np.nan).astype(np.float32)
+    return wind_sea
+
+
 def extract_from_grib2_to_np(filepath: str) -> dict:
     grbs = pygrib.open(filepath)
     try:
@@ -329,6 +357,7 @@ def extract_from_grib2_to_np(filepath: str) -> dict:
             "period": partitions[0]["period"],
             "direction": partitions[0]["direction"],
             "swell_partitions": partitions,
+            "wind_sea": _extract_wind_sea(grbs, combined_msg.validDate),
             "valid_date": height_msg.validDate,
         }
     finally:
@@ -605,6 +634,7 @@ def write_metadata(
     heatmap_bounds: dict | None = None,
     nwps: dict | None = None,
     spot_forecasts: dict | None = None,
+    hours: list[int] | None = None,
 ) -> str:
     metadata_path = os.path.join(files_dir, "metadata.json")
     metadata: dict[str, object] = {
@@ -617,6 +647,11 @@ def write_metadata(
         metadata["hours_processed"] = successes
     if failures is not None:
         metadata["hours_failed"] = failures
+    if hours is not None:
+        # The forecast hours this run published frames for, ascending. The
+        # map's timeline is built from this list, so a failed hour is
+        # skipped instead of showing a hole (or a previous run's frame).
+        metadata["hours"] = hours
     if heatmap_bounds is not None:
         # The web app pins the heatmap PNGs to these corner coordinates.
         metadata["heatmap_bounds"] = heatmap_bounds
@@ -781,7 +816,8 @@ def process_forecast_hours(
     process, which keeps a simple path for debugging and tests.
 
     With spots (lats, lons), each hour's spot samples are collected into
-    run_info["spot_samples"], keyed by position in hour_sequence.
+    run_info["spot_samples"], keyed by position in hour_sequence. The
+    forecast hours that succeeded go to run_info["hours"], ascending.
     """
     hours = list(hour_sequence)
     if workers is None:
@@ -807,6 +843,7 @@ def process_forecast_hours(
     failures = 0
     bounds_by_position: dict[int, dict] = {}
     spot_samples: dict[int, dict] = {}
+    succeeded_positions: list[int] = []
 
     def tally(
         result: tuple[str, bool, dict | None, dict | None], done: int, position: int
@@ -815,6 +852,7 @@ def process_forecast_hours(
         file_index, succeeded, bounds, samples = result
         if succeeded:
             successes += 1
+            succeeded_positions.append(position)
             if bounds is not None:
                 bounds_by_position[position] = bounds
             if samples is not None:
@@ -842,6 +880,8 @@ def process_forecast_hours(
         run_info.setdefault("heatmap_bounds", bounds_by_position[first_position])
     if run_info is not None and spot_samples:
         run_info["spot_samples"] = spot_samples
+    if run_info is not None:
+        run_info["hours"] = [int(hours[p]) for p in sorted(succeeded_positions)]
 
     _print_progress(
         len(hours), len(hours), f"done ({failures} failed)" if failures else "done"
@@ -980,6 +1020,7 @@ def main() -> None:
             heatmap_bounds=run_info.get("heatmap_bounds"),
             nwps=nwps,
             spot_forecasts=spot_forecasts,
+            hours=run_info.get("hours"),
         )
 
         total = successes + failures

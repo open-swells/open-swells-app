@@ -26,6 +26,8 @@ class ProcessForecastHoursTests(unittest.TestCase):
         self.assertEqual((successes, failures), (2, 1))
         # First successful hour's bounds win; later ones must not overwrite.
         self.assertEqual(run_info["heatmap_bounds"], {"north": 85.0})
+        # Only hours with frames are published; the failed hour is left out.
+        self.assertEqual(run_info["hours"], [0, 6])
 
     def test_parallel_bounds_follow_forecast_order_not_completion_order(self):
         later_hour_finished = Event()
@@ -48,6 +50,8 @@ class ProcessForecastHoursTests(unittest.TestCase):
 
         self.assertEqual((successes, failures), (2, 0))
         self.assertEqual(run_info["heatmap_bounds"], {"north": 85.0})
+        # Ascending forecast order even though hour 3 finished first.
+        self.assertEqual(run_info["hours"], [0, 3])
 
     def test_worker_kwargs_forwarded(self):
         seen = {}

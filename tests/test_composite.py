@@ -110,6 +110,34 @@ class CompositeSwellTests(unittest.TestCase):
         np.testing.assert_array_equal(combined["height"], 5.0)
         self.assertFalse(combined["height_mask"].any())
 
+    def test_wind_sea_follows_the_band_split(self):
+        hi = make_swell_data(HI_LAT, HI_LON, 2.0)
+        lo = make_swell_data(LO_LAT, LO_LON, 5.0)
+        for data, value in ((hi, 0.3), (lo, 0.9)):
+            shape = data["height"].shape
+            data["wind_sea"] = {
+                "height": np.full(shape, value, np.float32),
+                "period": np.full(shape, 4.0, np.float32),
+                "direction": np.full(shape, 250.0, np.float32),
+            }
+
+        combined = composite_swell(hi, lo)
+
+        lat_axis = combined["lat"][:, 0]
+        in_band = (lat_axis >= -15.0) & (lat_axis <= 52.5)
+        np.testing.assert_array_equal(combined["wind_sea"]["height"][in_band], np.float32(0.3))
+        np.testing.assert_array_equal(combined["wind_sea"]["height"][~in_band], np.float32(0.9))
+        self.assertEqual(combined["wind_sea"]["period"].shape, combined["height"].shape)
+
+    def test_wind_sea_dropped_when_one_grid_lacks_it(self):
+        hi = make_swell_data(HI_LAT, HI_LON, 2.0)
+        lo = make_swell_data(LO_LAT, LO_LON, 5.0)
+        shape = hi["height"].shape
+        hi["wind_sea"] = {
+            key: np.zeros(shape, np.float32) for key in ("height", "period", "direction")
+        }
+        self.assertIsNone(composite_swell(hi, lo)["wind_sea"])
+
     def test_single_grid_passes_through_unchanged(self):
         lo = make_swell_data(LO_LAT, LO_LON, 5.0)
         self.assertIs(composite_swell(None, lo), lo)

@@ -24,7 +24,9 @@ Payload layout (values are arrays aligned with "hours"; null = missing):
 
 Fields: hs combined wind-wave-and-swell height (m); hN/pN/dN swell
 partition N height (m), mean period (s), direction from (deg true);
-ws/wd surface wind speed (m/s) and direction from (deg true). "cell" is
+ws/wd surface wind speed (m/s) and direction from (deg true); hw/pw/dw the
+locally generated wind sea's height (m), mean period (s) and direction
+from (deg true), which the swell partitions exclude. "cell" is
 the sampled grid cell (lon -180..180) and "km" its distance from the spot's
 sample point.
 """
@@ -50,12 +52,13 @@ FIELDS = (
     "h2", "p2", "d2",
     "h3", "p3", "d3",
     "ws", "wd",
+    "hw", "pw", "dw",
 )
 # Decimal places per field in the JSON; 0 means integer degrees.
-_DECIMALS = {"hs": 2, "ws": 1, "wd": 0}
+_DECIMALS = {"hs": 2, "ws": 1, "wd": 0, "hw": 2, "pw": 1, "dw": 0}
 for _n in (1, 2, 3):
     _DECIMALS.update({f"h{_n}": 2, f"p{_n}": 1, f"d{_n}": 0})
-_DIRECTIONS = {"d1", "d2", "d3", "wd"}
+_DIRECTIONS = {"d1", "d2", "d3", "wd", "dw"}
 
 # (lattice + wet-mask fingerprint) -> (tree, flat indices of wet cells).
 # The mask is effectively static across hours, so each worker builds one
@@ -161,6 +164,11 @@ def sample_spots(
         columns[f"h{n}"] = partition["height"]
         columns[f"p{n}"] = partition["period"]
         columns[f"d{n}"] = partition["direction"]
+    wind_sea = data.get("wind_sea")
+    if wind_sea is not None:
+        columns["hw"] = wind_sea["height"]
+        columns["pw"] = wind_sea["period"]
+        columns["dw"] = wind_sea["direction"]
     if wind_data is not None and wind_data["speed"].shape == height.shape:
         columns["ws"] = wind_data["speed"]
         columns["wd"] = wind_data["direction"]

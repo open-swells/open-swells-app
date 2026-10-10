@@ -70,8 +70,12 @@ copy_files_locally() {
     fi
 
     if [ ${#contour_files[@]} -gt 0 ]; then
-        echo "Copying ${#contour_files[@]} contour files from $source_path to $dest_path"
-        rsync -t --delay-updates "${contour_files[@]}" "$dest_path/"
+        # Same sync as grib_copy_to_server.sh: --delete through publish.rules
+        # drops products this run didn't make.
+        echo "Syncing ${#contour_files[@]} contour files from $source_path to $dest_path"
+        rsync -rt --delay-updates --delete-delay \
+            --filter="merge $SCRIPT_DIR/scripts/publish.rules" \
+            "$source_path/" "$dest_path/"
     else
         echo "No contour files to copy from $source_path"
     fi

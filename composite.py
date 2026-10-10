@@ -112,9 +112,18 @@ def composite_swell(data_hi: dict | None, data_lo: dict | None) -> dict:
                 "mask": compositor.pick(partition_hi["mask"], partition_lo["mask"]),
             }
         )
+    # Wind sea is optional per file; with either side missing it is
+    # dropped for the hour rather than half-filled from one grid.
+    wind_sea = None
+    if data_hi.get("wind_sea") is not None and data_lo.get("wind_sea") is not None:
+        wind_sea = {
+            key: compositor.pick(data_hi["wind_sea"][key], data_lo["wind_sea"][key])
+            for key in ("height", "period", "direction")
+        }
     return {
         "lon": compositor.lon_grid,
         "lat": compositor.lat_grid,
+        "wind_sea": wind_sea,
         "height": compositor.pick(data_hi["height"], data_lo["height"]),
         "height_mask": compositor.pick(data_hi["height_mask"], data_lo["height_mask"]),
         "period": partitions[0]["period"],

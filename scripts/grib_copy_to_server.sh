@@ -52,10 +52,16 @@ if [ -f "$SOURCE_PATH/spot_forecasts.json.gz" ]; then
 fi
 
 if [ ${#contour_files[@]} -gt 0 ]; then
-    # --delay-updates stages everything in a temp dir on the server and renames
-    # at the end, so readers never see a truncated file mid-transfer.
-    echo "Copying ${#contour_files[@]} contour files from $SOURCE_PATH to $DEST_PATH"
-    rsync -t --delay-updates -e "ssh -i $SSH_KEY_PATH" "${contour_files[@]}" "$DEST_PATH"
+    # Sync the directory through publish.rules: --delete removes products
+    # this run didn't make (a failed hour's frame from the previous run).
+    # The file-count guard above keeps an empty run from emptying the
+    # server. --delay-updates stages everything in a temp dir on the server
+    # and renames at the end, so readers never see a truncated file
+    # mid-transfer; --delete-delay holds deletions until then too.
+    echo "Syncing ${#contour_files[@]} contour files from $SOURCE_PATH to $DEST_PATH"
+    rsync -rt --delay-updates --delete-delay \
+        --filter="merge $SCRIPT_DIR/publish.rules" \
+        -e "ssh -i $SSH_KEY_PATH" "$SOURCE_PATH/" "$DEST_PATH"
 else
     echo "No contour files to copy from $SOURCE_PATH"
 fi

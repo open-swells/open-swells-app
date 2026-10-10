@@ -91,8 +91,10 @@ the hour degrades to partial coverage instead of failing.
   100 km; lakes, rivers and unmodeled seas are left out), for every
   forecast hour. Arrays align with the top-level `hours` list; `null`
   marks a failed hour. Fields are `hs` (combined height m), `h1`/`p1`/`d1`
-  through `h3`/`p3`/`d3` (swell partitions, as above) and `ws`/`wd` (wind
-  m/s, direction from). Each spot also records the sampled `cell`
+  through `h3`/`p3`/`d3` (swell partitions, as above), `ws`/`wd` (wind
+  m/s, direction from) and `hw`/`pw`/`dw` (the local wind sea's height m,
+  mean period s and direction from — the part of the sea state the swell
+  partitions leave out). Each spot also records the sampled `cell`
   `[lat, lon]` and its distance `km`. See `spot_forecasts.py` for the
   full layout; `metadata.json` summarizes it under `spot_forecasts`.
   Spots are read from `spots.json` in this repository, a copy of the web
@@ -114,9 +116,20 @@ unaffected); `--local` copies output to the sibling
 `open-swells-app/data/forecast` directory instead of the server. Override that
 location for a one-off run with `LOCAL_DEST_PATH=/path/to/data/forecast`.
 `--limit <n>` processes only the first n forecast hours for quick render checks
-(don't publish a limited run to the server). The application should set
+(don't publish a limited run to the server — see Publishing below). The application should set
 `FORECAST_DIR='./data/forecast'` so it reads the generated files from the same
 location.
+
+**Publishing**: both the server copy and `--local` sync the files directory
+with `rsync --delete` through `scripts/publish.rules`. Forecast products the
+new run didn't produce (a failed hour) are deleted from the destination
+rather than left behind from the previous run; files outside those
+patterns, including `metadata.json`, are never touched. That also means a
+`--limit` run published to the server would delete every later hour.
+`metadata.json` lists the published forecast hours under `hours`; the map
+builds its timeline from it and requests each file as `?run=<forecast_start>`
+so caches never mix runs. If the server restricts the deploy key with
+`rrsync`, don't pass it `-no-del`.
 
 **Optional tuning env vars**:
 ```
