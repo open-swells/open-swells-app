@@ -102,6 +102,26 @@ the hour degrades to partial coverage instead of failing.
   spot missing here just falls back to the app's coarse sampling).
   `SPOTS_PATH` overrides the location; if the file is missing the run
   continues without spot forecasts.
+
+**Spot facing (one-time, offline)**: `spot_facing.py` adds each spot's
+beach `facing` and `open_water` arcs to `spots.json`, from the GSHHG
+full-resolution shoreline. The web app uses them to judge how squarely
+swell and wind hit each beach, and which swell land blocks. It is not part
+of the forecast run; re-run it when spots are added. Spots with a
+hand-tuned `swell_window` are left alone.
+
+```sh
+# gshhg-bin-2.3.7.zip from https://www.soest.hawaii.edu/pwessel/gshhg/
+unzip gshhg-bin-2.3.7.zip gshhs_f.b -d ~/.cache/openswells-gshhg
+.venv/bin/python -I spot_facing.py --gshhg ~/.cache/openswells-gshhg/gshhs_f.b \
+    --report facing_report.csv spots.json ../open-swells-app/data/spots.json
+```
+
+It takes a few minutes on 8 cores. `--report` writes a CSV with each spot's
+status and review flags (`scale_disagreement`: the shoreline turns sharply
+near the spot; `facing_outside_window`: the beach faces into land, such as
+an island shadow or across a bay; `narrow_window`); `--only <ids>` prints
+results for a few spots without writing anything.
 - `tides.json` — NOAA CO-OPS hourly astronomical predictions and the latest
   48 hours of observed water levels, in meters relative to MLLW and UTC.
   Set `TIDE_STATIONS` to comma-separated CO-OPS station IDs to generate it,
