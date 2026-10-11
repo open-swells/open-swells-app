@@ -29,7 +29,7 @@ func TestClassifyHourRatings(t *testing.T) {
 		{"mid-size swell, glassy", []SwellComponent{{HeightM: 1.4, PeriodS: 12, DirDeg: 260}}, 1, 0, true, "good"},
 	}
 	for _, tc := range cases {
-		score, _ := classifyHour(tc.comps, facing, true, nil, tc.windMs, tc.windDir, tc.hasWind)
+		score, _ := classifyHour(tc.comps, beach{Facing: facing, HasFacing: true}, tc.windMs, tc.windDir, tc.hasWind)
 		if got := ratingFor(score); got != tc.want {
 			t.Errorf("%s: got %s (score %.1f), want %s", tc.name, got, score, tc.want)
 		}
@@ -38,8 +38,8 @@ func TestClassifyHourRatings(t *testing.T) {
 
 func TestOffshoreBeatsOnshore(t *testing.T) {
 	comps := []SwellComponent{{HeightM: 1.5, PeriodS: 12, DirDeg: 270}}
-	offshore, _ := classifyHour(comps, 270, true, nil, 5, 90, true)
-	onshore, _ := classifyHour(comps, 270, true, nil, 5, 270, true)
+	offshore, _ := classifyHour(comps, beach{Facing: 270, HasFacing: true}, 5, 90, true)
+	onshore, _ := classifyHour(comps, beach{Facing: 270, HasFacing: true}, 5, 270, true)
 	if offshore <= onshore {
 		t.Errorf("offshore wind (%.1f) should outscore the same wind onshore (%.1f)", offshore, onshore)
 	}
@@ -49,9 +49,9 @@ func TestCombinedSwellsBeatEither(t *testing.T) {
 	a := []SwellComponent{{HeightM: 1.2, PeriodS: 13, DirDeg: 270}}
 	b := []SwellComponent{{HeightM: 1.0, PeriodS: 10, DirDeg: 250}}
 	both := append(append([]SwellComponent{}, a...), b...)
-	sa, _ := classifyHour(a, 270, true, nil, 2, 90, true)
-	sb, _ := classifyHour(b, 270, true, nil, 2, 90, true)
-	sc, _ := classifyHour(both, 270, true, nil, 2, 90, true)
+	sa, _ := classifyHour(a, beach{Facing: 270, HasFacing: true}, 2, 90, true)
+	sb, _ := classifyHour(b, beach{Facing: 270, HasFacing: true}, 2, 90, true)
+	sc, _ := classifyHour(both, beach{Facing: 270, HasFacing: true}, 2, 90, true)
 	if sc <= sa || sc <= sb {
 		t.Errorf("combined swells (%.1f) should outscore either alone (%.1f, %.1f)", sc, sa, sb)
 	}
@@ -61,8 +61,8 @@ func TestSwellWindowGatesDirection(t *testing.T) {
 	window := []float64{170, 260} // e.g. Huntington
 	inside := []SwellComponent{{HeightM: 1.5, PeriodS: 14, DirDeg: 200}}
 	outside := []SwellComponent{{HeightM: 1.5, PeriodS: 14, DirDeg: 330}}
-	si, _ := classifyHour(inside, 215, true, window, 2, 35, true)
-	so, _ := classifyHour(outside, 215, true, window, 2, 35, true)
+	si, _ := classifyHour(inside, beach{Facing: 215, HasFacing: true, Window: window}, 2, 35, true)
+	so, _ := classifyHour(outside, beach{Facing: 215, HasFacing: true, Window: window}, 2, 35, true)
 	if si <= so {
 		t.Errorf("in-window swell (%.1f) should outscore blocked swell (%.1f)", si, so)
 	}
@@ -161,12 +161,12 @@ func TestSurfLabel(t *testing.T) {
 }
 
 func TestSurfRangeBlocksAndBreaks(t *testing.T) {
-	lo, hi, _ := surfRange([]SwellComponent{{HeightM: 1, PeriodS: 14, DirDeg: 270}}, 270, true, nil)
+	lo, hi, _ := surfRange([]SwellComponent{{HeightM: 1, PeriodS: 14, DirDeg: 270}}, beach{Facing: 270, HasFacing: true})
 	// 1 m @ 14 s head-on: ~1.77 m breaking, so ~4-6 ft.
 	if hi < 5.5 || hi > 6.1 || math.Abs(lo-hi*surfLowFactor) > 1e-9 {
 		t.Errorf("1m@14s head-on = %.1f-%.1f ft, want ~4.1-5.8", lo, hi)
 	}
-	if _, hi, _ := surfRange([]SwellComponent{{HeightM: 2, PeriodS: 15, DirDeg: 90}}, 270, true, nil); hi != 0 {
+	if _, hi, _ := surfRange([]SwellComponent{{HeightM: 2, PeriodS: 15, DirDeg: 90}}, beach{Facing: 270, HasFacing: true}); hi != 0 {
 		t.Errorf("swell from behind the beach should not break, got %.1f ft", hi)
 	}
 }
@@ -174,7 +174,7 @@ func TestSurfRangeBlocksAndBreaks(t *testing.T) {
 func TestWindSeaMakesSurf(t *testing.T) {
 	// An enclosed sea with no swell, only a local wind sea, still has surf.
 	comps := []SwellComponent{{HeightM: 0.8, PeriodS: 4.5, DirDeg: 270, WindSea: true}}
-	_, surf := classifyHour(comps, 270, true, nil, 2, 90, true)
+	_, surf := classifyHour(comps, beach{Facing: 270, HasFacing: true}, 2, 90, true)
 	if surf.HiFt < 2 {
 		t.Errorf("0.8 m wind sea should make surf, got %.1f ft", surf.HiFt)
 	}
@@ -186,9 +186,9 @@ func TestWindSeaIsNotTheSeawardStandIn(t *testing.T) {
 	// using the wind sea as the stand-in would score it onshore.
 	swell := SwellComponent{HeightM: 1.2, PeriodS: 13, DirDeg: 270}
 	windSea := SwellComponent{HeightM: 1.5, PeriodS: 5, DirDeg: 90, WindSea: true}
-	flagged, _ := classifyHour([]SwellComponent{swell, windSea}, 0, false, nil, 7, 90, true)
+	flagged, _ := classifyHour([]SwellComponent{swell, windSea}, beach{}, 7, 90, true)
 	windSea.WindSea = false
-	unflagged, _ := classifyHour([]SwellComponent{swell, windSea}, 0, false, nil, 7, 90, true)
+	unflagged, _ := classifyHour([]SwellComponent{swell, windSea}, beach{}, 7, 90, true)
 	if flagged <= unflagged {
 		t.Errorf("easterly wind should score as offshore (%.1f) not onshore (%.1f)", flagged, unflagged)
 	}
@@ -204,5 +204,75 @@ func TestApplyConditionSummaryUsesSurfRange(t *testing.T) {
 	applyConditionSummary(summary, conds)
 	if summary[0].WaveHeight != "3–4ft" || summary[0].HeightFt != 3.8 {
 		t.Errorf("day height should be the best hour's surf, got %q (%.1f)", summary[0].WaveHeight, summary[0].HeightFt)
+	}
+}
+
+// huntington is the coastline-derived exposure spot_facing.py computes for
+// Huntington Beach: facing SW into Catalina's shadow, with open water to
+// the south and a western slot between Catalina and Palos Verdes.
+var huntington = beach{Facing: 223, HasFacing: true, OpenWater: [][2]float64{{134, 214}, {250, 284}}}
+
+func TestOpenWaterGatesBlockedSwell(t *testing.T) {
+	if got := swellExposure(30, huntington); got != 0 {
+		t.Errorf("swell from over land should be blocked, got %.2f", got)
+	}
+	// Just inside Catalina's shadow: partly wrapping in from the near edge.
+	shadow := swellExposure(225, huntington)
+	if shadow <= 0 || shadow >= 0.5 {
+		t.Errorf("swell 11 deg into the shadow should be mostly blocked, got %.2f", shadow)
+	}
+	if got := swellExposure(232, huntington); got != 0 {
+		t.Errorf("swell from mid-shadow should be blocked, got %.2f", got)
+	}
+}
+
+func TestOpenWaterObliquityUsesNearestOpenDirection(t *testing.T) {
+	// The facing (223) is in the shadow, so swell arrives square from the
+	// nearest open direction (214): a south swell enters at full strength.
+	if got := swellExposure(185, huntington); got != 1 {
+		t.Errorf("south swell through open water = %.2f, want 1", got)
+	}
+	// Through the western slot, 51 deg off that reference: partial.
+	west := swellExposure(265, huntington)
+	if west <= 0.5 || west >= 1 {
+		t.Errorf("west swell through the slot = %.2f, want partial", west)
+	}
+	// A facing inside open water is its own reference.
+	open := beach{Facing: 180, HasFacing: true, OpenWater: [][2]float64{{90, 270}}}
+	if got := obliquityReference(open); got != 180 {
+		t.Errorf("open facing reference = %v, want 180", got)
+	}
+}
+
+func TestOpenWaterAllAround(t *testing.T) {
+	islet := beach{Facing: 90, HasFacing: true, OpenWater: [][2]float64{{0, 360}}}
+	if got := swellExposure(270, islet); got != 0 {
+		// Open all around, but a swell from straight behind the beach
+		// still doesn't reach this side of it.
+		t.Errorf("swell from behind = %.2f, want 0", got)
+	}
+	if got := swellExposure(90, islet); got != 1 {
+		t.Errorf("swell head-on = %.2f, want 1", got)
+	}
+}
+
+func TestHandTunedWindowIgnoresFacingObliquity(t *testing.T) {
+	// A curated window is the effective window: full energy anywhere in it.
+	b := beach{Facing: 215, HasFacing: true, Window: []float64{170, 260}}
+	if got := swellExposure(172, b); got != 1 {
+		t.Errorf("swell at the window edge = %.2f, want 1", got)
+	}
+}
+
+func TestObliquityReferenceIgnoresNarrowSlots(t *testing.T) {
+	// Uluwatu: the shoreline faces NW (321) past a narrow open slot
+	// (298-310), but its swell window is the wide SW arc (202-274). SW
+	// swell must not be judged as oblique to the slot.
+	uluwatu := beach{Facing: 321, HasFacing: true, OpenWater: [][2]float64{{298, 310}, {202, 274}}}
+	if got := obliquityReference(uluwatu); got != 274 {
+		t.Errorf("reference = %v, want the wide arc's near edge 274", got)
+	}
+	if got := swellExposure(225, uluwatu); got < 0.8 {
+		t.Errorf("SW swell at Uluwatu = %.2f, want most of it", got)
 	}
 }

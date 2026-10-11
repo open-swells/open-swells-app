@@ -46,3 +46,35 @@ func TestSpotForecastRejectsInitialDistantGrid(t *testing.T) {
 		t.Fatal("forecast should be empty when the first grid has no nearby ocean cell")
 	}
 }
+
+func TestSpotCoastlineFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "spots.json")
+	os.WriteFile(path, []byte(`[
+		{"id": "auto", "name": "Auto", "lat": 33.6, "lon": -118.0, "facing": 223, "open_water": [[134, 214], [250, 284]]},
+		{"id": "tuned", "name": "Tuned", "lat": 33.6, "lon": -118.0, "swell_window": [170, 260], "facing": 223, "open_water": [[134, 214]]}
+	]`), 0o644)
+	store, err := NewSpotStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir() // no forecast files: facing must come from the spot
+
+	auto, _ := store.Get("auto")
+	if deg, ok := spotFacing(dir, auto); !ok || deg != 223 {
+		t.Errorf("computed facing = %v (ok=%v), want 223", deg, ok)
+	}
+	b := spotBeach(dir, auto)
+	if len(b.OpenWater) != 2 || b.OpenWater[1] != [2]float64{250, 284} || b.Window != nil {
+		t.Errorf("auto beach = %+v", b)
+	}
+
+	// A hand-tuned window wins: its midpoint is the facing, and open
+	// water is not stacked on top of it.
+	tuned, _ := store.Get("tuned")
+	if deg, _ := spotFacing(dir, tuned); deg != 215 {
+		t.Errorf("tuned facing = %v, want the window midpoint 215", deg)
+	}
+	if b := spotBeach(dir, tuned); b.OpenWater != nil || len(b.Window) != 2 {
+		t.Errorf("tuned beach = %+v", b)
+	}
+}

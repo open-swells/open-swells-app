@@ -63,24 +63,97 @@ func circularMid(a, b float64) float64 {
 	return math.Mod(a+width/2+360, 360)
 }
 
-// swellExposure is how much of a train the beach receives, 0..1. A curated
-// swell window is authoritative: full energy inside, tapering to zero 45
-// degrees beyond its edges. Otherwise the estimated facing is used with a
-// generous acceptance cone (refraction bends swell toward shore, so even
-// oblique trains deliver some energy). With neither, everything passes.
-func swellExposure(dir float64, facing float64, hasFacing bool, window []float64) float64 {
-	if len(window) == 2 {
-		width := math.Mod(window[1]-window[0]+360, 360)
-		into := math.Mod(dir-window[0]+360, 360)
-		if into <= width {
-			return 1
-		}
-		past := math.Min(into-width, 360-into) // degrees beyond the nearer edge
+// beach is what the classifier knows about a spot's exposure.
+type beach struct {
+	// Facing is the bearing (degrees true) the beach faces, toward open
+	// water; it judges wind (offshore vs onshore) and swell obliquity.
+	Facing    float64
+	HasFacing bool
+	// Window is a hand-tuned [from, to] effective swell window. It decides
+	// swell exposure on its own.
+	Window []float64
+	// OpenWater is the coastline-derived arcs of open sea, [from, to]
+	// clockwise (see grib-parse-collect/spot_facing.py). Swell from outside
+	// them is blocked by land; swell inside still loses energy the more
+	// obliquely it meets the beach.
+	OpenWater [][2]float64
+}
+
+// openWaterTaperDeg is how far beyond an open-water arc's edge swell still
+// arrives, fading to nothing: it diffracts and refracts around the land
+// that bounds the arc.
+const openWaterTaperDeg = 15.0
+
+// arcPast is how many degrees dir lies beyond arc [from, to] (clockwise),
+// 0 inside it. An arc whose ends meet ([0, 360]) is the whole circle.
+func arcPast(dir float64, arc [2]float64) float64 {
+	width := math.Mod(arc[1]-arc[0]+360, 360)
+	if width == 0 {
+		return 0
+	}
+	into := math.Mod(dir-arc[0]+360, 360)
+	if into <= width {
+		return 0
+	}
+	return math.Min(into-width, 360-into) // degrees beyond the nearer edge
+}
+
+// swellExposure is how much of a train the beach receives, 0..1.
+//
+// A hand-tuned swell window is authoritative: full energy inside, tapering
+// to zero 45 degrees beyond its edges. Otherwise a facing gives a generous
+// acceptance cone (refraction bends swell toward shore, so even oblique
+// trains deliver some energy), and open-water arcs gate out swell that
+// land blocks. With none of these, everything passes.
+func swellExposure(dir float64, b beach) float64 {
+	if len(b.Window) == 2 {
+		past := arcPast(dir, [2]float64{b.Window[0], b.Window[1]})
 		return math.Max(0, 1-past/45)
 	}
-	if !hasFacing {
-		return 1
+	exposure := 1.0
+	if len(b.OpenWater) > 0 {
+		past := 360.0
+		for _, arc := range b.OpenWater {
+			past = math.Min(past, arcPast(dir, arc))
+		}
+		exposure = math.Max(0, 1-past/openWaterTaperDeg)
 	}
+	if b.HasFacing && exposure > 0 {
+		exposure *= obliquity(dir, obliquityReference(b))
+	}
+	return exposure
+}
+
+// obliquityReference is the direction swell is judged against for how
+// squarely it meets the beach: the facing, unless land blocks it (a beach
+// facing across a bay, or into an island's shadow). Swell then reaches the
+// beach by bending in from the main body of open water, so the reference
+// is the nearer edge of the widest open arc. (The nearest edge of any arc
+// could be a sliver between islands, which would mark the beach's real
+// swell window as oblique.)
+func obliquityReference(b beach) float64 {
+	if len(b.OpenWater) == 0 {
+		return b.Facing
+	}
+	widest, widestWidth := b.OpenWater[0], -1.0
+	for _, arc := range b.OpenWater {
+		if arcPast(b.Facing, arc) == 0 {
+			return b.Facing
+		}
+		width := math.Mod(arc[1]-arc[0]+360, 360)
+		if width > widestWidth {
+			widest, widestWidth = arc, width
+		}
+	}
+	if angDiff(b.Facing, widest[1]) < angDiff(b.Facing, widest[0]) {
+		return widest[1]
+	}
+	return widest[0]
+}
+
+// obliquity is the share of a train that reaches a beach facing `facing`
+// from direction dir.
+func obliquity(dir, facing float64) float64 {
 	diff := angDiff(dir, facing)
 	switch {
 	case diff <= 35:
@@ -142,10 +215,10 @@ func breakerHeightM(h0, t float64) float64 {
 // refraction), then broken with breakerHeightM; trains combine by
 // root-sum-square as their energies add. quality is the period quality
 // averaged by each train's share of breaking energy (1 when flat).
-func surfRange(comps []SwellComponent, facing float64, hasFacing bool, window []float64) (loFt, hiFt, quality float64) {
+func surfRange(comps []SwellComponent, b beach) (loFt, hiFt, quality float64) {
 	energy, weighted := 0.0, 0.0
 	for _, c := range comps {
-		hb := breakerHeightM(c.HeightM*swellExposure(c.DirDeg, facing, hasFacing, window), c.PeriodS)
+		hb := breakerHeightM(c.HeightM*swellExposure(c.DirDeg, b), c.PeriodS)
 		energy += hb * hb
 		weighted += hb * hb * periodQuality(c.PeriodS)
 	}
@@ -275,10 +348,10 @@ type surfHeight struct {
 }
 
 // classifyHour scores one hour of swell + wind for a beach.
-func classifyHour(comps []SwellComponent, facing float64, hasFacing bool, window []float64,
+func classifyHour(comps []SwellComponent, b beach,
 	windSpeedMs, windDir float64, hasWind bool) (score float64, surf surfHeight) {
 
-	lo, hi, quality := surfRange(comps, facing, hasFacing, window)
+	lo, hi, quality := surfRange(comps, b)
 	surf = surfHeight{LoFt: lo, HiFt: hi}
 	score = surfScore(hi) * quality
 
@@ -287,7 +360,7 @@ func classifyHour(comps []SwellComponent, facing float64, hasFacing bool, window
 	// is offshore-ish — the user-visible "offshore effect"). Wind sea is
 	// skipped: it runs with the local wind, so it would make any wind
 	// look onshore.
-	seaward, hasSeaward := facing, hasFacing
+	seaward, hasSeaward := b.Facing, b.HasFacing
 	if !hasSeaward {
 		bestH := 0.0
 		for _, c := range comps {
@@ -307,7 +380,7 @@ func classifyHour(comps []SwellComponent, facing float64, hasFacing bool, window
 
 // conditionSeries classifies every forecast hour for a spot.
 func conditionSeries(hours []hourSwells, wind []WindSample, windStart time.Time, hasWindStart bool,
-	facing float64, hasFacing bool, window []float64) []HourlyCondition {
+	b beach) []HourlyCondition {
 
 	out := make([]HourlyCondition, 0, len(hours))
 	for _, h := range hours {
@@ -316,7 +389,7 @@ func conditionSeries(hours []hourSwells, wind []WindSample, windStart time.Time,
 		if hasWindStart {
 			speedMs, dir, hasWind = windAt(wind, windStart, h.Time)
 		}
-		score, surf := classifyHour(h.Comps, facing, hasFacing, window, speedMs, dir, hasWind)
+		score, surf := classifyHour(h.Comps, b, speedMs, dir, hasWind)
 		out = append(out, HourlyCondition{
 			UnixMs:   h.Time.UnixMilli(),
 			Score:    int(math.Round(score)),

@@ -44,6 +44,11 @@ type Spot struct {
 	// Optional hand-tuned [from, to] arc of swell directions (degrees true,
 	// clockwise) this break can receive; drives the condition classifier.
 	SwellWindow []float64 `json:"swell_window,omitempty"`
+	// Computed from a high-resolution coastline by
+	// grib-parse-collect/spot_facing.py: the bearing the beach faces and
+	// the arcs of open sea it sees. A hand-tuned SwellWindow wins.
+	Facing    *float64     `json:"facing,omitempty"`
+	OpenWater [][2]float64 `json:"open_water,omitempty"`
 }
 
 // samplePoint is where this spot reads the wave/wind grids.
@@ -746,13 +751,17 @@ func spotWind(staticDir string, spot Spot) []WindSample {
 }
 
 // spotFacing is the bearing (degrees true) from the beach toward open
-// water: the middle of a curated swell window when the spot has one,
-// otherwise estimated as the bearing to the nearest wet wave-grid cell:
-// the spot's full-resolution cell first, then the coarse grid when that
-// cell sits too close to the spot to give a direction.
+// water: the middle of a curated swell window when the spot has one, then
+// the coastline-derived facing, otherwise estimated as the bearing to the
+// nearest wet wave-grid cell: the spot's full-resolution cell first, then
+// the coarse grid when that cell sits too close to the spot to give a
+// direction.
 func spotFacing(staticDir string, spot Spot) (float64, bool) {
 	if len(spot.SwellWindow) == 2 {
 		return circularMid(spot.SwellWindow[0], spot.SwellWindow[1]), true
+	}
+	if spot.Facing != nil {
+		return *spot.Facing, true
 	}
 	if _, series, ok := spotSeriesFor(staticDir, spot.ID); ok {
 		if deg, ok := bearingToCell(spot, series.Cell[0], series.Cell[1]); ok {
@@ -792,13 +801,23 @@ func spotConditions(staticDir string, spot Spot, hours []hourSwells) []HourlyCon
 	if len(hours) == 0 {
 		return nil
 	}
-	facing, hasFacing := spotFacing(staticDir, spot)
 	windStart, err := time.Parse("20060102_15Z", windForecastStart(staticDir))
 	var wind []WindSample
 	if err == nil {
 		wind = spotWind(staticDir, spot)
 	}
-	return conditionSeries(hours, wind, windStart, err == nil, facing, hasFacing, spot.SwellWindow)
+	return conditionSeries(hours, wind, windStart, err == nil, spotBeach(staticDir, spot))
+}
+
+// spotBeach gathers a spot's exposure for the classifier. Open water only
+// applies without a hand-tuned window, which already accounts for it.
+func spotBeach(staticDir string, spot Spot) beach {
+	b := beach{Window: spot.SwellWindow}
+	b.Facing, b.HasFacing = spotFacing(staticDir, spot)
+	if len(spot.SwellWindow) != 2 {
+		b.OpenWater = spot.OpenWater
+	}
+	return b
 }
 
 // --- Favorites drawer entries ---------------------------------------------
