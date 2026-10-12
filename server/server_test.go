@@ -268,7 +268,8 @@ func TestLoadTemplates(t *testing.T) {
 	if bytes.Contains(spotPage.Bytes(), []byte("seo-forecast-table")) || bytes.Contains(spotPage.Bytes(), []byte("multi-day surf forecast")) {
 		t.Error("spot page renders an extra SEO forecast table before the interactive forecast")
 	}
-	if !bytes.Contains(spotPage.Bytes(), []byte("travelBearing(d.PrimaryDegrees)")) ||
+	if !bytes.Contains(spotPage.Bytes(), []byte("rotate(${travelBearing(d[degField])})")) ||
+		!bytes.Contains(spotPage.Bytes(), []byte("'PrimaryWaveHeight', 'PrimaryDegrees'")) ||
 		!bytes.Contains(spotPage.Bytes(), []byte("travelBearing(direction)")) {
 		t.Error("hourly forecast arrows do not convert marine from-directions to travel bearings")
 	}

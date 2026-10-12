@@ -227,7 +227,11 @@
                     card.innerHTML =
                         `<div class="fc-day">${cardDayFmt.format(d)} ${d.getMonth() + 1}/${d.getDate()}</div>` +
                         `<div class="fc-height">${label}</div>` +
-                        (cond ? `<div class="fc-cond" style="color: ${CONDITION_COLORS[cond]};">${cond}</div>` : '');
+                        // buoys have no rating; an empty row keeps the card
+                        // the same height as a surf spot's
+                        (cond
+                            ? `<div class="fc-cond" style="color: ${CONDITION_COLORS[cond]};">${cond}</div>`
+                            : '<div class="fc-cond" aria-hidden="true">&nbsp;</div>');
                     container.appendChild(card);
                 }
                 const current = dayStats[dayKeys[0]];
@@ -535,6 +539,12 @@
                 const hh = Math.round(h) % 24;
                 return `${hh % 12 || 12}${hh < 12 ? 'am' : 'pm'}`;
             };
+            // Direction glyph: a notched arrowhead pointing up at 0deg, so
+            // rotate(bearing) points it the way the swell or wind travels.
+            // The notched tail makes front and back unmistakable, which a
+            // plain triangle is not. `s` is the half-length in px; the
+            // glyph is centered on the data point.
+            const arrowPath = s => `M0 ${-s} L${0.72 * s} ${0.8 * s} L0 ${0.36 * s} L${-0.72 * s} ${0.8 * s} Z`;
             // condition rating bands on the classifier's 0-100 score
             // (ratingFor in server/conditions.go)
             const COND_BANDS = [['poor', 0, 28], ['fair', 28, 55], ['good', 55, 80], ['epic', 80, 100]];
@@ -697,7 +707,8 @@
                     const pk = data.reduce((a, b) => (+b.PrimaryWaveHeight > +a.PrimaryWaveHeight ? b : a));
                     swellSummary = `Peak primary ${(pk.PrimaryWaveHeight * 3.28084).toFixed(1)} ft @ ${pk.PrimaryPeriod}s ${cardinal(pk.PrimaryDegrees)} at ${fmtHour(pk.hour)}`;
                 }
-                panelTitle(0, surfDayPts.length ? 'SURF & SWELL HEIGHT (FT)' : 'SWELL HEIGHT (FT)', swellSummary);
+                const arrowNote = width >= 560 ? ' · ARROWS POINT WHERE IT IS HEADING' : '';
+                panelTitle(0, `${surfDayPts.length ? 'SURF & SWELL HEIGHT (FT)' : 'SWELL HEIGHT (FT)'}${arrowNote}`, swellSummary);
 
                 const linePrimary = d3.line().x(d => x(d.hour)).y(d => y(d.PrimaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
                 const lineSecondary = d3.line().x(d => x(d.hour)).y(d => y(d.SecondaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
@@ -712,7 +723,6 @@
                 const windSeaRows = data.filter(d => parseFloat(d.WindSeaHeight) > 0);
                 const lineWindSea = d3.line().defined(d => parseFloat(d.WindSeaHeight) > 0).x(d => x(d.hour)).y(d => y(d.WindSeaHeight * 3.28084)).curve(d3.curveMonotoneX);
                 svg.selectAll(".lineWindSea").data(windSeaRows.length ? [data] : []).join("path").attr("class", "lineWindSea").attr("d", lineWindSea).attr("fill", "none").attr("stroke-width", 1.25).attr("stroke-dasharray", "4,3").attr("stroke", chartColors.lineWindSea);
-                svg.selectAll(".windSeaPoint").data(windSeaRows).join("path").attr("class", "windSeaPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.WindSeaHeight * 3.28084)}) rotate(${travelBearing(d.WindSeaDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(18)).attr("fill", chartColors.lineWindSea);
 
                 svg.selectAll(".linePrimary").data([data]).join("path").attr("class", "linePrimary").attr("d", linePrimary).attr("fill", "none").attr("stroke-width", 1.5).attr("stroke", chartColors.linePrimary);
                 svg.selectAll(".lineSecondary").data([data]).join("path").attr("class", "lineSecondary").attr("d", lineSecondary).attr("fill", "none").attr("stroke-width", 1.25).attr("stroke", chartColors.lineSecondary);
@@ -720,10 +730,24 @@
                 svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineQuaternary);
 
 
-                svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.PrimaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(28)).attr("fill", chartColors.linePrimary);
-                svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.SecondaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(24)).attr("fill", chartColors.lineSecondary);
-                svg.selectAll(".tertiaryPoint").data(data).join("path").attr("class", "tertiaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.TertiaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.TertiaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(20)).attr("fill", chartColors.lineTertiary);
-                svg.selectAll(".quaternaryPoint").data(data).join("path").attr("class", "quaternaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.QuaternaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.QuaternaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(20)).attr("fill", chartColors.lineQuaternary);
+                // direction arrows on each swell line, thinned on narrow
+                // screens so neighbors never overlap
+                const arrowEvery = Math.max(1, Math.ceil(24 / Math.max(x(1) - x(0), 1)));
+                const halo = themeColor('--panel', '#17181b');
+                const swellArrows = (cls, rows, field, degField, color, size) => {
+                    svg.selectAll(`.${cls}`)
+                        .data(rows.filter((d, i) => i % arrowEvery === 0 && parseFloat(d[field]) > 0))
+                        .join("path").attr("class", cls)
+                        .attr("transform", d => `translate(${x(d.hour)},${y(d[field] * 3.28084)}) rotate(${travelBearing(d[degField])})`)
+                        .attr("d", arrowPath(size))
+                        .attr("fill", color)
+                        .attr("stroke", halo).attr("stroke-width", 1).attr("stroke-linejoin", 'round');
+                };
+                swellArrows('windSeaPoint', data, 'WindSeaHeight', 'WindSeaDegrees', chartColors.lineWindSea, 6.5);
+                swellArrows('quaternaryPoint', data, 'QuaternaryWaveHeight', 'QuaternaryDegrees', chartColors.lineQuaternary, 7);
+                swellArrows('tertiaryPoint', data, 'TertiaryWaveHeight', 'TertiaryDegrees', chartColors.lineTertiary, 7);
+                swellArrows('secondaryPoint', data, 'SecondaryWaveHeight', 'SecondaryDegrees', chartColors.lineSecondary, 7.5);
+                swellArrows('primaryPoint', data, 'PrimaryWaveHeight', 'PrimaryDegrees', chartColors.linePrimary, 8);
 
                 if (showWind) {
                     const lane = svg.append("g").attr("class", "wind-lane");
@@ -781,17 +805,14 @@
                             const gap = samples.length > 1 ? x(samples[1].hour) - x(samples[0].hour) : width;
                             return Math.max(1, Math.ceil(minPx / Math.max(gap, 1)));
                         };
-                        const arrowEvery = stride(16), readingEvery = stride(30);
+                        const windArrowEvery = stride(24), readingEvery = stride(30);
                         samples.forEach((w, i) => {
-                            if (i % arrowEvery && w !== windPeak) return;
-                            const g = lane.append("g")
-                                .attr("transform", `translate(${x(w.hour)}, ${yw(mph(w))})`);
-                            g.append("circle").attr("r", 2).attr("fill", CHART.wind);
-                            g.append("path")
-                                .attr("d", 'M0 -9 L2.6 -4.4 L1 -4.4 L1 2 L-1 2 L-1 -4.4 L-2.6 -4.4 Z')
+                            if (i % windArrowEvery && w !== windPeak) return;
+                            lane.append("path")
+                                .attr("d", arrowPath(8))
+                                .attr("transform", `translate(${x(w.hour)}, ${yw(mph(w))}) rotate(${travelBearing(w.d)})`)
                                 .attr("fill", CHART.wind)
-                                .attr("transform", `rotate(${w.d + 180}) translate(0, -7)`)
-                                .attr("opacity", 0.9);
+                                .attr("stroke", themeColor('--panel', '#17181b')).attr("stroke-width", 1).attr("stroke-linejoin", 'round');
                             if (w !== windPeak && (i % readingEvery || Math.abs(x(w.hour) - x(windPeak.hour)) < 30)) return;
                             lane.append("text").attr("class", "wind-reading")
                                 .attr("x", Math.max(8, Math.min(width - 8, x(w.hour))))
@@ -803,7 +824,7 @@
                         });
                         windSummary = `Peak ${mph(windPeak).toFixed(0)} mph ${cardinal(windPeak.d)} at ${fmtHour(windPeak.hour)}`;
                     }
-                    panelTitle(wdTop, 'WIND (MPH)', windSummary, CHART.wind);
+                    panelTitle(wdTop, `WIND (MPH)${arrowNote}`, windSummary, CHART.wind);
                 }
 
                 // surf-condition panel: hourly score bars on the 0-100
