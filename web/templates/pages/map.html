@@ -534,6 +534,12 @@
                         document.getElementById('forecastLoading').classList.add('hidden');
                         frame.classList.remove('opacity-0');
                         bindForecastPageFavorite();
+                        // once the page inside has focus, key presses go to
+                        // the iframe's document, not this one -- listen there
+                        // too so Escape still closes the popup
+                        frame.contentDocument?.addEventListener('keydown', (event) => {
+                            if (event.key === 'Escape') closeForecast();
+                        });
                     };
                     frame.src = url;
                     modal.classList.add('is-open');
@@ -562,6 +568,9 @@
 
                 function closeForecast() {
                     document.getElementById('forecastModal').classList.remove('is-open');
+                    // hand focus back to the map so its shortcuts work again
+                    const frame = document.getElementById('forecastFrame');
+                    if (document.activeElement === frame) frame.blur();
                 }
 
                 function syncForecastPageFavorite() {
@@ -1224,7 +1233,20 @@
                 activeHeatLayer = next;
             }
 
+            // Flat, darker gray land: recolor the basemap background and
+            // hide the land-use/land-cover fills that tint it.
+            function applyLandColor() {
+                for (const layer of map.getStyle().layers) {
+                    if (layer.type === 'background') {
+                        map.setPaintProperty(layer.id, 'background-color', '#c3c3c3');
+                    } else if (layer.type === 'fill' && /landcover|landuse|park|aeroway|wood|grass/.test(layer.id)) {
+                        map.setLayoutProperty(layer.id, 'visibility', 'none');
+                    }
+                }
+            }
+
             function initializeSwellMap() {
+                applyLandColor();
                 addSwellLayers();
                 swellLayersReady = true;
                 // Find the first symbol layer and slot the swell layers beneath
@@ -1877,12 +1899,15 @@
                     const marker = popupMap.get(match.id);
                     if (marker) {
                         if (marker.getPopup() && !marker.getPopup().isOpen()) marker.togglePopup();
-                        map.flyTo({ center: [match.lon, match.lat], zoom: 4, offset: [0, -100] });
+                        // jump, don't fly: a search result should land instantly.
+                        // easeTo with no duration keeps the popup offset,
+                        // which jumpTo doesn't support
+                        map.easeTo({ center: [match.lon, match.lat], zoom: 4, offset: [0, -100], duration: 0 });
                     }
                     return;
                 }
 
-                map.flyTo({ center: [match.lon, match.lat], zoom: 9.5, offset: [0, -100] });
+                map.easeTo({ center: [match.lon, match.lat], zoom: 9.5, offset: [0, -100], duration: 0 });
                 new maplibregl.Popup({ offset: 10, maxWidth: '280px' })
                     .setLngLat([match.lon, match.lat])
                     .setHTML(spotPopupHTML({ id: match.id, name: match.name, region: match.region }))

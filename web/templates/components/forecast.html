@@ -21,6 +21,7 @@
                 gridStrong: themeColor('--line-strong', '#43454c'),
                 verticalLine: themeColor('--accent-bright', '#3b82f6'),
                 label: themeColor('--text-3', '#8b9099'),
+                title: themeColor('--text-1', '#d5d7dc'),
             };
             const getChartColors = () => CHART;
 
@@ -68,30 +69,7 @@
                 const tempdate = new Date(parts[0], parts[1] - 1, parts[2]);
 
                 dateHeader.innerHTML = `${days[tempdate.getDay()]} <span class="hdr-date">${headerDateFmt.format(tempdate)}</span>`;
-                updateDayHeader(date);
                 updateStripSelection(date);
-            }
-
-            // Right side of the log line: the selected day at a glance.
-            // Wind joins once /api/wind resolves.
-            function updateDayHeader(date) {
-                const el = document.getElementById('day-summary');
-                if (!el || !date) return;
-                const st = dayStats[date];
-                if (!st) { el.innerHTML = ''; return; }
-                let html = `${st.surf ? `${st.label} surf` : `${st.avgFt.toFixed(1)} ft avg`} &middot; <span style="color: ${CONDITION_COLORS[st.cond]};">${st.cond}</span>`;
-                if (windState === 'loading') {
-                    html += ' &middot; <span class="wind-loading">wind &hellip;</span>';
-                } else if (windState === 'ready') {
-                    const { start, end } = localDayBounds(date);
-                    const pts = windSamples.filter(w =>
-                        w.t >= start && w.t < end);
-                    if (pts.length) {
-                        const pk = pts.reduce((a, b) => (b.s > a.s ? b : a));
-                        html += ` &middot; wind ${(pk.s * 2.237).toFixed(0)} mph ${cardinal(pk.d)}`;
-                    }
-                }
-                el.innerHTML = html;
             }
 
             // --- Surface wind ---------------------------------------------
@@ -146,7 +124,6 @@
                     buildSwellStrip();
                     if (stripSelectedDate) updateStripSelection(stripSelectedDate);
                     if (currentDay.length) updateChart(currentDay, svg);
-                    if (currentDate) updateDayHeader(currentDate);
                 }
             }
             loadWindForecast();
@@ -196,7 +173,7 @@
             const includedDays = new Set(dayKeys);
             data = data.filter(item => includedDays.has(localDateKey(item.dateObj)));
             dataGroupedByDay = groupDataByDay(data);
-            const dayStats = {}; // key -> {avgFt, cond}, feeds the day log line
+            const dayStats = {}; // key -> {avgFt, cond, label}, feeds the current-conditions card
             const CONDITION_COLORS = {
                 epic: themeColor('--cond-epic', '#86d4c6'),
                 good: themeColor('--cond-good', '#4fd1bc'),
@@ -212,18 +189,12 @@
             // then charts surf height rather than the primary swell.
             const SURF_MODE = CONDS.length > 0 && typeof CONDS[0].surf === 'string';
 
-            // a day rates as its best hour; without classifier data, fall
-            // back to mirroring determineCondition in main.go
+            // a day rates as its best hour. Ratings come only from the
+            // classifier, so buoy pages (no surf spot) show none.
             const condDayBest = {}; // local date key -> best HourlyCondition
             for (const c of CONDS) {
                 const key = dateKeyOf(c.t);
                 if (!condDayBest[key] || c.score > condDayBest[key].score) condDayBest[key] = c;
-            }
-            function conditionFor(key, avgFt) {
-                if (condDayBest[key]) return condDayBest[key].rating;
-                if (avgFt < 0.5) return 'poor';
-                if (avgFt < 1.5) return 'fair';
-                return 'good';
             }
             if (CONDS.length) {
                 const title = document.querySelector('.strip-title');
@@ -243,9 +214,9 @@
                     const avgFt = heights.length
                         ? (heights.reduce((a, b) => a + b, 0) / heights.length) * 3.28084
                         : 0;
-                    const cond = conditionFor(key, avgFt);
                     // with surf ranges, a day shows its best hour's surf
                     const best = condDayBest[key];
+                    const cond = best ? best.rating : null;
                     const label = SURF_MODE && best ? best.surf : `${avgFt.toFixed(1)}ft`;
                     dayStats[key] = { avgFt, cond, label, surf: SURF_MODE && !!best };
                     const parts = key.split('-');
@@ -256,18 +227,12 @@
                     card.innerHTML =
                         `<div class="fc-day">${cardDayFmt.format(d)} ${d.getMonth() + 1}/${d.getDate()}</div>` +
                         `<div class="fc-height">${label}</div>` +
-                        `<div class="fc-cond" style="color: ${CONDITION_COLORS[cond]};">${cond}</div>`;
+                        (cond ? `<div class="fc-cond" style="color: ${CONDITION_COLORS[cond]};">${cond}</div>` : '');
                     container.appendChild(card);
                 }
                 const current = dayStats[dayKeys[0]];
-                document.querySelectorAll('[data-current-outlook]').forEach(el => {
-                    if (!current) return;
-                    el.textContent = current.cond;
-                    el.style.color = CONDITION_COLORS[current.cond];
-                    el.style.borderColor = 'currentColor';
-                });
                 document.querySelectorAll('[data-current-condition-card]').forEach(card => {
-                    if (!current) return;
+                    if (!current || !current.cond) return;
                     card.style.setProperty('--condition-color', CONDITION_COLORS[current.cond]);
                     const condition = card.querySelector('[data-current-condition]');
                     const height = card.querySelector('[data-current-height]');
@@ -551,12 +516,28 @@
             const cards = document.querySelectorAll('.forecastcard');
             const firstCard = cards[0];
 
-            const margin = {top: 10, right: 12, bottom: 24, left: 34},
-                width = document.getElementById('chart-container').clientWidth - margin.left - margin.right,
-                height = 220 - margin.top - margin.bottom;
+            // The hourly detail is three stacked panels -- swell height,
+            // wind, surf conditions -- in one svg so they share the x scale
+            // and crosshair. Each panel has its own title row, axis, and
+            // frame; `height` is the swell panel's plot height.
+            // The right margin mirrors the left (axis-label) margin so the
+            // plots sit centered in the card; phones keep a slim right edge
+            // rather than give up plot width.
+            const chartOuterWidth = document.getElementById('chart-container').clientWidth;
+            const margin = {top: 24, right: chartOuterWidth >= 640 ? 44 : 14, bottom: 24, left: 44},
+                width = chartOuterWidth - margin.left - margin.right,
+                height = 180;
 
-            // wind lane below the swell lane, same svg, same x scale
-            const windGap = 24, windLaneH = 56;
+            // vertical space between panels; holds the next panel's title
+            const panelGap = 36, windLaneH = 100, condLaneH = 68;
+            // hour labels: 12am, 3am, ... 9pm
+            const fmtHour = h => {
+                const hh = Math.round(h) % 24;
+                return `${hh % 12 || 12}${hh < 12 ? 'am' : 'pm'}`;
+            };
+            // condition rating bands on the classifier's 0-100 score
+            // (ratingFor in server/conditions.go)
+            const COND_BANDS = [['poor', 0, 28], ['fair', 28, 55], ['good', 55, 80], ['epic', 80, 100]];
 
             const svg = d3.select("#chart")
                 .append("svg")
@@ -573,7 +554,7 @@
             const xAxisGroup = svg.append("g")
                 .attr("class", "xaxis")
                 .attr("transform", `translate(0,${height})`)
-                .call(d3.axisBottom(x).tickValues([0, 6, 12, 18, 23]).tickFormat(d => `${String(d).padStart(2, '0')}:00`).tickSize(4).tickSizeOuter(0).tickPadding(6));
+                .call(d3.axisBottom(x).tickValues([0, 3, 6, 9, 12, 15, 18, 21]).tickFormat(fmtHour).tickSize(4).tickSizeOuter(0).tickPadding(6));
 
             var y = d3.scaleLinear()
                 .range([ height, 0 ]);
@@ -581,9 +562,10 @@
             var yScale = d3.scaleLinear()
                 .range([ height, 0 ]);
 
-            var yAxis = d3.axisLeft(yScale).ticks(3)
-                .tickFormat(d => `${d % 1 ? d.toFixed(1) : d.toFixed(0)}′`)
-                .tickSize(0).tickSizeOuter(0).tickPadding(8);
+            // full-width gridlines at each tick; the unit is in the title
+            var yAxis = d3.axisLeft(yScale).ticks(4)
+                .tickFormat(d => (d % 1 ? d.toFixed(1) : d.toFixed(0)))
+                .tickSize(-width).tickSizeOuter(0).tickPadding(8);
 
             const yAxisGroup = svg.append("g")
                 .attr("class", "yaxis")
@@ -597,33 +579,6 @@
                 svg.selectAll(".yaxis").selectAll("line").style("stroke", CHART.grid);
             };
             setAxisColor();
-
-            // Chart key. A train is listed only if it has height on the
-            // selected day, so the key always matches what is drawn.
-            function renderSwellLegend(dayRows, hasWind, hasSurf) {
-                const host = document.getElementById('swellLegend');
-                if (!host) return;
-                const entries = [
-                    ['Primary', 'PrimaryWaveHeight', CHART.linePrimary],
-                    ['Secondary', 'SecondaryWaveHeight', CHART.lineSecondary],
-                    ['Tertiary', 'TertiaryWaveHeight', CHART.lineTertiary],
-                    ['4th', 'QuaternaryWaveHeight', CHART.lineQuaternary],
-                    ['Wind sea', 'WindSeaHeight', CHART.lineWindSea],
-                ].filter(([, field]) => dayRows.some(row => parseFloat(row[field]) > 0));
-                if (hasSurf) entries.unshift(['Surf', null, CHART.surf]);
-                if (hasWind) entries.push(['Wind', null, CHART.wind]);
-                host.replaceChildren(...entries.map(([label, , color]) => {
-                    const item = document.createElement('span');
-                    item.style.color = color;
-                    const swatch = document.createElement('i');
-                    const text = document.createElement('em');
-                    text.style.fontStyle = 'normal';
-                    text.style.color = 'var(--text-2)';
-                    text.textContent = label;
-                    item.append(swatch, text);
-                    return item;
-                }));
-            }
 
             function updateChart(data, svg) {
                 if (!data || data.length === 0) return;
@@ -652,7 +607,7 @@
                                 const sampleTime = new Date(windDayStart);
                                 sampleTime.setHours(hour, 0, 0, 0);
                                 const w = windAtTime(sampleTime.getTime());
-                                if (w) windDayPts.push({ hour, s: w.s, d: w.d });
+                                if (w) windDayPts.push({ hour, s: w.s, d: w.d, pad: true });
                             }
                         }
                         windDayPts.sort((a, b) => a.hour - b.hour);
@@ -663,7 +618,8 @@
                 // the wind lane keeps its slot while loading so the chart
                 // doesn't jump when the data lands
                 const showWind = windState !== 'none';
-                const windBottom = showWind ? height + windGap + windLaneH : height;
+                const windTop = height + panelGap;
+                const windBottom = showWind ? windTop + windLaneH : height;
 
                 // classifier hours for the selected day, as fractional hours
                 // on the swell chart's x scale
@@ -675,8 +631,8 @@
                         .map(c => ({ ...c, hour: localHour(c.t) }))
                         .filter(c => c.hour <= 23);
                 }
-                const condGap = 20, condLaneH = 40;
-                const chartBottom = condDayPts.length ? windBottom + condGap + condLaneH : windBottom;
+                const condTop = windBottom + panelGap;
+                const chartBottom = condDayPts.length ? condTop + condLaneH : windBottom;
                 d3.select(svg.node().ownerSVGElement)
                     .attr("width", width + margin.left + margin.right)
                     .attr("height", chartBottom + margin.top + margin.bottom)
@@ -699,6 +655,50 @@
                 svg.select(".yaxis").call(yAxis);
                 setAxisColor();
 
+                // Panel frames, 3-hour gridlines, and title rows. Inserted
+                // first so every series draws on top of them.
+                svg.selectAll(".panel-chrome").remove();
+                const chrome = svg.insert("g", ":first-child").attr("class", "panel-chrome");
+                const panels = [[0, height]];
+                if (showWind) panels.push([windTop, windBottom]);
+                if (condDayPts.length) panels.push([condTop, chartBottom]);
+                for (const [top, bottom] of panels) {
+                    chrome.append("rect").attr("class", "plot-bg")
+                        .attr("x", 0).attr("y", top)
+                        .attr("width", width).attr("height", bottom - top)
+                        .attr("fill", themeColor('--panel', '#17181b'))
+                        .attr("stroke", CHART.gridStrong);
+                    for (let h = 3; h < 23; h += 3) {
+                        chrome.append("line").attr("class", "hour-grid")
+                            .attr("x1", x(h)).attr("x2", x(h))
+                            .attr("y1", top).attr("y2", bottom)
+                            .attr("stroke", CHART.grid);
+                    }
+                }
+                // title on the left, the panel's one-line summary on the right
+                const panelTitle = (y, title, summary, summaryColor) => {
+                    chrome.append("text").attr("class", "panel-title")
+                        .attr("x", 0).attr("y", y - 9)
+                        .attr("fill", CHART.title)
+                        .text(title);
+                    if (summary) {
+                        chrome.append("text").attr("class", "panel-summary")
+                            .attr("x", width).attr("y", y - 9)
+                            .attr("text-anchor", 'end')
+                            .attr("fill", summaryColor || CHART.title)
+                            .text(summary);
+                    }
+                };
+                let swellSummary = '';
+                if (surfDayPts.length) {
+                    const pk = surfDayPts.reduce((a, b) => (b.ft_hi > a.ft_hi ? b : a));
+                    swellSummary = `Peak surf ${pk.surf} at ${fmtHour(pk.hour)}`;
+                } else {
+                    const pk = data.reduce((a, b) => (+b.PrimaryWaveHeight > +a.PrimaryWaveHeight ? b : a));
+                    swellSummary = `Peak primary ${(pk.PrimaryWaveHeight * 3.28084).toFixed(1)} ft @ ${pk.PrimaryPeriod}s ${cardinal(pk.PrimaryDegrees)} at ${fmtHour(pk.hour)}`;
+                }
+                panelTitle(0, surfDayPts.length ? 'SURF & SWELL HEIGHT (FT)' : 'SWELL HEIGHT (FT)', swellSummary);
+
                 const linePrimary = d3.line().x(d => x(d.hour)).y(d => y(d.PrimaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
                 const lineSecondary = d3.line().x(d => x(d.hour)).y(d => y(d.SecondaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
                 const lineTertiary = d3.line().x(d => x(d.hour)).y(d => y(d.TertiaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
@@ -719,7 +719,6 @@
                 svg.selectAll(".lineTertiary").data([data]).join("path").attr("class", "lineTertiary").attr("d", lineTertiary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineTertiary);
                 svg.selectAll(".lineQuaternary").data([data]).join("path").attr("class", "lineQuaternary").attr("d", lineQuaternary).attr("fill", "none").attr("stroke-width", 1).attr("stroke", chartColors.lineQuaternary);
 
-                renderSwellLegend(data, showWind || windDayPts.length, surfDayPts.length > 1);
 
                 svg.selectAll(".primaryPoint").data(data).join("path").attr("class", "primaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.PrimaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.PrimaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(28)).attr("fill", chartColors.linePrimary);
                 svg.selectAll(".secondaryPoint").data(data).join("path").attr("class", "secondaryPoint").attr("transform", d => `translate(${x(d.hour)},${y(d.SecondaryWaveHeight * 3.28084)}) rotate(${travelBearing(d.SecondaryDegrees)})`).attr("d", d3.symbol().type(d3.symbolTriangle).size(24)).attr("fill", chartColors.lineSecondary);
@@ -728,15 +727,11 @@
 
                 if (showWind) {
                     const lane = svg.append("g").attr("class", "wind-lane");
-                    const wdTop = height + windGap, wdBase = windBottom, wdMid = (wdTop + wdBase) / 2;
-                    lane.append("line")
-                        .attr("x1", 0).attr("x2", width)
-                        .attr("y1", height).attr("y2", height)
-                        .attr("stroke", CHART.grid);
-                    lane.append("text")
-                        .attr("x", 0).attr("y", height + 15)
-                        .attr("fill", CHART.label).attr("font-size", 9)
-                        .text('SURFACE WIND · MPH');
+                    const wdTop = windTop, wdBase = windBottom, wdMid = (wdTop + wdBase) / 2;
+                    // a row of speed readings across the top of the panel;
+                    // the line plots beneath it
+                    const readingY = wdTop + 13, plotTop = wdTop + 24;
+                    let windSummary = '';
                     if (windState === 'loading') {
                         lane.append("line").attr("class", "wind-loading")
                             .attr("x1", 0).attr("x2", width)
@@ -746,66 +741,97 @@
                         lane.append("text").attr("class", "wind-loading")
                             .attr("x", width / 2).attr("y", wdMid - 8)
                             .attr("text-anchor", 'middle')
-                            .attr("fill", CHART.wind).attr("font-size", 9)
+                            .attr("fill", CHART.wind)
                             .text('loading wind…');
                     } else if (!windDayPts.length) {
                         lane.append("text")
-                            .attr("x", width / 2).attr("y", wdMid)
+                            .attr("x", width / 2).attr("y", wdMid + 3)
                             .attr("text-anchor", 'middle')
-                            .attr("fill", CHART.label).attr("font-size", 9)
+                            .attr("fill", CHART.label)
                             .text('no wind data for this day');
                     } else {
-                        const maxMph = d3.max(windDayPts, w => w.s) * 2.237;
-                        const yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 5)]).range([wdBase, wdTop]);
+                        const mph = w => w.s * 2.237;
+                        const maxMph = d3.max(windDayPts, mph);
+                        const yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.1, 10)]).nice(4).range([wdBase, plotTop]);
+                        // mph axis with gridlines, like the swell panel
+                        for (const t of yw.ticks(3)) {
+                            if (t > 0) {
+                                lane.append("line")
+                                    .attr("x1", 0).attr("x2", width)
+                                    .attr("y1", yw(t)).attr("y2", yw(t))
+                                    .attr("stroke", CHART.grid);
+                            }
+                            lane.append("text").attr("class", "axis-label")
+                                .attr("x", -8).attr("y", yw(t)).attr("dy", '0.32em')
+                                .attr("text-anchor", 'end')
+                                .attr("fill", CHART.axis)
+                                .text(t);
+                        }
                         lane.append("path").datum(windDayPts)
-                            .attr("fill", 'none').attr("stroke", CHART.wind).attr("stroke-width", 1.5)
-                            .attr("d", d3.line().x(w => x(w.hour)).y(w => yw(w.s * 2.237)).curve(d3.curveMonotoneX));
-                        // an arrow per sample carries the direction; the peak
-                        // is the one labeled point
+                            .attr("fill", 'none').attr("stroke", CHART.wind).attr("stroke-width", 1.75)
+                            .attr("d", d3.line().x(w => x(w.hour)).y(w => yw(mph(w))).curve(d3.curveMonotoneX));
+                        // each model sample gets a direction arrow on the line
+                        // and its speed in the reading row; the interpolated
+                        // day-edge points only extend the line
                         const windPeak = windDayPts.reduce((a, b) => (b.s > a.s ? b : a));
-                        for (const w of windDayPts) {
+                        const samples = windDayPts.filter(p => !p.pad);
+                        // thin arrows and readings so they never crowd on
+                        // narrow screens; the peak reading is always shown
+                        const stride = minPx => {
+                            const gap = samples.length > 1 ? x(samples[1].hour) - x(samples[0].hour) : width;
+                            return Math.max(1, Math.ceil(minPx / Math.max(gap, 1)));
+                        };
+                        const arrowEvery = stride(16), readingEvery = stride(30);
+                        samples.forEach((w, i) => {
+                            if (i % arrowEvery && w !== windPeak) return;
                             const g = lane.append("g")
-                                .attr("transform", `translate(${x(w.hour)}, ${yw(w.s * 2.237)})`);
+                                .attr("transform", `translate(${x(w.hour)}, ${yw(mph(w))})`);
                             g.append("circle").attr("r", 2).attr("fill", CHART.wind);
                             g.append("path")
                                 .attr("d", 'M0 -9 L2.6 -4.4 L1 -4.4 L1 2 L-1 2 L-1 -4.4 L-2.6 -4.4 Z')
                                 .attr("fill", CHART.wind)
                                 .attr("transform", `rotate(${w.d + 180}) translate(0, -7)`)
                                 .attr("opacity", 0.9);
-                            if (w === windPeak) {
-                                lane.append("text")
-                                    .attr("x", Math.max(16, Math.min(width - 16, x(w.hour))))
-                                    .attr("y", Math.max(yw(w.s * 2.237) - 14, wdTop - 2))
-                                    .attr("text-anchor", 'middle')
-                                    .attr("fill", CHART.wind).attr("font-size", 9)
-                                    .text(`${(w.s * 2.237).toFixed(0)} mph`);
-                            }
-                        }
+                            if (w !== windPeak && (i % readingEvery || Math.abs(x(w.hour) - x(windPeak.hour)) < 30)) return;
+                            lane.append("text").attr("class", "wind-reading")
+                                .attr("x", Math.max(8, Math.min(width - 8, x(w.hour))))
+                                .attr("y", readingY)
+                                .attr("text-anchor", 'middle')
+                                .attr("fill", CHART.wind)
+                                .attr("font-weight", w === windPeak ? 700 : 400)
+                                .text(mph(w).toFixed(0));
+                        });
+                        windSummary = `Peak ${mph(windPeak).toFixed(0)} mph ${cardinal(windPeak.d)} at ${fmtHour(windPeak.hour)}`;
                     }
+                    panelTitle(wdTop, 'WIND (MPH)', windSummary, CHART.wind);
                 }
 
-                // surf-condition lane: hourly rating bars under the wind
-                // lane, sharing the x axis with everything above
+                // surf-condition panel: hourly score bars on the 0-100
+                // scale, with the rating bands marked on the axis
                 if (condDayPts.length) {
                     const lane = svg.append("g").attr("class", "cond-lane");
-                    const cdTop = windBottom + condGap, cdBase = chartBottom;
-                    lane.append("line")
-                        .attr("x1", 0).attr("x2", width)
-                        .attr("y1", windBottom).attr("y2", windBottom)
-                        .attr("stroke", CHART.grid);
+                    const cdTop = condTop, cdBase = chartBottom;
                     const dayBest = condDayPts.reduce((a, b) => (b.score > a.score ? b : a));
-                    lane.append("text")
-                        .attr("x", 0).attr("y", windBottom + 13)
-                        .attr("fill", CHART.label).attr("font-size", 9)
-                        .text('SURF CONDITIONS');
-                    lane.append("text")
-                        .attr("x", width).attr("y", windBottom + 13)
-                        .attr("text-anchor", 'end')
-                        .attr("fill", CONDITION_COLORS[dayBest.rating]).attr("font-size", 9)
-                        .attr("font-weight", 600)
-                        .text(`BEST ${String(dayBest.hour).padStart(2, '0')}:00 · ${dayBest.rating.toUpperCase()}`);
+                    panelTitle(cdTop, 'SURF CONDITIONS (SCORE)',
+                        `Best ${fmtHour(dayBest.hour)} · ${dayBest.rating.toUpperCase()}`,
+                        CONDITION_COLORS[dayBest.rating]);
                     const yc = d3.scaleLinear().domain([0, 100]).range([cdBase, cdTop]);
-                    // bars center on their hour like the lanes above; the
+                    for (const [rating, lo, hi] of COND_BANDS) {
+                        if (lo > 0) {
+                            lane.append("line")
+                                .attr("x1", 0).attr("x2", width)
+                                .attr("y1", yc(lo)).attr("y2", yc(lo))
+                                .attr("stroke", CHART.gridStrong)
+                                .attr("stroke-dasharray", '3,3');
+                        }
+                        lane.append("text").attr("class", "axis-label")
+                            .attr("x", -8).attr("y", yc((lo + hi) / 2)).attr("dy", '0.32em')
+                            .attr("text-anchor", 'end')
+                            .attr("fill", CONDITION_COLORS[rating])
+                            .attr("font-weight", 600)
+                            .text(rating.toUpperCase());
+                    }
+                    // bars center on their hour like the panels above; the
                     // first and last are cropped at the plot edge (a half
                     // bar) rather than shifted into their neighbor
                     const bw = Math.max(2, x(1) - x(0) - 3);
@@ -831,7 +857,7 @@
                     verticalLine.attr("x1", mouseX).attr("x2", mouseX).style("opacity", 1);
                     const hoverDate = x.invert(mouseX);
                     const closestData = data.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
-                    const formattedHour = `${closestData.hour.toString().padStart(2, '0')}:00`;
+                    const formattedHour = fmtHour(closestData.hour);
                     const createArrowHTML = (direction, color) => `<span class="detail-tooltip-arrow" style="color: ${color}; transform: rotate(${travelBearing(direction)}deg);">&#8593;</span>`;
                     const detailTooltipRow = (label, color, value) => `
                         <div class="forecast-tooltip-row detail-tooltip-row" style="--tooltip-color: ${color};">
@@ -985,14 +1011,9 @@
             background: var(--raised);
             border: 1px solid var(--line);
         }
-        .swell-detail-heading, #day-summary { font-family: var(--font-mono); }
-        .swell-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-family: var(--font-mono); font-size: 9px; }
-        .swell-legend span { display: inline-flex; align-items: center; gap: 5px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
-        .swell-legend i { width: 9px; height: 2px; flex: none; background: currentColor; }
-        /* the day log line: the popup's one loud element */
+        /* the selected day: the detail card's one loud element */
         #date-header { font-size: 15px; font-weight: 600; color: #fff; }
         #date-header .hdr-date { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--text-2); margin-left: 4px; }
-        #day-summary { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-2); }
         #chart-container { width: 100%; min-width: 0; }
         #chart, #chart svg { display: block; width: 100%; }
         /* The svg can be CSS-stretched from its drawn size; keep hairlines
@@ -1001,7 +1022,10 @@
             shape-rendering: crispEdges;
             vector-effect: non-scaling-stroke;
         }
-        #chart text { font-family: var(--font-mono); font-size: 9px; }
+        #chart text { font-family: var(--font-mono); font-size: 10px; }
+        #chart .panel-title { font-size: 10px; font-weight: 600; letter-spacing: .04em; }
+        #chart .panel-summary { font-size: 10px; font-weight: 600; }
+        #chart .plot-bg, #chart .hour-grid { shape-rendering: crispEdges; }
         /* pulse for the wind lane's loading placeholder */
         .wind-loading { animation: windPulse 1.4s ease-in-out infinite; }
         @keyframes windPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.85; } }
@@ -1049,17 +1073,9 @@
     </div>
     <div id="forecastContainer"></div>
     <div class="swell-detail">
-        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
-            <div class="swell-detail-heading text-[10px] font-semibold uppercase tracking-wide text-[#a6aab2]">Hourly swell · height &amp; direction</div>
-            <!-- Key for the four swell trains; only the trains present in the
-                 selected day are listed, so it never claims data that is not
-                 on the chart. -->
-            <div id="swellLegend" class="swell-legend" aria-label="Chart series key"></div>
-        </div>
-        <!-- log line: the selected day, then that day at a glance -->
-        <div class="flex flex-wrap items-baseline justify-between gap-x-4 px-1 mt-2 mb-1">
+        <!-- the selected day -->
+        <div class="px-1 mb-1">
             <div id="date-header"></div>
-            <div id="day-summary"></div>
         </div>
         <!-- Hourly swell on top, surface wind (wave-model grid) beneath,
              drawn in one svg so the lanes share an x axis and crosshair -->

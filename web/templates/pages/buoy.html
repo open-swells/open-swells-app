@@ -17,7 +17,7 @@
         <link rel="stylesheet" href="/assets/theme.css">
         <style>
             body { background: var(--bg) !important; }
-            #chart-container { border: 1px solid var(--line); background: var(--raised); overflow-x: auto; padding-top: 8px; }
+            #chart-container { overflow-x: auto; padding-top: 8px; }
             #tooltip { border-radius: 4px !important; background: var(--panel) !important; border-color: var(--line-strong) !important; }
             .popup-only { display: none; }
             body.embedded .popup-only { display: inline-flex; }
@@ -44,16 +44,6 @@
 
         <div class="flex items-center justify-between gap-3 mb-2">
             <div class="section-label">Current report</div>
-            {{if gt (len .ForecastSummary) 0}}
-                {{$current := index .ForecastSummary 0}}
-                <div class="flex items-center gap-2">
-                    <span class="text-[10px] text-[#8b9099]">Current outlook</span>
-                    <span data-current-outlook class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide border"
-                          style="color: {{template "condcolor" $current.Condition}}; border-color: currentColor; background: color-mix(in srgb, currentColor 12%, transparent);">
-                        {{$current.Condition}}
-                    </span>
-                </div>
-            {{end}}
         </div>
         <div class="current-report">{{template "report" .}}</div>
         {{if .HasForecastError}}
