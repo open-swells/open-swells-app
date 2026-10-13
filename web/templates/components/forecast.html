@@ -707,8 +707,7 @@
                     const pk = data.reduce((a, b) => (+b.PrimaryWaveHeight > +a.PrimaryWaveHeight ? b : a));
                     swellSummary = `Peak primary ${(pk.PrimaryWaveHeight * 3.28084).toFixed(1)} ft @ ${pk.PrimaryPeriod}s ${cardinal(pk.PrimaryDegrees)} at ${fmtHour(pk.hour)}`;
                 }
-                const arrowNote = width >= 560 ? ' · ARROWS POINT WHERE IT IS HEADING' : '';
-                panelTitle(0, `${surfDayPts.length ? 'SURF & SWELL HEIGHT (FT)' : 'SWELL HEIGHT (FT)'}${arrowNote}`, swellSummary);
+                panelTitle(0, surfDayPts.length ? 'SURF & SWELL HEIGHT (FT)' : 'SWELL HEIGHT (FT)', swellSummary);
 
                 const linePrimary = d3.line().x(d => x(d.hour)).y(d => y(d.PrimaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
                 const lineSecondary = d3.line().x(d => x(d.hour)).y(d => y(d.SecondaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
@@ -824,7 +823,7 @@
                         });
                         windSummary = `Peak ${mph(windPeak).toFixed(0)} mph ${cardinal(windPeak.d)} at ${fmtHour(windPeak.hour)}`;
                     }
-                    panelTitle(wdTop, `WIND (MPH)${arrowNote}`, windSummary, CHART.wind);
+                    panelTitle(wdTop, 'WIND (MPH)', windSummary, CHART.wind);
                 }
 
                 // surf-condition panel: hourly score bars on the 0-100
