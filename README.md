@@ -126,6 +126,13 @@ results for a few spots without writing anything.
   48 hours of observed water levels, in meters relative to MLLW and UTC.
   Set `TIDE_STATIONS` to comma-separated CO-OPS station IDs to generate it,
   for example `TIDE_STATIONS=9410230,9410840`.
+- `spot_tides.json.gz` — predicted highs and lows (meters MLLW, UTC) at the
+  NOAA CO-OPS station nearest each spot within 50 km, plus hourly
+  predictions for reference stations, for the tide panel on spot pages.
+  A spot's `tide_station` in `spots.json` overrides the nearest station.
+  CO-OPS rate-limits bursts, so stations fetched earlier the same UTC day
+  are reused from `TIDE_CACHE_DIR` (default `~/.cache/openswells-tides`);
+  a failed fetch keeps the server's previous file (`P` in publish.rules).
   also drives the app's hover readout.
 
 See `../webgl-swell-rendering.md` for the possible next step (client-side

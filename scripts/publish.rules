@@ -5,9 +5,13 @@
 # behind under the same name. Everything else in the destination is
 # excluded and therefore untouched: metadata.json (copied separately, last)
 # and any .gz siblings the web app generates there.
+# Tide predictions are astronomical, so a run whose tide fetch failed keeps
+# the previous spot_tides file rather than deleting it (P: never delete).
+P spot_tides.json.gz
 + *.geojson
 + *.geojson.gz
 + *.png
 + tides.json
 + spot_forecasts.json.gz
++ spot_tides.json.gz
 - *

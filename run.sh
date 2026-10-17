@@ -68,6 +68,9 @@ copy_files_locally() {
     if [ -f "$source_path/spot_forecasts.json.gz" ]; then
         contour_files+=("$source_path/spot_forecasts.json.gz")
     fi
+    if [ -f "$source_path/spot_tides.json.gz" ]; then
+        contour_files+=("$source_path/spot_tides.json.gz")
+    fi
 
     if [ ${#contour_files[@]} -gt 0 ]; then
         # Same sync as grib_copy_to_server.sh: --delete through publish.rules

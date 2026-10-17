@@ -50,6 +50,9 @@ fi
 if [ -f "$SOURCE_PATH/spot_forecasts.json.gz" ]; then
     contour_files+=("$SOURCE_PATH/spot_forecasts.json.gz")
 fi
+if [ -f "$SOURCE_PATH/spot_tides.json.gz" ]; then
+    contour_files+=("$SOURCE_PATH/spot_tides.json.gz")
+fi
 
 if [ ${#contour_files[@]} -gt 0 ]; then
     # Sync the directory through publish.rules: --delete removes products

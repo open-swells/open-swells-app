@@ -29,7 +29,7 @@ from scipy.ndimage import gaussian_filter
 from composite import composite_swell, composite_wind
 from nwps import process_nwps_domains
 from spot_forecasts import load_spots, sample_spots, write_spot_forecasts
-from tides import write_tides
+from tides import DEFAULT_TIDE_CACHE_DIR, SPOT_TIDES_NAME, write_spot_tides, write_tides
 from wind import extract_wind, write_wind_arrows
 
 logger = logging.getLogger("GFSWaveContours")
@@ -1008,6 +1008,22 @@ def main() -> None:
                 os.remove(tide_path)
             except FileNotFoundError:
                 pass
+
+        # High/low tides at the station nearest each spot, for the spot
+        # pages' tide chart. Predictions are astronomical, so when this
+        # fails publish.rules keeps the previous run's file on the server.
+        if spot_ids:
+            try:
+                write_spot_tides(
+                    session,
+                    spots_path,
+                    os.path.join(files_dir, SPOT_TIDES_NAME),
+                    cache_path=os.path.join(
+                        os.environ.get("TIDE_CACHE_DIR") or DEFAULT_TIDE_CACHE_DIR, SPOT_TIDES_NAME
+                    ),
+                )
+            except Exception as exc:
+                logger.error("Writing spot tides failed: %s", exc, exc_info=True)
 
         # Metadata is written last (and copied to the server last) so the
         # frontend never sees a run announced before its contours exist.
