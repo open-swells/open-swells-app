@@ -245,6 +245,14 @@
                 window.SPOT_CONDITIONS = {{json .Conditions}};
             </script>
             {{end}}
+            {{if .HasTide}}
+            <script>
+                // Predicted highs and lows (t = epoch ms UTC, v = meters
+                // MLLW) at the NOAA CO-OPS station nearest the spot. The
+                // forecast component draws the curve between them.
+                window.SPOT_TIDES = {{json .Tide}};
+            </script>
+            {{end}}
             {{template "forecast" .}}
             {{template "favoritecontrol" .}}
         {{else}}

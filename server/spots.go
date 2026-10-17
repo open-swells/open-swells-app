@@ -1016,6 +1016,8 @@ type SpotPageData struct {
 	Latitude        float64
 	Longitude       float64
 	NearbySpots     []NearbySpot
+	Tide            SpotTide
+	HasTide         bool
 }
 
 // facingLabel renders a facing bearing as "SW 225°" for the page header.
@@ -1047,6 +1049,13 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 		// The NWS surf zone report is matched on the spot itself (not the
 		// offshore sample point): zones cover the coastal strip.
 		zone, hasZone := zones.ZoneForPoint(spot.Lat, spot.Lon)
+		var tide SpotTide
+		hasTide := false
+		if rows := forecastData.Forecast; len(rows) > 0 {
+			// a day either side covers local midnight in every time zone
+			tide, hasTide = spotTide(staticDir, spot.ID,
+				rows[0].Time.Add(-24*time.Hour), rows[len(rows)-1].Time.Add(24*time.Hour))
+		}
 		seo := spotSEOPage(siteURL, spotStore, spot)
 		data := SpotPageData{
 			SEO:             seo,
@@ -1068,6 +1077,8 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 			Latitude:        spot.Lat,
 			Longitude:       spot.Lon,
 			NearbySpots:     spotStore.Nearby(spot, 6),
+			Tide:            tide,
+			HasTide:         hasTide,
 		}
 		renderTemplate(c, tmpl, "spot.html", data)
 	}

@@ -16,6 +16,7 @@
                 lineWindSea: themeColor('--wind-sea', '#b98ad6'),
                 surf: themeColor('--surf', '#3b82f6'),
                 wind: themeColor('--wind', '#eec37c'),
+                tide: themeColor('--tide', '#2ec2c2'),
                 axis: themeColor('--text-3', '#8b9099'),
                 grid: themeColor('--line', '#2f3137'),
                 gridStrong: themeColor('--line-strong', '#43454c'),
@@ -127,6 +128,39 @@
                 }
             }
             loadWindForecast();
+
+            // --- Tide ------------------------------------------------------
+            // Predicted highs and lows at the nearest NOAA CO-OPS station,
+            // injected by the spot page (buoy pages have none). Most coastal
+            // stations are subordinate stations that NOAA only predicts as
+            // highs and lows; between those the curve is a half cosine, the
+            // same shape NOAA draws for them. Reference stations also send
+            // hourly predictions, which the curve follows instead.
+            const TIDE = window.SPOT_TIDES || null;
+            const tideEvents = TIDE && TIDE.events
+                ? TIDE.events.map(e => ({ t: e.t, ft: e.v * 3.28084, high: e.high }))
+                : [];
+            const tideHourly = TIDE && TIDE.hourly
+                ? TIDE.hourly.v.map((v, i) => ({ t: TIDE.hourly.start + i * 3600e3, ft: v * 3.28084 }))
+                : [];
+            // one y range for every day, so day-to-day tides compare at a glance
+            const tideExtent = tideEvents.length > 1
+                ? d3.extent([...tideEvents, ...tideHourly], e => e.ft)
+                : null;
+
+            // tide height (ft) and direction at an arbitrary moment (null
+            // outside the predicted range)
+            function tideAtTime(tMs) {
+                const pts = tideHourly.length > 1 ? tideHourly : tideEvents;
+                if (pts.length < 2) return null;
+                if (tMs < pts[0].t || tMs > pts[pts.length - 1].t) return null;
+                const i = Math.max(1, pts.findIndex(e => e.t >= tMs));
+                const a = pts[i - 1], b = pts[i];
+                const f = (tMs - a.t) / (b.t - a.t);
+                // hourly values are close enough together to blend linearly
+                const shape = pts === tideHourly ? f : (1 - Math.cos(Math.PI * f)) / 2;
+                return { ft: a.ft + (b.ft - a.ft) * shape, rising: b.ft > a.ft };
+            }
 
             function convertToDate(data, date) {
                 if (!data.length) return data;
@@ -533,7 +567,7 @@
                 height = 180;
 
             // vertical space between panels; holds the next panel's title
-            const panelGap = 36, windLaneH = 100, condLaneH = 68;
+            const panelGap = 36, windLaneH = 100, tideLaneH = 110, condLaneH = 68;
             // hour labels: 12am, 3am, ... 9pm
             const fmtHour = h => {
                 const hh = Math.round(h) % 24;
@@ -597,6 +631,7 @@
                 svg.selectAll(".vertical-line").remove();
                 svg.selectAll(".overlay").remove();
                 svg.selectAll(".wind-lane").remove();
+                svg.selectAll(".tide-lane").remove();
                 svg.selectAll(".cond-lane").remove();
 
                 // wind samples for the selected day, as fractional hours so
@@ -641,8 +676,36 @@
                         .map(c => ({ ...c, hour: localHour(c.t) }))
                         .filter(c => c.hour <= 23);
                 }
-                const condTop = windBottom + panelGap;
-                const chartBottom = condDayPts.length ? condTop + condLaneH : windBottom;
+                // tide curve for the selected day as fractional hours: the
+                // hourly predictions where the station has them, else
+                // 10-minute steps along the curve between events. Highs and
+                // lows that fall in the day get labeled markers.
+                let tideDayPts = [], tideDayEvents = [];
+                if (tideExtent && currentDate) {
+                    const { start: tideDayStart, end: tideDayEnd } = localDayBounds(currentDate);
+                    const step = tideHourly.length > 1 ? 3600e3 : 600e3;
+                    for (let t = tideDayStart.getTime(); t < tideDayEnd.getTime(); t += step) {
+                        const hour = localHour(new Date(t));
+                        // the repeated hour of a DST fall-back day would
+                        // run the line backwards
+                        if (hour > 23 || (tideDayPts.length && hour <= tideDayPts[tideDayPts.length - 1].hour)) continue;
+                        const tide = tideAtTime(t);
+                        if (tide) tideDayPts.push({ hour, ft: tide.ft });
+                    }
+                    tideDayEvents = tideEvents
+                        .filter(e => e.t >= tideDayStart.getTime() && e.t < tideDayEnd.getTime())
+                        .map(e => ({ ...e, hour: localHour(new Date(e.t)) }))
+                        .filter(e => e.hour <= 23);
+                    if (tideDayPts.length < 2) tideDayPts = [];
+                }
+                // the panel stays on a day past the predictions so the
+                // chart keeps its shape, with a note instead of a curve
+                const showTide = !!tideExtent;
+                const tideTop = windBottom + panelGap;
+                const tideBottom = showTide ? tideTop + tideLaneH : windBottom;
+
+                const condTop = tideBottom + panelGap;
+                const chartBottom = condDayPts.length ? condTop + condLaneH : tideBottom;
                 d3.select(svg.node().ownerSVGElement)
                     .attr("width", width + margin.left + margin.right)
                     .attr("height", chartBottom + margin.top + margin.bottom)
@@ -671,6 +734,7 @@
                 const chrome = svg.insert("g", ":first-child").attr("class", "panel-chrome");
                 const panels = [[0, height]];
                 if (showWind) panels.push([windTop, windBottom]);
+                if (showTide) panels.push([tideTop, tideBottom]);
                 if (condDayPts.length) panels.push([condTop, chartBottom]);
                 for (const [top, bottom] of panels) {
                     chrome.append("rect").attr("class", "plot-bg")
@@ -826,6 +890,65 @@
                     panelTitle(wdTop, 'WIND (MPH)', windSummary, CHART.wind);
                 }
 
+                // tide panel: the day's curve on a fixed range, highs
+                // labeled above their marker and lows below
+                if (showTide) {
+                    const lane = svg.append("g").attr("class", "tide-lane");
+                    const tdTop = tideTop, tdBase = tideBottom;
+                    // room inside the frame for the event labels
+                    // the data's own range (not niced: rounding out to the
+                    // next 5 ft flattens a 6 ft tide)
+                    const yt = d3.scaleLinear()
+                        .domain(tideExtent)
+                        .range([tdBase - 18, tdTop + 20]);
+                    const ftLabel = v => `${v.toFixed(1)} ft`;
+                    const station = TIDE.name && TIDE.name.length > 30 ? `${TIDE.name.slice(0, 29)}…` : (TIDE.name || TIDE.station);
+                    panelTitle(tdTop, 'TIDE (FT, MLLW)', `${station} · ${TIDE.km.toFixed(0)} km`, CHART.axis);
+                    for (const t of yt.ticks(4)) {
+                        lane.append("line")
+                            .attr("x1", 0).attr("x2", width)
+                            .attr("y1", yt(t)).attr("y2", yt(t))
+                            .attr("stroke", t === 0 ? CHART.gridStrong : CHART.grid)
+                            .attr("stroke-dasharray", t === 0 ? '3,3' : null);
+                        lane.append("text").attr("class", "axis-label")
+                            .attr("x", -8).attr("y", yt(t)).attr("dy", '0.32em')
+                            .attr("text-anchor", 'end')
+                            .attr("fill", CHART.axis)
+                            .text(t);
+                    }
+                    if (!tideDayPts.length) {
+                        lane.append("text")
+                            .attr("x", width / 2).attr("y", (tdTop + tdBase) / 2 + 3)
+                            .attr("text-anchor", 'middle')
+                            .attr("fill", CHART.label)
+                            .text('no tide predictions for this day');
+                    } else {
+                        lane.append("path").datum(tideDayPts)
+                            .attr("fill", CHART.tide).attr("fill-opacity", 0.12)
+                            .attr("d", d3.area().x(p => x(p.hour)).y0(tdBase).y1(p => yt(p.ft)).curve(d3.curveMonotoneX));
+                        lane.append("path").datum(tideDayPts)
+                            .attr("fill", 'none').attr("stroke", CHART.tide).attr("stroke-width", 1.75)
+                            .attr("d", d3.line().x(p => x(p.hour)).y(p => yt(p.ft)).curve(d3.curveMonotoneX));
+                        for (const e of tideDayEvents) {
+                            const ex = x(e.hour), ey = yt(e.ft);
+                            lane.append("circle")
+                                .attr("cx", ex).attr("cy", ey).attr("r", 2.5)
+                                .attr("fill", CHART.tide)
+                                .attr("stroke", themeColor('--panel', '#17181b')).attr("stroke-width", 1);
+                            const when = new Date(e.t);
+                            const hh = when.getHours(), mm = String(when.getMinutes()).padStart(2, '0');
+                            lane.append("text").attr("class", "tide-reading")
+                                // half a label's width from either edge
+                                .attr("x", Math.max(46, Math.min(width - 46, ex)))
+                                .attr("y", e.high ? ey - 7 : ey + 14)
+                                .attr("text-anchor", 'middle')
+                                .attr("fill", CHART.tide)
+                                .attr("font-weight", e.high ? 600 : 400)
+                                .text(`${ftLabel(e.ft)} ${hh % 12 || 12}:${mm}${hh < 12 ? 'am' : 'pm'}`);
+                        }
+                    }
+                }
+
                 // surf-condition panel: hourly score bars on the 0-100
                 // scale, with the rating bands marked on the axis
                 if (condDayPts.length) {
@@ -894,6 +1017,15 @@
                             `${createArrowHTML(w.d, CHART.wind)}${(w.s * 2.237).toFixed(0)} mph · ${cardinal(w.d)}`
                         );
                     }
+                    let tideRow = '';
+                    const tide = tideDayPts.length ? tideAtTime(closestData.dateObj.getTime()) : null;
+                    if (tide) {
+                        tideRow = detailTooltipRow(
+                            'TIDE',
+                            CHART.tide,
+                            `${tide.ft.toFixed(1)} ft · ${tide.rising ? 'rising' : 'falling'}`
+                        );
+                    }
                     let condRow = '';
                     if (condDayPts.length) {
                         const c = condDayPts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
@@ -920,7 +1052,7 @@
                         ))
                         .join('');
                     tooltip.style("visibility", "visible")
-                        .html(`<div class="forecast-tooltip-date">${formattedHour}</div>${swellRows}${windRow}${condRow}`);
+                        .html(`<div class="forecast-tooltip-date">${formattedHour}</div>${swellRows}${windRow}${tideRow}${condRow}`);
                     // flip to the cursor's left when the tooltip would be
                     // squeezed against the right edge (measure after setting
                     // content so the width is the natural, unwrapped one)
@@ -1097,8 +1229,9 @@
         <div class="px-1 mb-1">
             <div id="date-header"></div>
         </div>
-        <!-- Hourly swell on top, surface wind (wave-model grid) beneath,
-             drawn in one svg so the lanes share an x axis and crosshair -->
+        <!-- Hourly swell on top, then surface wind (wave-model grid), tide
+             (spot pages near a NOAA station) and surf conditions, drawn in
+             one svg so the lanes share an x axis and crosshair -->
         <div id="chart-container">
             <div id="chart"></div>
         </div>
