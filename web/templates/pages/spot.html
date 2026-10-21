@@ -152,8 +152,30 @@
                 .condition-rating { color: var(--condition-color); font-size: 16px; font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
                 .condition-height { color: #fff; font-size: 14px; font-weight: 600; }
                 .condition-summary-sub { margin-top: 3px; color: var(--text-2); font-size: 10px; }
+                /* Exposure dial: a top-down zoom on the beach. Land is solid,
+                   the outlined lobe is how much swell height gets in from
+                   each direction, and the arrows are the current swells. */
+                .report-cards.has-exposure { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+                .exposure-card .report-row { margin-top: -4px; }
+                .exposure-dial { width: 56px; height: 56px; }
+                .exposure-dial .ring { fill: color-mix(in srgb, var(--swell) 8%, var(--bg)); }
+                .exposure-dial .land { fill: color-mix(in srgb, var(--kind-beach) 26%, var(--raised)); stroke: color-mix(in srgb, var(--kind-beach) 55%, transparent); stroke-width: .5; }
+                .exposure-dial .accept { fill: color-mix(in srgb, var(--text-1) 14%, transparent); stroke: var(--text-1); stroke-width: .8; stroke-linejoin: round; }
+                .exposure-dial .beach { fill: var(--kind-beach); }
+                .exposure-dial .swell-ray { stroke-width: 1.2; transform-box: view-box; transform-origin: 50% 50%; }
+                .exposure-dial .swell-ray path { stroke: none; }
+                .exposure-dial .ray-primary { stroke: var(--swell); fill: var(--swell); }
+                .exposure-dial .ray-secondary { stroke: var(--swell-2); fill: var(--swell-2); }
+                .exposure-key-primary { color: var(--swell); }
+                .exposure-key-secondary { color: var(--swell-2); }
+                .exposure-card .report-value .sub + .sub { margin-top: 1px; }
+                @media (max-width: 719px) {
+                    .exposure-dial { width: 48px; height: 48px; }
+                    .report-cards.has-exposure { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+                    .exposure-card { grid-column: 1 / -1; }
+                }
             </style>
-            <div class="report-cards">
+            <div class="report-cards{{if .HasExposure}} has-exposure{{end}}">
                 {{if gt (len .ForecastSummary) 0}}
                 {{$current := index .ForecastSummary 0}}
                 <div class="report-card condition-card" data-current-condition-card
@@ -233,6 +255,29 @@
                         {{end}}
                     </div>
                 </div>
+
+                {{if .HasExposure}}
+                {{$e := .Exposure}}
+                <div class="report-card exposure-card" title="Faces {{$e.Facing}}. Accepts swell from {{$e.Accepts}}; swell from farther around is cut by land and by how obliquely it meets the beach.">
+                    <h2>Swell exposure</h2>
+                    <div class="report-row">
+                        <svg class="compass exposure-dial" viewBox="0 0 40 40" role="img" aria-label="Beach faces {{$e.Facing}}, accepts swell from {{$e.Accepts}}">
+                            <circle class="ring" cx="20" cy="20" r="17"/>
+                            {{if $e.LandPath}}<path class="land" d="{{$e.LandPath}}"/>{{end}}
+                            <path class="accept" d="{{$e.AcceptPath}}"/>
+                            <text x="20" y="2.4" text-anchor="middle" font-size="3" fill="var(--text-3)" font-family="var(--font-mono)">N</text>
+                            {{if $e.Secondary.Has}}<g class="swell-ray ray-secondary" style="transform: rotate({{$e.Secondary.Deg}}deg);"><line x1="20" y1="6.5" x2="20" y2="15"/><path d="M17.6 3 L22.4 3 L20 7 Z"/></g>{{end}}
+                            {{if $e.Primary.Has}}<g class="swell-ray ray-primary" style="transform: rotate({{$e.Primary.Deg}}deg);"><line x1="20" y1="6.5" x2="20" y2="15"/><path d="M17.6 3 L22.4 3 L20 7 Z"/></g>{{end}}
+                            <circle class="beach" cx="20" cy="20" r="1.8"/>
+                        </svg>
+                        <div class="report-value">
+                            <div class="main">Faces {{$e.Facing}}</div>
+                            <div class="sub">Accepts {{$e.Accepts}}</div>
+                            {{if $e.Primary.Has}}<div class="sub"><span class="exposure-key-primary">&#9650;</span> {{$e.Primary.Pct}}% in{{if $e.Secondary.Has}} &middot; <span class="exposure-key-secondary">&#9650;</span> {{$e.Secondary.Pct}}% in{{end}}</div>{{end}}
+                        </div>
+                    </div>
+                </div>
+                {{end}}
             </div>
             {{end}}
             {{if .HasConditions}}
