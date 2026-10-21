@@ -1029,6 +1029,16 @@ func facingLabel(deg float64) string {
 	return fmt.Sprintf("%s %.0f°", cardinals[idx], deg)
 }
 
+// bearingLabel is facingLabel for a model direction string ("195" -> "SSW
+// 195°"), empty when it is not a number.
+func bearingLabel(deg string) string {
+	d, err := strconv.ParseFloat(deg, 64)
+	if err != nil {
+		return ""
+	}
+	return facingLabel(d)
+}
+
 func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneStore, siteURL string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		spot, ok := spotStore.Get(c.Param("slug"))
@@ -1044,7 +1054,12 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 		}
 		summary := generateForecastSummary(forecastData)
 		applyConditionSummary(summary, conditions)
-		exposure, hasExposure := spotExposure(spotBeach(staticDir, spot), report, hasReport)
+		b := spotBeach(staticDir, spot)
+		facing := ""
+		if b.HasFacing {
+			facing = facingLabel(b.Facing)
+		}
+		exposure, hasExposure := spotExposure(b, report, hasReport)
 		// The NWS surf zone report is matched on the spot itself (not the
 		// offshore sample point): zones cover the coastal strip.
 		zone, hasZone := zones.ZoneForPoint(spot.Lat, spot.Lon)
@@ -1070,7 +1085,7 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 			ForecastSummary: summary,
 			Conditions:      conditions,
 			HasConditions:   len(conditions) > 0,
-			Facing:          exposure.Facing,
+			Facing:          facing,
 			Exposure:        exposure,
 			HasExposure:     hasExposure,
 			PageHeading:     seo.OpenGraphTitle,

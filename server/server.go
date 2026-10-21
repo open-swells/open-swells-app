@@ -792,6 +792,7 @@ func loadTemplates(templateDir string) *template.Template {
 		"json":        jsonForTemplate,
 		"ripcolor":    ripRiskColor,
 		"formatcount": formatCount,
+		"bearing":     bearingLabel,
 		// NWS remark fields are often a literal "None." — not worth a row
 		"notnone": func(s string) bool {
 			t := strings.ToLower(strings.TrimRight(strings.TrimSpace(s), "."))

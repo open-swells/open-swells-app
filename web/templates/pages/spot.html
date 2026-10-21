@@ -24,6 +24,10 @@
                 }
             }
         </script>
+        {{if .HasExposure}}
+        <script src="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js" defer></script>
+        <link href="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css" rel="stylesheet">
+        {{end}}
         <link rel="stylesheet" href="/assets/theme.css">
         <style>
             body { background: var(--bg) !important; }
@@ -134,151 +138,426 @@
         </div>
         {{end}}
         {{if .HasForecast}}
-            <div class="section-label mb-2 min-w-0">Current report {{if .HasReport}}<span class="normal-case font-normal tracking-normal text-[#8b9099]">&middot; model, valid <span data-local-time="{{.Report.ValidUnixMs}}">{{.Report.Valid}}</span></span>{{end}}</div>
+            <div class="section-label mb-2 min-w-0">Report {{if .HasReport}}<span class="normal-case font-normal tracking-normal text-[#8b9099]">&middot; model, valid <span data-local-time="{{.Report.ValidUnixMs}}">{{.Report.Valid}}</span></span>{{end}}</div>
             {{if .HasReport}}
             <style>
-                /* The condition card is the page's one loud element: it is the
-                   answer most visitors came for, so it gets the accent border,
-                   the tinted fill, and the largest type on the row. */
-                .report-cards { margin-bottom: 4px; }
-                .condition-card {
-                    border-color: var(--condition-color);
-                    background: color-mix(in srgb, var(--condition-color) 12%, var(--raised));
+                /* The report: three columns on the page background, split by
+                   hairlines. Left, now: the rating and surf height, then the
+                   swell, wind and tide as a property list. Middle, today:
+                   surf, tide, wind and rating lanes on one time axis. Right,
+                   the beach: its swell window and the swells arriving. */
+                .report { display: flex; flex-wrap: wrap; }
+                .report > section { min-width: 0; padding: 4px 24px; }
+                .report > section + section { border-left: 1px solid var(--line); }
+                .rp-now-col { flex: 0 0 340px; padding-left: 0 !important; }
+                .rp-today-col { flex: 1 1 0; }
+                .rp-map-col { flex: 0 0 auto; padding-right: 0 !important; }
+                .rp-label { margin: 0 0 10px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+
+                .rp-now { margin-bottom: 18px; }
+                .rp-rating { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--condition-color, var(--text-2)); }
+                .rp-height { margin-top: 2px; font-size: 34px; font-weight: 600; line-height: 1.1; letter-spacing: -.02em; color: #fff; font-variant-numeric: tabular-nums; }
+                .rp-sub { margin-top: 4px; font-size: 11px; color: var(--text-3); }
+
+                .rp-props { margin: 0; display: grid; gap: 10px; }
+                .rp-prop { display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; }
+                .rp-prop dt { font-size: 11px; color: var(--text-3); }
+                .rp-prop dd { margin: 0; display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+                .rp-prop .v { font-size: 13px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+                .rp-prop .m { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
+                .rp-arrow { flex: none; width: 14px; height: 14px; transform-origin: 50% 50%; }
+                .rp-prop dd > .m:first-child { margin-left: 20px; } /* no arrow: line up with the values that have one */
+                .rp-arrow path { fill: currentColor; }
+                .rp-arrow.primary { color: var(--swell); }
+                .rp-arrow.secondary { color: var(--swell-2); }
+                .rp-arrow.wind { color: var(--wind); }
+                .rp-arrow.wind-sea { color: var(--wind-sea); }
+                .rp-arrow.tide { color: var(--tide); }
+
+                .rp-today-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+                .rp-today-head .rp-label { margin: 0; white-space: nowrap; }
+                .today-readout { min-width: 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .today-readout b { font-weight: 600; color: var(--text-1); }
+                .today-chart svg { display: block; width: 100%; overflow: visible; }
+                .today-chart text { font-family: var(--font-mono); font-size: 9px; fill: var(--text-3); }
+                .today-chart .lane-label { text-transform: uppercase; letter-spacing: .05em; }
+                .today-chart .grid { stroke: var(--line); stroke-width: 1; }
+                .today-chart .surf-band { fill: color-mix(in srgb, var(--surf) 28%, transparent); }
+                .today-chart .surf-line { fill: none; stroke: var(--surf); stroke-width: 1.5; }
+                .today-chart .wind-bar { fill: color-mix(in srgb, var(--wind) 70%, transparent); }
+                .today-chart .wind-arrow { fill: var(--wind); }
+                .today-chart .tide-line { fill: none; stroke: var(--tide); stroke-width: 1.5; }
+                .today-chart .tide-turn { fill: var(--tide); }
+                .today-chart .tide-text { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+                .today-chart .peak { fill: var(--text-1); font-weight: 600; }
+                .today-chart .now-line { stroke: var(--accent-soft); stroke-width: 1; stroke-dasharray: 2 2; }
+                .today-chart .now-label { fill: var(--accent-soft); }
+                .today-chart .hover-line { stroke: #fff; stroke-opacity: .5; stroke-width: 1; }
+
+                .exposure-map { position: relative; width: 216px; aspect-ratio: 1; overflow: hidden; background: #d4dadc; border: 1px solid var(--line); }
+                .exposure-basemap { position: absolute; inset: 0; }
+                .exposure-arc { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+                .exposure-arc .open { fill: color-mix(in srgb, var(--swell) 28%, transparent); stroke: var(--swell); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+                .exposure-arc .beach { fill: var(--kind-beach); stroke: #111214; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+                .exposure-arc .swell-arrow { stroke: #fff; stroke-width: 1.5; stroke-linejoin: round; paint-order: stroke; vector-effect: non-scaling-stroke; }
+                .exposure-arc .swell-arrow.primary { fill: var(--swell); }
+                .exposure-arc .swell-arrow.secondary { fill: var(--swell-2); }
+                .exposure-map .maplibregl-ctrl-attrib { font-size: 9px; }
+
+                /* tablets: now and the map side by side, today beneath */
+                @media (max-width: 1023px) {
+                    .rp-now-col { flex: 1 1 0; }
+                    .rp-map-col { padding-right: 0 !important; }
+                    .rp-today-col { order: 3; flex-basis: 100%; margin-top: 20px; padding-inline: 0 !important; border-left: 0 !important; }
                 }
-                .condition-card:hover { border-color: var(--condition-color); }
-                .condition-card h2 { color: var(--condition-color); }
-                .condition-summary { min-height: 40px; display: flex; flex-direction: column; justify-content: center; }
-                .condition-summary-main { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
-                .condition-rating { color: var(--condition-color); font-size: 16px; font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
-                .condition-height { color: #fff; font-size: 14px; font-weight: 600; }
-                .condition-summary-sub { margin-top: 3px; color: var(--text-2); font-size: 10px; }
-                /* Exposure dial: a top-down zoom on the beach. Land is solid,
-                   the outlined lobe is how much swell height gets in from
-                   each direction, and the arrows are the current swells. */
-                .report-cards.has-exposure { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-                .exposure-card .report-row { margin-top: -4px; }
-                .exposure-dial { width: 56px; height: 56px; }
-                .exposure-dial .ring { fill: color-mix(in srgb, var(--swell) 8%, var(--bg)); }
-                .exposure-dial .land { fill: color-mix(in srgb, var(--kind-beach) 26%, var(--raised)); stroke: color-mix(in srgb, var(--kind-beach) 55%, transparent); stroke-width: .5; }
-                .exposure-dial .accept { fill: color-mix(in srgb, var(--text-1) 14%, transparent); stroke: var(--text-1); stroke-width: .8; stroke-linejoin: round; }
-                .exposure-dial .beach { fill: var(--kind-beach); }
-                .exposure-dial .swell-ray { stroke-width: 1.2; transform-box: view-box; transform-origin: 50% 50%; }
-                .exposure-dial .swell-ray path { stroke: none; }
-                .exposure-dial .ray-primary { stroke: var(--swell); fill: var(--swell); }
-                .exposure-dial .ray-secondary { stroke: var(--swell-2); fill: var(--swell-2); }
-                .exposure-key-primary { color: var(--swell); }
-                .exposure-key-secondary { color: var(--swell-2); }
-                .exposure-card .report-value .sub + .sub { margin-top: 1px; }
-                @media (max-width: 719px) {
-                    .exposure-dial { width: 48px; height: 48px; }
-                    .report-cards.has-exposure { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-                    .exposure-card { grid-column: 1 / -1; }
+                /* phones: the map shrinks to a thumbnail beside the
+                   headline, the property list and today run full width */
+                @media (max-width: 639px) {
+                    .report { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "now map" "props props" "today today"; column-gap: 16px; }
+                    .report > section { padding: 0 !important; border-left: 0 !important; }
+                    .rp-now-col { display: contents; }
+                    .rp-now { grid-area: now; align-self: center; margin-bottom: 16px; }
+                    .rp-props { grid-area: props; }
+                    .rp-map-col { grid-area: map; align-self: start; }
+                    .rp-today-col { grid-area: today; margin-top: 20px; }
+                    .exposure-map { width: 116px; }
+                    .exposure-map .maplibregl-ctrl-attrib { transform: scale(.7); transform-origin: 100% 100%; }
+                    .rp-height { font-size: 30px; }
                 }
             </style>
-            <div class="report-cards{{if .HasExposure}} has-exposure{{end}}">
-                {{if gt (len .ForecastSummary) 0}}
-                {{$current := index .ForecastSummary 0}}
-                <div class="report-card condition-card" data-current-condition-card
-                     style="--condition-color: {{template "condcolor" $current.Condition}};">
-                    <h2>Current conditions</h2>
-                    <div class="condition-summary">
-                        <div class="condition-summary-main">
-                            <span class="condition-rating" data-current-condition>{{$current.Condition}}</span>
-                            <span class="condition-height" data-current-height>{{$current.WaveHeight}}</span>
-                        </div>
-                        <div class="condition-summary-sub" data-current-height-label>{{if .HasConditions}}Surf height &middot; best of today{{if .Report.Surf}} &middot; now {{.Report.Surf}}{{end}}{{else}}Wave height{{end}}</div>
+            {{$r := .Report}}
+            <div class="report">
+                <section class="rp-now-col" aria-label="Current conditions">
+                    {{if gt (len .ForecastSummary) 0}}
+                    {{$current := index .ForecastSummary 0}}
+                    <div class="rp-now" data-current-condition-card style="--condition-color: {{template "condcolor" $current.Condition}};">
+                        <div class="rp-rating" data-current-condition>{{$current.Condition}}</div>
+                        <div class="rp-height" data-current-height>{{$current.WaveHeight}}</div>
+                        <div class="rp-sub" data-current-height-label>{{if .HasConditions}}Surf, best of today{{if $r.Surf}} &middot; now {{$r.Surf}}{{end}}{{else}}Wave height{{end}}</div>
                     </div>
-                </div>
+                    {{else}}
+                    <div class="rp-now">
+                        <div class="rp-height">{{if $r.Surf}}{{$r.Surf}}{{else}}{{$r.PrimaryHeight}}ft{{end}}</div>
+                        <div class="rp-sub">{{if $r.Surf}}Surf now{{else}}Wave height{{end}}</div>
+                    </div>
+                    {{end}}
+                    <dl class="rp-props">
+                        <div class="rp-prop">
+                            <dt>{{if $r.SwellHeight}}Seas{{else if $r.PrimaryIsWindSea}}Wind sea{{else}}Primary{{end}}</dt>
+                            <dd>
+                                <svg class="rp-arrow primary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.PrimaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v">{{$r.PrimaryHeight}}ft @ {{$r.PrimaryPeriod}}s</span>
+                                <span class="m">{{bearing $r.PrimaryDegrees}}{{if $r.SwellHeight}} &middot; swell {{$r.SwellHeight}}ft{{end}}</span>
+                            </dd>
+                        </div>
+                        <div class="rp-prop">
+                            <dt>Secondary</dt>
+                            <dd>
+                                {{if $r.HasSecondary}}
+                                <svg class="rp-arrow secondary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.SecondaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v">{{$r.SecondaryHeight}}ft @ {{$r.SecondaryPeriod}}s</span>
+                                <span class="m">{{bearing $r.SecondaryDegrees}}</span>
+                                {{else}}<span class="m">None</span>{{end}}
+                            </dd>
+                        </div>
+                        {{if and $r.HasWindSea (not $r.PrimaryIsWindSea)}}
+                        <div class="rp-prop">
+                            <dt>Wind sea</dt>
+                            <dd>
+                                <svg class="rp-arrow wind-sea" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.WindSeaDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v">{{$r.WindSeaHeight}}ft @ {{$r.WindSeaPeriod}}s</span>
+                                <span class="m">{{bearing $r.WindSeaDegrees}}</span>
+                            </dd>
+                        </div>
+                        {{end}}
+                        <div class="rp-prop">
+                            <dt>Wind</dt>
+                            <dd>
+                                {{if $r.HasWind}}
+                                <svg class="rp-arrow wind" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.WindDir}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v">{{$r.WindSpeed}} mph</span>
+                                <span class="m">{{bearing $r.WindDir}}</span>
+                                {{else}}<span class="m">Unavailable</span>{{end}}
+                            </dd>
+                        </div>
+                        {{if .HasTide}}
+                        <div class="rp-prop" data-tide-row hidden>
+                            <dt>Tide</dt>
+                            <dd>
+                                <svg class="rp-arrow tide" viewBox="0 0 16 16" aria-hidden="true" data-tide-arrow><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v" data-tide-next></span>
+                                <span class="m" data-tide-kind></span>
+                            </dd>
+                        </div>
+                        {{end}}
+                    </dl>
+                </section>
+
+                {{if .HasConditions}}
+                <section class="rp-today-col" aria-label="Today">
+                    <div class="rp-today-head">
+                        <h2 class="rp-label" data-today-title>Today</h2>
+                        <div class="today-readout" data-today-readout></div>
+                    </div>
+                    <div class="today-chart" data-today-chart></div>
+                </section>
                 {{end}}
-
-                <div class="report-card">
-                    <h2>{{if .Report.SwellHeight}}Seas &middot; nearshore{{else if .Report.PrimaryIsWindSea}}Wind sea{{else}}Primary swell{{end}}</h2>
-                    <div class="report-row">
-                        <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
-                            <circle class="ring" cx="20" cy="20" r="16"/>
-                            <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
-                            <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
-                            <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
-                            <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
-                            <path class="needle" style="transform: rotate({{.Report.PrimaryDegrees}}deg);"
-                                  d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
-                        </svg>
-                        <div class="report-value">
-                            <div class="main">{{.Report.PrimaryHeight}}ft @ {{.Report.PrimaryPeriod}}s</div>
-                            <div class="sub">{{.Report.PrimaryDegrees}}&deg;{{if .Report.SwellHeight}} &middot; swell {{.Report.SwellHeight}}ft{{end}}{{if and .Report.HasWindSea (not .Report.PrimaryIsWindSea)}} &middot; wind sea {{.Report.WindSeaHeight}}ft @ {{.Report.WindSeaPeriod}}s{{end}}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="report-card">
-                    <h2>Secondary swell</h2>
-                    <div class="report-row">
-                        {{if .Report.HasSecondary}}
-                        <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
-                            <circle class="ring" cx="20" cy="20" r="16"/>
-                            <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
-                            <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
-                            <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
-                            <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
-                            <path class="needle" style="transform: rotate({{.Report.SecondaryDegrees}}deg);"
-                                  d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
-                        </svg>
-                        <div class="report-value">
-                            <div class="main">{{.Report.SecondaryHeight}}ft @ {{.Report.SecondaryPeriod}}s</div>
-                            <div class="sub">{{.Report.SecondaryDegrees}}&deg;</div>
-                        </div>
-                        {{else}}
-                        <div class="report-value"><div class="main">--</div><div class="sub">No second system</div></div>
-                        {{end}}
-                    </div>
-                </div>
-
-                <div class="report-card">
-                    <h2>Wind</h2>
-                    <div class="report-row">
-                        {{if .Report.HasWind}}
-                        <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
-                            <circle class="ring" cx="20" cy="20" r="16"/>
-                            <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
-                            <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
-                            <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
-                            <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
-                            <path class="needle" style="transform: rotate({{.Report.WindDir}}deg);"
-                                  d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
-                        </svg>
-                        <div class="report-value">
-                            <div class="main">{{.Report.WindSpeed}} mph</div>
-                            <div class="sub">{{.Report.WindDir}}&deg;</div>
-                        </div>
-                        {{else}}
-                        <div class="report-value"><div class="main">--</div><div class="sub">Unavailable</div></div>
-                        {{end}}
-                    </div>
-                </div>
 
                 {{if .HasExposure}}
-                {{$e := .Exposure}}
-                <div class="report-card exposure-card" title="Faces {{$e.Facing}}. Accepts swell from {{$e.Accepts}}; swell from farther around is cut by land and by how obliquely it meets the beach.">
-                    <h2>Swell exposure</h2>
-                    <div class="report-row">
-                        <svg class="compass exposure-dial" viewBox="0 0 40 40" role="img" aria-label="Beach faces {{$e.Facing}}, accepts swell from {{$e.Accepts}}">
-                            <circle class="ring" cx="20" cy="20" r="17"/>
-                            {{if $e.LandPath}}<path class="land" d="{{$e.LandPath}}"/>{{end}}
-                            <path class="accept" d="{{$e.AcceptPath}}"/>
-                            <text x="20" y="2.4" text-anchor="middle" font-size="3" fill="var(--text-3)" font-family="var(--font-mono)">N</text>
-                            {{if $e.Secondary.Has}}<g class="swell-ray ray-secondary" style="transform: rotate({{$e.Secondary.Deg}}deg);"><line x1="20" y1="6.5" x2="20" y2="15"/><path d="M17.6 3 L22.4 3 L20 7 Z"/></g>{{end}}
-                            {{if $e.Primary.Has}}<g class="swell-ray ray-primary" style="transform: rotate({{$e.Primary.Deg}}deg);"><line x1="20" y1="6.5" x2="20" y2="15"/><path d="M17.6 3 L22.4 3 L20 7 Z"/></g>{{end}}
-                            <circle class="beach" cx="20" cy="20" r="1.8"/>
+                <section class="rp-map-col" aria-label="Swell exposure">
+                    <div class="exposure-map" role="img" aria-label="Map of the beach with the swell directions it is open to and the swells arriving">
+                        <div class="exposure-basemap" data-exposure-map data-lat="{{.Latitude}}" data-lon="{{.Longitude}}"></div>
+                        <svg class="exposure-arc" viewBox="0 0 100 100" aria-hidden="true">
+                            {{if .Exposure.ArcPath}}<path class="open" d="{{.Exposure.ArcPath}}"/>{{end}}
+                            {{range .Exposure.Arrows}}<path class="swell-arrow {{.Kind}}" d="{{.Path}}"/>{{end}}
+                            <circle class="beach" cx="50" cy="50" r="2.2"/>
                         </svg>
-                        <div class="report-value">
-                            <div class="main">Faces {{$e.Facing}}</div>
-                            <div class="sub">Accepts {{$e.Accepts}}</div>
-                            {{if $e.Primary.Has}}<div class="sub"><span class="exposure-key-primary">&#9650;</span> {{$e.Primary.Pct}}% in{{if $e.Secondary.Has}} &middot; <span class="exposure-key-secondary">&#9650;</span> {{$e.Secondary.Pct}}% in{{end}}</div>{{end}}
-                        </div>
                     </div>
-                </div>
+                </section>
                 {{end}}
             </div>
+
+            {{if .HasExposure}}
+            <script>
+                // A fixed, north-up view of the app map's basemap around the
+                // spot, without labels: just the coastline under the wedge.
+                window.addEventListener('DOMContentLoaded', () => {
+                    const el = document.querySelector('[data-exposure-map]');
+                    if (!el || !window.maplibregl) return;
+                    const map = new maplibregl.Map({
+                        container: el,
+                        style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+                        center: [Number(el.dataset.lon), Number(el.dataset.lat)],
+                        zoom: 11,
+                        interactive: false,
+                        attributionControl: false,
+                    });
+                    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+                    el.closest('.exposure-map')._map = map; // resized with the row, see fitMap
+                    // Compact attribution opens expanded once the map loads;
+                    // fold it back to the (i) button.
+                    map.once('load', () => el.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
+                    map.on('style.load', () => {
+                        for (const layer of map.getStyle().layers) {
+                            if (layer.type === 'symbol') map.setLayoutProperty(layer.id, 'visibility', 'none');
+                        }
+                    });
+                });
+            </script>
+            {{end}}
+
+            <script>
+                // Side by side, the map square is as tall as the taller of
+                // the other two columns' content, so the row is never padded
+                // out by the map (a spot without tide has a shorter list and
+                // chart). Stacked layouts keep their CSS size.
+                document.addEventListener('DOMContentLoaded', () => {
+                    const mapBox = document.querySelector('.exposure-map');
+                    const cols = [...document.querySelectorAll('.rp-now-col, .rp-today-col')];
+                    if (!mapBox || !cols.length) return;
+                    const sideBySide = window.matchMedia('(min-width: 1024px)');
+                    const contentHeight = col => {
+                        const last = col.lastElementChild;
+                        if (!last) return 0;
+                        return last.getBoundingClientRect().bottom - col.getBoundingClientRect().top - parseFloat(getComputedStyle(col).paddingTop);
+                    };
+                    const fitMap = () => {
+                        const size = sideBySide.matches
+                            ? Math.round(Math.min(280, Math.max(180, ...cols.map(contentHeight))))
+                            : null;
+                        const next = size ? `${size}px` : '';
+                        if (mapBox.style.width === next) return;
+                        mapBox.style.width = next;
+                        mapBox._map?.resize();
+                    };
+                    new ResizeObserver(fitMap).observe(document.querySelector('.report'));
+                    cols.forEach(col => [...col.children].forEach(child => new ResizeObserver(fitMap).observe(child)));
+                    sideBySide.addEventListener('change', fitMap);
+                });
+
+                document.addEventListener('DOMContentLoaded', () => {
+                    const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+                    const RATING = { epic: css('--cond-epic'), good: css('--cond-good'), fair: css('--cond-fair'), poor: css('--cond-poor') };
+                    const CARDINALS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+                    const cardinal = d => CARDINALS[Math.round((((d % 360) + 360) % 360) / 22.5) % 16];
+                    const hourFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric' });
+                    const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+                    const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+                    const shortHour = d => hourFmt.format(d).toLowerCase().replace(' ', '');
+                    const shortTime = d => timeFmt.format(d).toLowerCase().replace(' ', '');
+                    const now = new Date();
+
+                    // tide: hourly predictions when the station has them,
+                    // otherwise a half cosine between highs and lows
+                    const TIDE = window.SPOT_TIDES;
+                    const tideEvents = TIDE && TIDE.events ? TIDE.events.map(e => ({ t: e.t, ft: e.v * 3.28084, high: e.high })) : [];
+                    const tideHourly = TIDE && TIDE.hourly ? TIDE.hourly.v.map((v, i) => ({ t: TIDE.hourly.start + i * 3600e3, ft: v * 3.28084 })) : [];
+                    const tideAt = tMs => {
+                        const pts = tideHourly.length > 1 ? tideHourly : tideEvents;
+                        if (pts.length < 2 || tMs < pts[0].t || tMs > pts[pts.length - 1].t) return null;
+                        const i = Math.max(1, pts.findIndex(e => e.t >= tMs));
+                        const a = pts[i - 1], b = pts[i], f = (tMs - a.t) / (b.t - a.t);
+                        const shape = pts === tideHourly ? f : (1 - Math.cos(Math.PI * f)) / 2;
+                        return { ft: a.ft + (b.ft - a.ft) * shape, rising: b.ft > a.ft };
+                    };
+
+                    // Tide row: rising toward the next high, or falling toward
+                    // the next low, and when it gets there.
+                    const tideRow = document.querySelector('[data-tide-row]');
+                    const next = tideEvents.find(e => e.t > +now);
+                    if (tideRow && next) {
+                        tideRow.querySelector('[data-tide-arrow]').style.transform = `rotate(${next.high ? 180 : 0}deg)`;
+                        tideRow.querySelector('[data-tide-next]').textContent = `${next.ft.toFixed(1)}ft at ${shortTime(new Date(next.t))}`;
+                        tideRow.querySelector('[data-tide-kind]').textContent = next.high ? 'Rising to high' : 'Falling to low';
+                        tideRow.hidden = false;
+                    }
+
+                    // --- Today: the viewer's local day as four lanes --------
+                    const el = document.querySelector('[data-today-chart]');
+                    const conds = (window.SPOT_CONDITIONS || []).map(c => ({ ...c, t: new Date(c.t) }));
+                    if (!el || !window.d3 || !conds.length) return;
+                    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                    const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+                    const hours = conds.filter(c => c.t >= dayStart && c.t < dayEnd);
+                    if (!hours.length) return;
+                    document.querySelector('[data-today-title]').textContent = `Today · ${dayFmt.format(now)}`;
+
+                    const tideCurve = [];
+                    for (let t = +dayStart; t <= +dayEnd; t += 15 * 60e3) {
+                        const v = tideAt(t);
+                        if (v) tideCurve.push({ t: new Date(t), ft: v.ft });
+                    }
+                    const hasTide = tideCurve.length > 1;
+                    const turns = tideEvents.filter(e => e.t >= +dayStart && e.t < +dayEnd);
+                    const windHours = hours.filter(h => h.haswind);
+                    const hasWind = windHours.length > 0;
+
+                    const best = hours.reduce((a, b) => (b.score > a.score ? b : a));
+                    const peakSurf = hours.reduce((a, b) => (b.ft_hi > a.ft_hi ? b : a));
+                    const peakWind = hasWind ? windHours.reduce((a, b) => (b.wmph > a.wmph ? b : a)) : null;
+
+                    const readout = document.querySelector('[data-today-readout]');
+                    const rated = h => `<b style="color:${RATING[h.rating] || '#fff'}">${h.rating.toUpperCase()}</b>`;
+                    const summary = `Best ${rated(best)} at <b>${shortHour(best.t)}</b> · peak <b>${peakSurf.surf}</b>`;
+                    const describe = h => {
+                        const parts = [`<b>${shortHour(h.t)}</b>`, `<b>${h.surf}</b>`];
+                        const tide = tideAt(+h.t);
+                        if (tide) parts.push(`tide ${tide.ft.toFixed(1)}ft ${tide.rising ? '↑' : '↓'}`);
+                        if (h.haswind) parts.push(`${Math.round(h.wmph)} mph ${cardinal(h.wdir)}`);
+                        parts.push(rated(h));
+                        return parts.join(' · ');
+                    };
+                    readout.innerHTML = summary;
+
+                    function draw() {
+                        el.replaceChildren();
+                        const width = el.clientWidth;
+                        if (!width) return;
+                        const left = 58, right = 4;
+                        const lanes = [
+                            { key: 'surf', label: 'Surf', h: 52 },
+                            ...(hasTide ? [{ key: 'tide', label: 'Tide', h: 40 }] : []),
+                            ...(hasWind ? [{ key: 'wind', label: 'Wind', h: 40 }] : []),
+                            { key: 'cond', label: 'Rating', h: 8 },
+                        ];
+                        const gap = 10, axisH = 14;
+                        let y = 0;
+                        for (const lane of lanes) { lane.y = y; y += lane.h + gap; }
+                        const height = y - gap + axisH;
+
+                        const x = d3.scaleTime().domain([dayStart, dayEnd]).range([left, width - right]);
+                        const hourW = x(new Date(+dayStart + 3600e3)) - x(dayStart);
+                        const at = h => x(h.t) + hourW / 2;
+                        const svg = d3.select(el).append('svg').attr('height', height).attr('viewBox', `0 0 ${width} ${height}`);
+
+                        // three-hourly grid; "now" sits on the axis, so hour
+                        // labels it would cover drop out
+                        const ticks = d3.range(0, 25, 3).map(h => new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), h));
+                        const narrow = width < 380;
+                        const nx = x(now);
+                        svg.append('g').selectAll('line').data(ticks).join('line').attr('class', 'grid')
+                            .attr('x1', d => x(d)).attr('x2', d => x(d)).attr('y1', 0).attr('y2', height - axisH);
+                        svg.append('g').selectAll('text')
+                            .data(ticks.slice(0, -1).filter((d, i) => (!narrow || i % 2 === 0) && Math.abs(x(d) - nx) > 24)).join('text')
+                            .attr('x', d => x(d)).attr('y', height - 2).attr('text-anchor', 'middle').text(shortHour);
+
+                        // a value scale in the gutter, so a flat day still reads as a height
+                        const yTicks = (g, ys) => {
+                            for (const v of ys.ticks(2).filter(v => v > 0)) {
+                                g.append('line').attr('class', 'grid').attr('stroke-dasharray', '2 3')
+                                    .attr('x1', left).attr('x2', width - right).attr('y1', ys(v)).attr('y2', ys(v));
+                                g.append('text').attr('x', left - 5).attr('y', ys(v) + 3).attr('text-anchor', 'end').text(v);
+                            }
+                        };
+                        // a peak label kept inside the plot
+                        const peakLabel = (g, px, py, text) => {
+                            const edge = px > width - right - 24 ? 'end' : px < left + 24 ? 'start' : 'middle';
+                            g.append('text').attr('class', 'peak').attr('x', px).attr('y', py).attr('text-anchor', edge).text(text);
+                        };
+
+                        for (const lane of lanes) {
+                            const g = svg.append('g').attr('transform', `translate(0,${lane.y})`);
+                            g.append('text').attr('class', 'lane-label').attr('x', 0).attr('y', Math.min(lane.h, 9)).text(lane.label);
+                            if (lane.key !== 'cond') g.append('line').attr('class', 'grid').attr('x1', left).attr('x2', width - right).attr('y1', lane.h).attr('y2', lane.h);
+                            if (lane.key === 'surf') {
+                                const ys = d3.scaleLinear().domain([0, Math.max(3, d3.max(hours, h => h.ft_hi) * 1.2)]).range([lane.h, 4]);
+                                yTicks(g, ys);
+                                g.append('path').attr('class', 'surf-band')
+                                    .attr('d', d3.area().x(at).y0(h => ys(h.ft_lo)).y1(h => ys(h.ft_hi)).curve(d3.curveMonotoneX)(hours));
+                                g.append('path').attr('class', 'surf-line')
+                                    .attr('d', d3.line().x(at).y(h => ys(h.ft_hi)).curve(d3.curveMonotoneX)(hours));
+                                peakLabel(g, at(peakSurf), Math.max(8, ys(peakSurf.ft_hi) - 4), peakSurf.surf);
+                            } else if (lane.key === 'tide') {
+                                // room above highs and below lows for their labels
+                                const ys = d3.scaleLinear().domain(d3.extent(tideCurve, p => p.ft)).range([lane.h - (narrow ? 3 : 12), narrow ? 3 : 12]);
+                                g.append('path').attr('class', 'tide-line')
+                                    .attr('d', d3.line().x(p => x(p.t)).y(p => ys(p.ft)).curve(d3.curveMonotoneX)(tideCurve));
+                                for (const e of turns) {
+                                    const tx = x(new Date(e.t)), ty = ys(e.ft);
+                                    g.append('circle').attr('class', 'tide-turn').attr('cx', tx).attr('cy', ty).attr('r', 2);
+                                    if (narrow) continue;
+                                    const edge = tx > width - right - 40 ? 'end' : tx < left + 40 ? 'start' : 'middle';
+                                    g.append('text').attr('class', 'tide-text').attr('x', tx).attr('y', e.high ? ty - 5 : ty + 11)
+                                        .attr('text-anchor', edge).text(`${e.ft.toFixed(1)}ft ${shortTime(new Date(e.t))}`);
+                                }
+                            } else if (lane.key === 'wind') {
+                                const ys = d3.scaleLinear().domain([0, Math.max(15, peakWind.wmph * 1.25)]).range([lane.h, 4]);
+                                yTicks(g, ys);
+                                g.append('g').selectAll('rect').data(windHours).join('rect').attr('class', 'wind-bar')
+                                    .attr('x', h => x(h.t) + 1).attr('width', Math.max(1, hourW - 2))
+                                    .attr('y', h => ys(h.wmph)).attr('height', h => lane.h - ys(h.wmph));
+                                // where the wind blows to, every three hours (not under the peak label)
+                                g.append('g').selectAll('path').data(windHours.filter(h => h.t.getHours() % 3 === 0 && h !== peakWind)).join('path')
+                                    .attr('class', 'wind-arrow').attr('d', 'M0 -3.5 L2.8 3 L0 1.5 L-2.8 3 Z')
+                                    .attr('transform', h => `translate(${at(h)},${ys(h.wmph) - 6}) rotate(${(h.wdir + 180) % 360})`);
+                                peakLabel(g, at(peakWind), Math.max(8, ys(peakWind.wmph) - 4), `${Math.round(peakWind.wmph)}`);
+                            } else {
+                                g.append('g').selectAll('rect').data(hours).join('rect')
+                                    .attr('x', h => x(h.t) + 1).attr('width', Math.max(1, hourW - 2))
+                                    .attr('y', 0).attr('height', lane.h)
+                                    .attr('fill', h => RATING[h.rating] || RATING.poor);
+                            }
+                        }
+
+                        svg.append('line').attr('class', 'now-line').attr('x1', nx).attr('x2', nx).attr('y1', 0).attr('y2', height - axisH);
+                        svg.append('text').attr('class', 'now-label').attr('x', nx).attr('y', height - 2).attr('text-anchor', 'middle').text('now');
+
+                        // hover reads the hour out in the header
+                        const hover = svg.append('line').attr('class', 'hover-line').attr('y1', 0).attr('y2', height - axisH).style('display', 'none');
+                        svg.append('rect').attr('x', left).attr('width', width - left - right).attr('height', height - axisH)
+                            .attr('fill', 'transparent')
+                            .on('pointermove', event => {
+                                const t = +x.invert(d3.pointer(event)[0]) - 1800e3;
+                                const h = hours.reduce((a, b) => (Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a));
+                                hover.attr('x1', at(h)).attr('x2', at(h)).style('display', null);
+                                readout.innerHTML = describe(h);
+                            })
+                            .on('pointerleave', () => { hover.style('display', 'none'); readout.innerHTML = summary; });
+                    }
+                    let frame;
+                    new ResizeObserver(() => { cancelAnimationFrame(frame); frame = requestAnimationFrame(draw); }).observe(el);
+                });
+            </script>
             {{end}}
             {{if .HasConditions}}
             <script>
@@ -298,6 +577,7 @@
                 window.SPOT_TIDES = {{json .Tide}};
             </script>
             {{end}}
+            <div class="section-label mt-6 mb-2 min-w-0">16 day forecast</div>
             {{template "forecast" .}}
             {{template "favoritecontrol" .}}
         {{else}}

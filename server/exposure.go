@@ -1,9 +1,10 @@
 package main
 
-// The spot page's exposure dial: a top-down zoom on the beach showing the
-// land around it, the swell directions it accepts (sampled from the same
-// swellExposure the classifier uses, so the picture is the model), and
-// where the current swells arrive from.
+// The spot page's exposure map: a zoomed-in square of the app's basemap
+// centered on the spot (drawn by MapLibre in the page), with the range of
+// swell directions the beach is open to drawn over it as a wedge from the
+// beach out, and the current swells as arrows in to the beach. A north-up Web Mercator map is conformal, so the overlay's screen
+// angles are true bearings at any zoom.
 
 import (
 	"fmt"
@@ -12,38 +13,92 @@ import (
 	"strings"
 )
 
-// SpotExposure is the exposure card's data. Paths are drawn in the report
-// compass's 40x40 viewBox, north up, with the beach at the center.
+// SpotExposure is the exposure map's overlay; the page renders the map.
+// Paths are in a 100x100 viewBox centered on the spot.
 type SpotExposure struct {
-	Facing     string // "SW 225°"
-	FacingDeg  float64
-	Accepts    string // accepted swell directions, e.g. "169–347°"
-	LandPath   string // blocked directions, as wedges to the rim
-	AcceptPath string // radius = share of swell height that gets in
-	Primary    exposedSwell
-	Secondary  exposedSwell
+	ArcPath string       // open directions
+	Arrows  []swellArrow // current swells, largest first so none hides a smaller one
 }
 
-// exposedSwell is one current swell train against the beach.
-type exposedSwell struct {
-	Deg float64
-	Pct int // share of the train's height that reaches the beach
-	Has bool
+// swellArrow is a current swell train drawn in to the beach, the way the
+// swell travels, sized by its height.
+type swellArrow struct {
+	Kind  string // "primary" or "secondary"
+	Path  string // shaft and head, one path
+	Scale float64
+	Has   bool
 }
 
+// Arrow geometry, as radii from the spot in the viewBox, for a full-size
+// arrow: the tail sits just inside the square's edge, the tip stops short
+// of the beach dot.
 const (
-	dialCenter    = 20.0
-	dialRim       = 17.0 // land and acceptance reach this radius
-	dialMinRadius = 2.5  // a fully blocked direction
-	// acceptedMin is the exposure below which a direction is not counted
-	// as accepted in the label (the open-water taper's last few percent).
-	acceptedMin = 0.05
+	arrowTail     = 46.0
+	arrowTip      = 4.5
+	arrowHeadLen  = 9.0
+	arrowHeadHalf = 4.5
+	arrowShaft    = 1.4 // half-width
 )
 
-// dialPoint is bearing deg at radius r, north up.
-func dialPoint(deg, r float64) string {
+// Arrows scale with swell height: full size at arrowFullFt and up, never
+// below arrowMinScale so a small train still reads. Scale goes with the
+// square root of height, so a 1ft train is not lost next to a 4ft one.
+const (
+	arrowFullFt   = 6.0
+	arrowMinScale = 0.3
+)
+
+// arrowScale is the arrow size for a train heightFt tall, 0..1.
+func arrowScale(heightFt float64) float64 {
+	return math.Max(arrowMinScale, math.Min(1, math.Sqrt(heightFt/arrowFullFt)))
+}
+
+// newSwellArrow draws swell heightFt tall arriving from bearing deg (model
+// strings such as "2.3" and "210"), false when there is no direction or
+// height. The tip stays at the beach; length scales with height and width
+// half as much, so small arrows stay solid enough to see.
+func newSwellArrow(deg, heightFt string) swellArrow {
+	d, err := strconv.ParseFloat(deg, 64)
+	if err != nil {
+		return swellArrow{}
+	}
+	h, err := strconv.ParseFloat(heightFt, 64)
+	if err != nil {
+		return swellArrow{}
+	}
+	length := arrowScale(h)
+	width := (1 + length) / 2
+	// offset(r, w) is the point at radius r along the bearing, w across it
+	// (positive clockwise)
+	rad := d * math.Pi / 180
+	offset := func(r, w float64) string {
+		x := 50 + r*math.Sin(rad) + w*math.Cos(rad)
+		y := 50 - r*math.Cos(rad) + w*math.Sin(rad)
+		return fmt.Sprintf("%.2f %.2f", x, y)
+	}
+	tail := arrowTip + (arrowTail-arrowTip)*length
+	neck := arrowTip + arrowHeadLen*width
+	shaft, head := arrowShaft*width, arrowHeadHalf*width
+	return swellArrow{
+		Path: fmt.Sprintf("M%s L%s L%s L%s L%s L%s L%s Z",
+			offset(tail, -shaft), offset(tail, shaft),
+			offset(neck, shaft), offset(neck, head),
+			offset(arrowTip, 0),
+			offset(neck, -head), offset(neck, -shaft)),
+		Scale: length,
+		Has:   true,
+	}
+}
+
+// exposureRadius is how far the open-direction wedge reaches, in the arc's
+// 100x100 viewBox: past the square's edges, so only the corners show its
+// rim and the wedge reads as rays out from the beach.
+const exposureRadius = 75.0
+
+// arcPoint is bearing deg at radius r from the viewBox center, north up.
+func arcPoint(deg, r float64) string {
 	rad := deg * math.Pi / 180
-	return fmt.Sprintf("%.1f %.1f", dialCenter+r*math.Sin(rad), dialCenter-r*math.Cos(rad))
+	return fmt.Sprintf("%.2f %.2f", 50+r*math.Sin(rad), 50-r*math.Cos(rad))
 }
 
 // blocked reports whether land stands between the beach and swell from
@@ -96,71 +151,59 @@ func circularRuns(in []bool) [][2]int {
 	return runs
 }
 
-// spotExposure builds the dial, false when nothing is known about which
-// way the beach faces.
-func spotExposure(b beach, report SpotReport, hasReport bool) (SpotExposure, bool) {
-	if !b.HasFacing {
-		return SpotExposure{}, false
+// openArcPath draws each run of open directions as a wedge from the beach.
+func openArcPath(b beach) string {
+	open := make([]bool, 360)
+	for d := range open {
+		open[d] = !blocked(float64(d), b)
 	}
-	e := SpotExposure{Facing: facingLabel(b.Facing), FacingDeg: b.Facing}
-
-	isBlocked, accepted := make([]bool, 360), make([]bool, 360)
-	var accept strings.Builder
-	for d := 0; d < 360; d++ {
-		isBlocked[d] = blocked(float64(d), b)
-		x := swellExposure(float64(d), b)
-		accepted[d] = x >= acceptedMin
-		if d%3 == 0 {
-			cmd := "L"
-			if d == 0 {
-				cmd = "M"
-			}
-			fmt.Fprintf(&accept, "%s%s ", cmd, dialPoint(float64(d), dialMinRadius+(dialRim-dialMinRadius)*x))
+	var path strings.Builder
+	for _, run := range circularRuns(open) {
+		// open degrees are inclusive, so a [170, 260] window spans 170–260
+		from, to := float64(run[0]), float64(run[1])
+		if to-from >= 359 { // open all round: a full disc
+			fmt.Fprintf(&path, "M%s A%.0f %.0f 0 1 1 %s A%.0f %.0f 0 1 1 %s Z ",
+				arcPoint(0, exposureRadius), exposureRadius, exposureRadius, arcPoint(180, exposureRadius),
+				exposureRadius, exposureRadius, arcPoint(0, exposureRadius))
+			continue
 		}
-	}
-	e.AcceptPath = accept.String() + "Z"
-
-	var land strings.Builder
-	for _, run := range circularRuns(isBlocked) {
-		// wedge from the center out to the rim across the run's degrees
-		from, to := float64(run[0]), float64(run[1]+1)
 		large := 0
 		if to-from > 180 {
 			large = 1
 		}
-		if to-from >= 360 { // land all round: two half arcs
-			fmt.Fprintf(&land, "M%s A%.0f %.0f 0 1 1 %s A%.0f %.0f 0 1 1 %s Z ",
-				dialPoint(0, dialRim), dialRim, dialRim, dialPoint(180, dialRim), dialRim, dialRim, dialPoint(0, dialRim))
-			continue
-		}
-		fmt.Fprintf(&land, "M%s L%s A%.0f %.0f 0 %d 1 %s Z ",
-			dialPoint(0, 0), dialPoint(from, dialRim), dialRim, dialRim, large, dialPoint(to, dialRim))
+		fmt.Fprintf(&path, "M50 50 L%s A%.0f %.0f 0 %d 1 %s Z ",
+			arcPoint(from, exposureRadius), exposureRadius, exposureRadius, large, arcPoint(to, exposureRadius))
 	}
-	e.LandPath = strings.TrimSpace(land.String())
+	return strings.TrimSpace(path.String())
+}
 
-	var labels []string
-	for _, run := range circularRuns(accepted) {
-		if run[1]-run[0] >= 359 {
-			labels = []string{"all directions"}
-			break
-		}
-		labels = append(labels, fmt.Sprintf("%d–%d°", run[0]%360, run[1]%360))
+// spotExposure builds the exposure map's overlay, with the report's swell
+// trains when there is one, false when nothing is known about which way
+// the beach faces.
+func spotExposure(b beach, report SpotReport, hasReport bool) (SpotExposure, bool) {
+	if !b.HasFacing {
+		return SpotExposure{}, false
 	}
-	e.Accepts = strings.Join(labels, ", ")
-
+	e := SpotExposure{ArcPath: openArcPath(b)}
 	if hasReport {
-		e.Primary = exposeSwell(report.PrimaryDegrees, b)
+		primary := newSwellArrow(report.PrimaryDegrees, report.PrimaryHeight)
+		primary.Kind = "primary"
+		var secondary swellArrow
 		if report.HasSecondary {
-			e.Secondary = exposeSwell(report.SecondaryDegrees, b)
+			secondary = newSwellArrow(report.SecondaryDegrees, report.SecondaryHeight)
+			secondary.Kind = "secondary"
+		}
+		// Later arrows draw on top: the primary goes last unless the
+		// secondary is smaller, which would vanish under it.
+		order := []swellArrow{secondary, primary}
+		if secondary.Scale < primary.Scale {
+			order = []swellArrow{primary, secondary}
+		}
+		for _, a := range order {
+			if a.Has {
+				e.Arrows = append(e.Arrows, a)
+			}
 		}
 	}
 	return e, true
-}
-
-func exposeSwell(deg string, b beach) exposedSwell {
-	d, err := strconv.ParseFloat(deg, 64)
-	if err != nil {
-		return exposedSwell{}
-	}
-	return exposedSwell{Deg: d, Pct: int(math.Round(swellExposure(d, b) * 100)), Has: true}
 }
