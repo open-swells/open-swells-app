@@ -257,7 +257,7 @@ func TestLoadTemplates(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("spot template failed to render: %v", err)
 	}
-	for _, want := range []string{"Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #4fd1bc", "stripHoverLine", "stripTooltip", "forecast-tooltip-row", "detail-tooltip-row"} {
+	for _, want := range []string{"Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #4fd1bc", "stripHoverLine", "stripTooltip", "readoutHTML", "readout-rating"} {
 		if !bytes.Contains(spotPage.Bytes(), []byte(want)) {
 			t.Errorf("spot condition summary is missing %q", want)
 		}
@@ -270,7 +270,7 @@ func TestLoadTemplates(t *testing.T) {
 	}
 	if !bytes.Contains(spotPage.Bytes(), []byte("rotate(${travelBearing(d[degField])})")) ||
 		!bytes.Contains(spotPage.Bytes(), []byte("'PrimaryWaveHeight', 'PrimaryDegrees'")) ||
-		!bytes.Contains(spotPage.Bytes(), []byte("travelBearing(direction)")) {
+		!bytes.Contains(spotPage.Bytes(), []byte("rotate(${travelBearing(w.d)})")) {
 		t.Error("hourly forecast arrows do not convert marine from-directions to travel bearings")
 	}
 	if bytes.Contains(spotPage.Bytes(), []byte("PrimaryDegrees - 135")) {
