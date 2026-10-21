@@ -1011,6 +1011,8 @@ type SpotPageData struct {
 	Conditions      []HourlyCondition
 	HasConditions   bool
 	Facing          string // e.g. "SW 225°", empty when unknown
+	Exposure        SpotExposure
+	HasExposure     bool
 	PageHeading     string
 	Coordinates     string
 	Latitude        float64
@@ -1025,6 +1027,16 @@ func facingLabel(deg float64) string {
 	cardinals := []string{"N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"}
 	idx := int(math.Round(math.Mod(deg, 360)/22.5)) % 16
 	return fmt.Sprintf("%s %.0f°", cardinals[idx], deg)
+}
+
+// bearingLabel is facingLabel for a model direction string ("195" -> "SSW
+// 195°"), empty when it is not a number.
+func bearingLabel(deg string) string {
+	d, err := strconv.ParseFloat(deg, 64)
+	if err != nil {
+		return ""
+	}
+	return facingLabel(d)
 }
 
 func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneStore, siteURL string) gin.HandlerFunc {
@@ -1042,10 +1054,12 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 		}
 		summary := generateForecastSummary(forecastData)
 		applyConditionSummary(summary, conditions)
+		b := spotBeach(staticDir, spot)
 		facing := ""
-		if deg, ok := spotFacing(staticDir, spot); ok {
-			facing = facingLabel(deg)
+		if b.HasFacing {
+			facing = facingLabel(b.Facing)
 		}
+		exposure, hasExposure := spotExposure(b, report, hasReport)
 		// The NWS surf zone report is matched on the spot itself (not the
 		// offshore sample point): zones cover the coastal strip.
 		zone, hasZone := zones.ZoneForPoint(spot.Lat, spot.Lon)
@@ -1072,6 +1086,8 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 			Conditions:      conditions,
 			HasConditions:   len(conditions) > 0,
 			Facing:          facing,
+			Exposure:        exposure,
+			HasExposure:     hasExposure,
 			PageHeading:     seo.OpenGraphTitle,
 			Coordinates:     coordinateLabel(spot.Lat, spot.Lon),
 			Latitude:        spot.Lat,
