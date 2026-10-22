@@ -57,6 +57,14 @@
                 timezoneLabel.title = resolvedTimeZone;
             }
 
+            // weekday of the selected day, for the hover readout
+            const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+            const currentDayName = () => {
+                if (!currentDate) return '';
+                const [yy, mm, dd] = currentDate.split('-').map(Number);
+                return weekdayFmt.format(new Date(yy, mm - 1, dd));
+            };
+
             function displayClicked(date) {
                 const dayData = dataGroupedByDay[date];
                 if (!dayData) return;
@@ -213,6 +221,32 @@
                 good: themeColor('--cond-good', '#4fd1bc'),
                 fair: themeColor('--cond-fair', '#eec478'),
                 poor: themeColor('--cond-poor', '#ef7a83'),
+            };
+
+            // Hover readout shared by the 16-day strip and the day detail.
+            // It answers "what's it like then?": a headline of the surf
+            // range and its rating (the swell height on buoy pages, which
+            // have no surf model), over a short subheader of the main swell,
+            // wind, and tide. Per-train swell detail stays on the chart.
+            function readoutHTML({ when, surf, rating, swell, wind, tide }) {
+                const headline = surf || (swell ? `${swell.ft.toFixed(1)} ft` : '--');
+                const badge = rating
+                    ? `<span class="readout-rating" style="--rating-color: ${CONDITION_COLORS[rating]}">${rating.toUpperCase()}</span>`
+                    : '';
+                const sub = [];
+                if (swell && surf) sub.push(['Swell', `${swell.ft.toFixed(1)} ft · ${swell.per}s ${cardinal(swell.deg)}`]);
+                else if (swell) sub.push(['Swell', `${swell.per}s ${cardinal(swell.deg)}`]);
+                if (wind) sub.push(['Wind', `${wind.mph} mph ${cardinal(wind.deg)}`]);
+                if (tide) sub.push(['Tide', `${tide.ft.toFixed(1)} ft ${tide.rising ? 'rising' : 'falling'}`]);
+                return `<div class="readout-time">${when}</div>`
+                    + `<div class="readout-head"><span class="readout-surf">${headline}</span>${badge}</div>`
+                    + (sub.length ? `<div class="readout-sub">${sub.map(([k, v]) => `<span class="k">${k}</span><span class="v">${v}</span>`).join('')}</div>` : '');
+            }
+            // the main (largest) swell train in a forecast row
+            const mainSwell = row => {
+                const ft = parseFloat(row.PrimaryWaveHeight) * 3.28084;
+                if (!Number.isFinite(ft) || ft <= 0) return null;
+                return { ft, per: Math.round(parseFloat(row.PrimaryPeriod)), deg: row.PrimaryDegrees };
             };
 
             // Hourly surf-condition classifier output, injected by the spot
@@ -470,11 +504,15 @@
                 const bisect = d3.bisector(p => p.t).center;
                 const windBisect = d3.bisector(w => w.t).center;
                 const condBisect = d3.bisector(c => c.t).center;
+                const dataBisect = d3.bisector(d => d.dateObj).center;
                 svg.append('rect')
                     .attr('width', width).attr('height', height)
                     .attr('fill', 'none').attr('pointer-events', 'all')
                     .style('cursor', 'pointer')
-                    .on('mousemove', (event) => {
+                    // a mouse hovers; a finger shows the readout while it is
+                    // down and scrubs it by sliding sideways (vertical swipes
+                    // still scroll the page, see touch-action in the CSS)
+                    .on('pointerdown pointermove', (event) => {
                         const [mx] = d3.pointer(event);
                         const t = x.invert(mx);
                         const p = stripPts[bisect(stripPts, t)];
@@ -484,50 +522,37 @@
                         stripHoverLine.style.left = `${panelX}px`;
                         stripHoverLine.style.display = 'block';
 
-                        stripTooltip.replaceChildren();
-                        const tooltipDate = document.createElement('div');
-                        tooltipDate.className = 'forecast-tooltip-date';
-                        tooltipDate.textContent = stripTimeFmt(p.t);
-                        stripTooltip.appendChild(tooltipDate);
-                        const appendTooltipRow = (label, value, color) => {
-                            const row = document.createElement('div');
-                            row.className = 'forecast-tooltip-row';
-                            row.style.setProperty('--tooltip-color', color);
-                            const dot = document.createElement('i');
-                            dot.className = 'forecast-tooltip-dot';
-                            const rowLabel = document.createElement('span');
-                            rowLabel.className = 'forecast-tooltip-label';
-                            rowLabel.textContent = label;
-                            const rowValue = document.createElement('strong');
-                            rowValue.className = 'forecast-tooltip-value';
-                            rowValue.textContent = value;
-                            row.append(dot, rowLabel, rowValue);
-                            stripTooltip.appendChild(row);
-                        };
-                        appendTooltipRow(SURF_MODE ? 'SURF' : 'SWELL', p.label, CHART.linePrimary);
-
+                        const c = showCondLane ? condPts[condBisect(condPts, t)] : null;
+                        const row = data.length ? data[dataBisect(data, t)] : null;
+                        const w = hasWind ? windPts[windBisect(windPts, t)] : null;
+                        stripTooltip.innerHTML = readoutHTML({
+                            when: stripTimeFmt(p.t),
+                            surf: SURF_MODE ? p.label : null,
+                            rating: c ? c.rating : null,
+                            swell: row ? mainSwell(row) : null,
+                            wind: w ? { mph: (w.s * 2.237).toFixed(0), deg: w.d } : null,
+                            tide: tideAtTime(p.t.getTime()),
+                        });
                         let text = `${stripTimeFmt(p.t)} · ${p.label}`;
-                        if (hasWind) {
-                            const w = windPts[windBisect(windPts, t)];
-                            const windText = `${(w.s * 2.237).toFixed(0)} mph`;
-                            appendTooltipRow('WIND', windText, CHART.wind);
-                            text += ` · ${windText}`;
-                        }
-                        if (showCondLane) {
-                            const condition = condPts[condBisect(condPts, t)].rating;
-                            appendTooltipRow('RATING', condition, CONDITION_COLORS[condition]);
-                            text += ` · ${condition}`;
-                        }
+                        if (w) text += ` · ${(w.s * 2.237).toFixed(0)} mph`;
+                        if (c) text += ` · ${c.rating}`;
                         stripTooltip.style.display = 'block';
                         const tooltipWidth = stripTooltip.offsetWidth;
                         const tooltipHeight = stripTooltip.offsetHeight;
                         const placeLeft = panelX + 10 + tooltipWidth > stripPanel.clientWidth;
-                        stripTooltip.style.left = `${placeLeft ? panelX - tooltipWidth - 10 : panelX + 10}px`;
-                        stripTooltip.style.top = `${Math.max(6, Math.min(stripPanel.clientHeight - tooltipHeight - 6, event.clientY - panelRect.top - tooltipHeight / 2))}px`;
+                        if (event.pointerType === 'touch') {
+                            // above the strip, so the finger never covers it
+                            stripTooltip.style.left = `${Math.max(0, Math.min(stripPanel.clientWidth - tooltipWidth, panelX - tooltipWidth / 2))}px`;
+                            stripTooltip.style.top = `${-tooltipHeight - 8}px`;
+                        } else {
+                            stripTooltip.style.left = `${placeLeft ? panelX - tooltipWidth - 10 : panelX + 10}px`;
+                            stripTooltip.style.top = `${Math.max(6, Math.min(stripPanel.clientHeight - tooltipHeight - 6, event.clientY - panelRect.top - tooltipHeight / 2))}px`;
+                        }
                         stripReadout.textContent = text;
                         stripReadout.style.color = '#bfdbfe';
                     })
-                    .on('mouseleave', () => {
+                    .on('pointerleave pointercancel pointerup', (event) => {
+                        if (event.type === 'pointerup' && event.pointerType !== 'touch') return;
                         stripHoverLine.style.display = 'none';
                         stripTooltip.style.display = 'none';
                         stripReadout.textContent = 'Select a day for hourly detail';
@@ -994,75 +1019,43 @@
                 const verticalLine = svg.append("line").attr("class", "vertical-line").attr("y1", 0).attr("y2", chartBottom).attr("stroke", chartColors.verticalLine).attr("stroke-width", 1).attr("stroke-dasharray", "5,5").style("opacity", 0);
                 svg.append("rect").attr("class", "overlay").attr("width", width).attr("height", chartBottom).style("fill", "none").style("pointer-events", "all");
 
-                svg.on("mousemove", (event) => {
+                // a mouse hovers; a finger shows the readout while it is down
+                // and scrubs it by sliding sideways
+                svg.on("pointerdown pointermove", (event) => {
                     const mousePos = d3.pointer(event);
                     const mouseX = Math.max(0, Math.min(width, mousePos[0]));
                     verticalLine.attr("x1", mouseX).attr("x2", mouseX).style("opacity", 1);
                     const hoverDate = x.invert(mouseX);
                     const closestData = data.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
-                    const formattedHour = fmtHour(closestData.hour);
-                    const createArrowHTML = (direction, color) => `<span class="detail-tooltip-arrow" style="color: ${color}; transform: rotate(${travelBearing(direction)}deg);">&#8593;</span>`;
-                    const detailTooltipRow = (label, color, value) => `
-                        <div class="forecast-tooltip-row detail-tooltip-row" style="--tooltip-color: ${color};">
-                            <i class="forecast-tooltip-dot"></i>
-                            <span class="forecast-tooltip-label">${label}</span>
-                            <strong class="forecast-tooltip-value">${value}</strong>
-                        </div>`;
-                    let windRow = '';
-                    if (windDayPts.length) {
-                        const w = windDayPts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
-                        windRow = detailTooltipRow(
-                            'WIND',
-                            CHART.wind,
-                            `${createArrowHTML(w.d, CHART.wind)}${(w.s * 2.237).toFixed(0)} mph · ${cardinal(w.d)}`
-                        );
-                    }
-                    let tideRow = '';
-                    const tide = tideDayPts.length ? tideAtTime(closestData.dateObj.getTime()) : null;
-                    if (tide) {
-                        tideRow = detailTooltipRow(
-                            'TIDE',
-                            CHART.tide,
-                            `${tide.ft.toFixed(1)} ft · ${tide.rising ? 'rising' : 'falling'}`
-                        );
-                    }
-                    let condRow = '';
-                    if (condDayPts.length) {
-                        const c = condDayPts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
-                        condRow = detailTooltipRow(
-                            'SURF',
-                            CONDITION_COLORS[c.rating],
-                            `${SURF_MODE ? `${c.surf} · ` : ''}${c.rating} · score ${c.score}`
-                        );
-                    }
-                    const swellLabels = ['PRIMARY', 'SECONDARY', 'TERTIARY', 'QUATERNARY', 'WIND SEA'];
-                    // only trains that exist at this hour get a row
-                    const swellRows = [
-                        [closestData.PrimaryDegrees, chartColors.linePrimary, closestData.PrimaryWaveHeight, closestData.PrimaryPeriod],
-                        [closestData.SecondaryDegrees, chartColors.lineSecondary, closestData.SecondaryWaveHeight, closestData.SecondaryPeriod],
-                        [closestData.TertiaryDegrees, chartColors.lineTertiary, closestData.TertiaryWaveHeight, closestData.TertiaryPeriod],
-                        [closestData.QuaternaryDegrees, chartColors.lineQuaternary, closestData.QuaternaryWaveHeight, closestData.QuaternaryPeriod],
-                        [closestData.WindSeaDegrees, chartColors.lineWindSea, closestData.WindSeaHeight, closestData.WindSeaPeriod],
-                    ].map((row, index) => [...row, swellLabels[index]])
-                        .filter(([, , hgt]) => parseFloat(hgt) > 0)
-                        .map(([deg, color, hgt, per, label]) => detailTooltipRow(
-                            label,
-                            color,
-                            `${createArrowHTML(deg, color)}${(hgt * 3.28084).toFixed(1)} ft @ ${per}s · ${cardinal(deg)}`
-                        ))
-                        .join('');
-                    tooltip.style("visibility", "visible")
-                        .html(`<div class="forecast-tooltip-date">${formattedHour}</div>${swellRows}${windRow}${tideRow}${condRow}`);
+                    const nearest = pts => pts.reduce((prev, curr) => (Math.abs(curr.hour - hoverDate) < Math.abs(prev.hour - hoverDate) ? curr : prev));
+                    const c = condDayPts.length ? nearest(condDayPts) : null;
+                    const w = windDayPts.length ? nearest(windDayPts) : null;
+                    tooltip.style("visibility", "visible").html(readoutHTML({
+                        when: `${currentDayName()} ${fmtHour(closestData.hour)}`,
+                        surf: SURF_MODE && c ? c.surf : null,
+                        rating: c ? c.rating : null,
+                        swell: mainSwell(closestData),
+                        wind: w ? { mph: (w.s * 2.237).toFixed(0), deg: w.d } : null,
+                        tide: tideDayPts.length ? tideAtTime(closestData.dateObj.getTime()) : null,
+                    }));
                     // flip to the cursor's left when the tooltip would be
                     // squeezed against the right edge (measure after setting
                     // content so the width is the natural, unwrapped one)
-                    const ttW = tooltip.node().offsetWidth;
-                    const flipX = event.pageX + 15 + ttW > document.documentElement.clientWidth - 8;
-                    tooltip.style("left", (flipX ? event.pageX - ttW - 15 : event.pageX + 15) + "px")
-                        .style("top", (event.pageY + 15) + "px");
+                    const ttW = tooltip.node().offsetWidth, ttH = tooltip.node().offsetHeight;
+                    const pageW = document.documentElement.clientWidth;
+                    if (event.pointerType === 'touch') {
+                        // centered above the finger so it never covers it
+                        tooltip.style("left", Math.max(8, Math.min(pageW - ttW - 8, event.pageX - ttW / 2)) + "px")
+                            .style("top", Math.max(window.scrollY + 8, event.pageY - ttH - 40) + "px");
+                    } else {
+                        const flipX = event.pageX + 15 + ttW > pageW - 8;
+                        tooltip.style("left", (flipX ? event.pageX - ttW - 15 : event.pageX + 15) + "px")
+                            .style("top", (event.pageY + 15) + "px");
+                    }
                 });
 
-                svg.on("mouseleave", () => {
+                svg.on("pointerleave pointercancel pointerup", (event) => {
+                    if (event.type === 'pointerup' && event.pointerType !== 'touch') return;
                     tooltip.style("visibility", "hidden");
                     verticalLine.style("opacity", 0);
                 });
@@ -1096,23 +1089,21 @@
         .swell-strip { position: relative; margin-top: 12px; background: var(--raised); border: 1px solid var(--line); }
         .swell-strip .strip-title, .swell-strip #stripReadout { font-family: var(--font-mono); }
         .swell-strip svg { display: block; }
+        /* horizontal finger slides scrub the hover readout; vertical ones
+           scroll the page. No long-press callout or text selection. */
+        .swell-strip svg, #chart svg { touch-action: pan-y; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
         .strip-hover-line { position: absolute; z-index: 3; top: 0; bottom: 0; display: none; width: 1px; background: var(--accent-soft); box-shadow: 0 0 7px rgba(72, 170, 168, .45); pointer-events: none; }
         /* Hover tooltips are the fastest way to read an exact value off any
            chart here, so they are sized for reading, not for minimalism:
            10px values, a full-contrast header, and a solid backdrop. */
         .strip-panel-tooltip {
-            position: absolute; z-index: 5; display: none; min-width: 152px;
+            position: absolute; z-index: 5; display: none; min-width: 168px;
             padding: 9px 10px; border: 1px solid #365d7c; border-left: 2px solid var(--swell);
             background: rgba(20, 21, 26, .98);
             box-shadow: var(--shadow-pop);
             color: var(--text); font-family: var(--font-mono);
             font-size: 10px; line-height: 1.45; pointer-events: none;
         }
-        .forecast-tooltip-date { margin-bottom: 7px; padding-bottom: 6px; border-bottom: 1px solid #3b3e49; color: #fff; font-weight: 600; white-space: nowrap; }
-        .forecast-tooltip-row { display: grid; grid-template-columns: 8px 48px 1fr; align-items: center; gap: 6px; margin-top: 5px; white-space: nowrap; }
-        .forecast-tooltip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tooltip-color); }
-        .forecast-tooltip-label { color: var(--text-3); font-size: 9px; letter-spacing: .04em; }
-        .forecast-tooltip-value { color: var(--tooltip-color); font-weight: 600; text-align: right; text-transform: capitalize; }
         /* One equal-width column per forecast day; the row scrolls on
            narrow screens. The selected day is also shown as a band in the
            strip above, so the strip stays readable while this scrolls. */
@@ -1183,7 +1174,7 @@
         @keyframes windPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.85; } }
         #tooltip {
             z-index: 20;
-            min-width: 214px;
+            min-width: 168px;
             padding: 9px 10px;
             background: rgba(20, 21, 26, .98);
             border: 1px solid #365d7c;
@@ -1194,9 +1185,23 @@
             line-height: 1.45;
             box-shadow: var(--shadow-pop);
         }
-        #tooltip .detail-tooltip-row { grid-template-columns: 8px 62px minmax(0, 1fr); }
-        #tooltip .forecast-tooltip-value { text-align: left; }
-        .detail-tooltip-arrow { display: inline-block; margin-right: 6px; transform-origin: 50% 50%; }
+        /* hover readout: time, then the headline (surf + rating), then a
+           small key/value subheader */
+        .readout-time { color: var(--text-3); font-size: 10px; letter-spacing: .03em; }
+        .readout-head { display: flex; align-items: center; gap: 8px; margin-top: 3px; white-space: nowrap; }
+        .readout-surf { color: #fff; font-family: var(--font-sans); font-size: 18px; font-weight: 600; line-height: 1.15; }
+        .readout-rating {
+            padding: 2px 6px 1px; border-radius: 2px;
+            background: var(--rating-color); color: var(--bg);
+            font-size: 10px; font-weight: 700; letter-spacing: .04em;
+        }
+        .readout-sub {
+            display: grid; grid-template-columns: auto 1fr; gap: 2px 10px;
+            margin-top: 7px; padding-top: 6px; border-top: 1px solid #3b3e49;
+            font-size: 10px; white-space: nowrap;
+        }
+        .readout-sub .k { color: var(--text-3); }
+        .readout-sub .v { color: var(--text-1); }
         /* phones: the day-card row scrolls anyway, so give each card
            room to be readable under a thumb */
         @media (max-width: 767px) {
