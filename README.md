@@ -76,6 +76,12 @@ the server, and restarts the existing `open-swells-app` systemd service. The
 tracked `ops/systemd/open-swells-app.service` file is provided for initial
 server setup;
 routine deployments do not install or modify the service definition.
+The server must have `curl` installed. After restarting, deployment pauses for
+one second, then waits for
+`/healthz` to return HTTP 200 before checking the embedded Firebase asset.
+It makes up to 60 health requests, with a five-second timeout per request and
+a one-second pause between attempts. Failed checks exit with an error and
+print systemd status and recent service logs.
 
 One-time server setup (run as root):
 
