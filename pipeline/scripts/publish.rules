@@ -1,0 +1,17 @@
+# rsync filter for publishing a run (merged by grib_copy_to_server.sh and
+# run.sh --local). Only the forecast products below are copied, and with
+# --delete only they are removed from the destination when the new run did
+# not produce them, so a failed hour can't leave the previous run's frame
+# behind under the same name. Everything else in the destination is
+# excluded and therefore untouched: metadata.json (copied separately, last)
+# and any .gz siblings the web app generates there.
+# Tide predictions are astronomical, so a run whose tide fetch failed keeps
+# the previous spot_tides file rather than deleting it (P: never delete).
+P spot_tides.json.gz
++ *.geojson
++ *.geojson.gz
++ *.png
++ tides.json
++ spot_forecasts.json.gz
++ spot_tides.json.gz
+- *
