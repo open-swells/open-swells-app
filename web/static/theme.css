@@ -34,7 +34,8 @@
     --accent-soft: #bfdbfe;
 
     /* Data series. Swell trends use deep blue while other swell indicators
-       retain the brand green-blue; wind stays amber across the app. */
+       retain the brand green-blue. Wind is a muted slate: it is context for
+       the surf, and must not read as one of the amber/red/teal ratings. */
     --swell: #3b82f6;
     --swell-trend: #4f6fae;
     --swell-2: #e2b86b;
@@ -44,7 +45,7 @@
     --wind-sea: #b98ad6;
     /* breaking surf height band on the forecast charts */
     --surf: #3b82f6;
-    --wind: #eec37c;
+    --wind: #94a3b8;
     --tide: #2ec2c2;
 
     /* Surf condition ramp: poor -> epic. Ordered by lightness as well as hue
