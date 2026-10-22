@@ -21,8 +21,28 @@
             #tooltip { border-radius: 4px !important; background: var(--panel) !important; border-color: var(--line-strong) !important; }
             .popup-only { display: none; }
             body.embedded .popup-only { display: inline-flex; }
+            /* No "today" lanes for a buoy, so the swell, wind, and water
+               sit beside the headline instead of beneath it. */
+            .buoy-report { display: flex; align-items: flex-start; gap: 16px 48px; }
+            .buoy-report .rp-now { flex: none; margin-bottom: 0; }
+            .buoy-report .rp-props { flex: 0 1 420px; gap: 14px 40px; }
+            @media (max-width: 639px) {
+                .buoy-report { flex-direction: column; }
+                .buoy-report .rp-props { flex-basis: auto; width: 100%; }
+            }
         </style>
-        <script>if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));</script>
+        <script>
+            if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));
+            document.addEventListener('DOMContentLoaded', () => {
+                const formatter = new Intl.DateTimeFormat(undefined, {
+                    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+                });
+                document.querySelectorAll('[data-local-time]').forEach(el => {
+                    const date = new Date(Number(el.dataset.localTime));
+                    if (!Number.isNaN(date.getTime())) el.textContent = formatter.format(date);
+                });
+            });
+        </script>
     </head>
 
     <body>
@@ -42,10 +62,9 @@
             </div>
         </div>
 
-        <div class="flex items-center justify-between gap-3 mb-2">
-            <div class="section-label">Current report</div>
-        </div>
-        <div class="current-report">{{template "report" .}}</div>
+        {{$r := buoyreport .SwellReport .WindReport}}
+        <div class="section-label mb-2 min-w-0">Report {{if $r.ObservedUnixMs}}<span class="normal-case font-normal tracking-normal text-[#8b9099]">&middot; observed <span data-local-time="{{$r.ObservedUnixMs}}">{{$r.Observed}}</span></span>{{end}}</div>
+        <div class="buoy-report">{{template "buoynow" $r}}</div>
         {{if .HasForecastError}}
         <section class="mt-4 border border-[#43454c] bg-[#1f2026] px-5 py-8 text-center" role="status">
             <h2 class="text-sm font-semibold text-white">Forecast not available</h2>
