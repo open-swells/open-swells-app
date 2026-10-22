@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html>
+    <head>
+        <title>OpenSwells - Map Test</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                    extend: {}
+                }
+            }
+        </script>
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        body {
+            font-family: 'JetBrains Mono', monospace !important;
+        }
+        </style>
+    </head>
+    <body class="h-screen w-screen relative dark:bg-slate-800">
+        <script src='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js'></script>
+        <link href='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css' rel='stylesheet' />
+
+        <div id="mapView" class="absolute inset-0 z-0">
+            <div 
+                id="map"
+                class="absolute inset-0 z-0 h-screen w-screen" 
+                style="background: #ccc;"
+            >
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="legend absolute lg:bottom-40 bottom-72 left-4 z-10 bg-white/95 dark:bg-slate-800/95 p-3 shadow-lg hidden lg:block">
+            <div class="text-xs font-semibold mb-2 dark:text-white">Significant wave height (m)</div>
+            <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-4" style="background-color: #A50026;"></div>
+                    <span class="text-xs dark:text-white">≥ 5.5</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-4" style="background-color: #D73027;"></div>
+                    <span class="text-xs dark:text-white">4.0 – 5.5</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-4" style="background-color: #F46D43;"></div>
+                    <span class="text-xs dark:text-white">2.5 – 4.0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-4" style="background-color: #4575B4;"></div>
+                    <span class="text-xs dark:text-white">1.5 – 2.5</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-4" style="background-color: #74ADD1;"></div>
+                    <span class="text-xs dark:text-white">1.0 – 1.5</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-4" style="background-color: #C7E9FF;"></div>
+                    <span class="text-xs dark:text-white">0.5 – 1.0</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <div class="w-6 h-4" style="background-color: #F7FBFF;"></div>
+                    <span class="text-xs dark:text-white">&lt; 0.5</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div class="bottom-controls absolute bottom-0 left-0 right-0 grid lg:grid-cols-3 grid-cols-1 items-end lg:gap-4 gap-1 m-4 z-10 lg:mb-4 mb-14">
+            <!-- Metadata Container - Center -->
+            <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2  min-w-[100px] justify-self-center w-full lg:w-auto lg:col-start-2">
+                <span class="text-xs font-semibold dark:text-white">Last Updated:</span>
+                <span id="metadataTimestamp" class="text-xs dark:text-white"></span>
+            </div>
+
+            <!-- Time Slider Container - Right -->
+            <div class="bg-white/95 dark:bg-slate-800/95 p-2 shadow-lg flex items-center gap-2 dark:text-white lg:w-auto lg:justify-self-end lg:col-start-3">
+                <button id="playButton" class="w-12 h-12 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-slate-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                </button>
+                <div class="flex flex-col w-full">
+                    <div class="flex items-center gap-2">
+                        <input type="range" 
+                               id="timeSlider" 
+                               min="0" 
+                               max="0" 
+                               value="0" 
+                               step="1"
+                               class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600">
+                        <span id="timeValue" class="text-xs min-w-[10ch]">--</span>
+                    </div>
+                    <span id="forecastTime" class="text-xs dark:text-gray-200 mt-1"></span>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            const forecastHours = Array.from({ length: 129 }, (_, i) => i * 3);
+
+            // Initialize MapLibre map
+            const map = new maplibregl.Map({
+                container: 'map',
+                center: [-121.157227, 33.800832], // Note: MapLibre uses [lng, lat] order
+                style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+                zoom: 5
+            });
+
+            const playButton = document.getElementById('playButton');
+            const timeSlider = document.getElementById('timeSlider');
+            const timeValue = document.getElementById('timeValue');
+            const forecastTimeLabel = document.getElementById('forecastTime');
+
+            timeSlider.max = forecastHours.length - 1;
+            timeSlider.value = 0;
+
+            let currentIndex = 0;
+            let isPlaying = false;
+            let animationInterval;
+            let forecastStartTime;
+
+            function hourToFilename(hour) {
+                return `files/contours_${String(hour).padStart(3, '0')}.geojson`;
+            }
+
+            // A helper function to add the contours source/layer
+            function addContoursLayer() {
+                if (map.getLayer('contour-fills')) {
+                    map.removeLayer('contour-fills');
+                }
+                if (map.getSource('contours')) {
+                    map.removeSource('contours');
+                }
+                map.addSource('contours', {
+                    type: 'geojson',
+                    data: hourToFilename(forecastHours[currentIndex])
+                });
+
+                // Add layer
+                map.addLayer(
+                    {
+                    id: 'contour-fills',
+                    type: 'fill',
+                    source: 'contours',
+                    paint: {
+                        'fill-color': [
+                            'step',
+                            ['get', 'contour_mean'],
+                            '#F7FBFF', 0.5,
+                            '#C7E9FF', 1.0,
+                            '#74ADD1', 1.5,
+                            '#4575B4', 2.5,
+                            '#F46D43', 4.0,
+                            '#D73027', 5.5,
+                            '#A50026'
+                        ],
+                        'fill-opacity': 0.72,
+                        'fill-outline-color': 'rgba(0, 0, 0, 0.15)'
+                        }
+                    }
+                );
+            }
+
+            map.on('style.load', () => {
+                addContoursLayer();
+                map.moveLayer('contour-fills');
+                updateMap(currentIndex);
+            });
+
+            // Fetch metadata and initialize time display
+            async function fetchMetadata() {
+                try {
+                    const response = await fetch('files/metadata.json'); // Use local file
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch metadata');
+                    }
+                    const metadata = await response.json();
+                    const timestamp = new Date(metadata.timestamp);
+                    
+                    const [datePart, timePart] = metadata.forecast_start.split('_');
+                    const year = datePart.substring(0, 4);
+                    const month = datePart.substring(4, 6);
+                    const day = datePart.substring(6, 8);
+                    const hour = timePart.substring(0, 2);
+                    
+                    forecastStartTime = new Date(Date.UTC(year, month - 1, day, hour));
+
+                    document.getElementById('metadataTimestamp').textContent = timestamp.toLocaleString();
+                    updateTimeDisplay(forecastHours[currentIndex]);
+                } catch (error) {
+                    console.error('Error fetching metadata:', error);
+                    document.getElementById('metadataTimestamp').textContent = 'Unable to load timestamp';
+                }
+            }
+
+            const dateFormatter = new Intl.DateTimeFormat(undefined, {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+            });
+
+            function updateTimeDisplay(hours) {
+                if (!forecastStartTime) {
+                    return;
+                }
+
+                const currentTime = new Date(
+                    forecastStartTime.getTime() + hours * 60 * 60 * 1000
+                );
+                const timeStr = dateFormatter.format(currentTime);
+                forecastTimeLabel.textContent = timeStr;
+                timeValue.textContent = timeStr;
+            }
+
+            function updateMap(index) {
+                currentIndex = index;
+                const hours = forecastHours[index];
+
+                if (map.style && map.isStyleLoaded()) {
+                    const source = map.getSource('contours');
+                    if (source) {
+                        source.setData(hourToFilename(hours));
+                    }
+                }
+                updateTimeDisplay(hours);
+            }
+
+            function stepForward() {
+                const nextIndex = (currentIndex + 1) % forecastHours.length;
+                timeSlider.value = nextIndex;
+                updateMap(nextIndex);
+            }
+
+            playButton.addEventListener('click', () => {
+                isPlaying = !isPlaying;
+                playButton.innerHTML = isPlaying ? 
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>' :
+                    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M8 5v14l11-7z"/></svg>';
+
+                if (isPlaying) {
+                    animationInterval = setInterval(() => {
+                        stepForward();
+                    }, 500); // Update every 500ms
+                } else {
+                    clearInterval(animationInterval);
+                }
+            });
+
+            timeSlider.addEventListener('input', (event) => {
+                const index = parseInt(event.target.value, 10);
+                updateMap(index);
+                if (isPlaying) {
+                    clearInterval(animationInterval);
+                    isPlaying = false;
+                    playButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M8 5v14l11-7z"/></svg>';
+                }
+            });
+
+            //center the map
+            map.setCenter([-119.069824, 33.101608]);
+            map.setZoom(3);
+
+            // Fetch metadata when page loads
+            fetchMetadata();
+        </script>
+    </body>
+</html>

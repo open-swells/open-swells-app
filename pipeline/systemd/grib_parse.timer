@@ -1,0 +1,13 @@
+[Unit]
+Description=Run GFS wave contour pipeline after each model cycle
+
+[Timer]
+# GFS wave output for a cycle is complete roughly 5h after cycle time
+# (00/06/12/18Z), so fire at 05/11/17/23Z. RandomizedDelaySec spreads
+# load on NOMADS.
+OnCalendar=*-*-* 05,11,17,23:00:00 UTC
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

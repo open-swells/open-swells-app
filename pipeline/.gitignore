@@ -1,0 +1,10 @@
+*.db
+.DS_store
+*.geojson
+*.grib2
+*.csv
+*.log
+.env
+logs
+files
+__pycache__/
