@@ -15,7 +15,7 @@
                 lineQuaternary: themeColor('--swell-4', '#73c4b6'),
                 lineWindSea: themeColor('--wind-sea', '#b98ad6'),
                 surf: themeColor('--surf', '#3b82f6'),
-                wind: themeColor('--wind', '#eec37c'),
+                wind: themeColor('--wind', '#94a3b8'),
                 tide: themeColor('--tide', '#2ec2c2'),
                 axis: themeColor('--text-3', '#8b9099'),
                 grid: themeColor('--line', '#2f3137'),
@@ -316,7 +316,7 @@
 
             // --- 16-day strip: swell height + wind speed lanes ------------
             // Two lanes on one shared day grid: swell (green-blue, ft) on top,
-            // wind (amber, mph) beneath. Hover reads out both; clicking
+            // wind (slate, mph) beneath. Hover reads out both; clicking
             // jumps to that day's hourly detail.
             const stripHost = document.getElementById('swellStrip');
             const stripReadout = document.getElementById('stripReadout');
@@ -579,15 +579,14 @@
             const cards = document.querySelectorAll('.forecastcard');
             const firstCard = cards[0];
 
-            // The hourly detail is three stacked panels -- swell height,
-            // wind, surf conditions -- in one svg so they share the x scale
-            // and crosshair. Each panel has its own title row, axis, and
-            // frame; `height` is the swell panel's plot height.
-            // The right margin mirrors the left (axis-label) margin so the
-            // plots sit centered in the card; phones keep a slim right edge
-            // rather than give up plot width.
+            // The hourly detail is stacked panels -- swell height, tide,
+            // wind, surf conditions, the same order as the report's today
+            // chart -- in one svg so they share the x scale and crosshair.
+            // Each panel has a title row above it and its axis values set
+            // inside the plot, so the plots run the full width of the page.
+            // `height` is the swell panel's plot height.
             const chartOuterWidth = document.getElementById('chart-container').clientWidth;
-            const margin = {top: 24, right: chartOuterWidth >= 640 ? 44 : 14, bottom: 24, left: 44},
+            const margin = {top: 24, right: 0, bottom: 24, left: 0},
                 width = chartOuterWidth - margin.left - margin.right,
                 height = 180;
 
@@ -631,10 +630,13 @@
             var yScale = d3.scaleLinear()
                 .range([ height, 0 ]);
 
-            // full-width gridlines at each tick; the unit is in the title
+            // full-width gridlines at each tick; the unit is in the title.
+            // Values sit on the plot, just above their gridline.
             var yAxis = d3.axisLeft(yScale).ticks(4)
                 .tickFormat(d => (d % 1 ? d.toFixed(1) : d.toFixed(0)))
-                .tickSize(-width).tickSizeOuter(0).tickPadding(8);
+                .tickSize(-width).tickSizeOuter(0).tickPadding(0);
+            const insetAxisLabels = g => g.selectAll(".tick text")
+                .attr("class", "axis-label").attr("x", 2).attr("dy", -3).attr("text-anchor", 'start');
 
             const yAxisGroup = svg.append("g")
                 .attr("class", "yaxis")
@@ -642,6 +644,8 @@
 
             const setAxisColor = () => {
                 const colors = getChartColors();
+                // the first hour label starts at the plot's left edge
+                svg.selectAll(".xaxis .tick text").attr("text-anchor", d => (d === 0 ? 'start' : 'middle'));
                 svg.selectAll(".yaxis, .xaxis").selectAll("text").style("fill", colors.axis);
                 svg.selectAll(".xaxis").selectAll("path, line").style("stroke", CHART.gridStrong);
                 svg.selectAll(".yaxis").selectAll("path").style("stroke", 'none');
@@ -685,12 +689,6 @@
                     if (windDayPts.length < 2) windDayPts = [];
                 }
 
-                // the wind lane keeps its slot while loading so the chart
-                // doesn't jump when the data lands
-                const showWind = windState !== 'none';
-                const windTop = height + panelGap;
-                const windBottom = showWind ? windTop + windLaneH : height;
-
                 // classifier hours for the selected day, as fractional hours
                 // on the swell chart's x scale
                 let condDayPts = [];
@@ -726,11 +724,17 @@
                 // the panel stays on a day past the predictions so the
                 // chart keeps its shape, with a note instead of a curve
                 const showTide = !!tideExtent;
-                const tideTop = windBottom + panelGap;
-                const tideBottom = showTide ? tideTop + tideLaneH : windBottom;
+                const tideTop = height + panelGap;
+                const tideBottom = showTide ? tideTop + tideLaneH : height;
 
-                const condTop = tideBottom + panelGap;
-                const chartBottom = condDayPts.length ? condTop + condLaneH : tideBottom;
+                // the wind lane keeps its slot while loading so the chart
+                // doesn't jump when the data lands
+                const showWind = windState !== 'none';
+                const windTop = tideBottom + panelGap;
+                const windBottom = showWind ? windTop + windLaneH : tideBottom;
+
+                const condTop = windBottom + panelGap;
+                const chartBottom = condDayPts.length ? condTop + condLaneH : windBottom;
                 d3.select(svg.node().ownerSVGElement)
                     .attr("width", width + margin.left + margin.right)
                     .attr("height", chartBottom + margin.top + margin.bottom)
@@ -742,15 +746,15 @@
                 const maxWaveHeight = Math.max(
                     d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight, d.TertiaryWaveHeight, d.QuaternaryWaveHeight, d.WindSeaHeight || 0)) * 3.28084,
                     d3.max(surfDayPts, c => c.ft_hi) || 0);
-                y.domain([0, maxWaveHeight]);
-                yScale.domain([0, maxWaveHeight]);
+                y.domain([0, maxWaveHeight * 1.08]);
+                yScale.domain([0, maxWaveHeight * 1.08]);
                 // dedupe ticks that would render identical labels
                 yAxis.tickValues([...new Set(yScale.ticks(3).map(v => +v.toFixed(1)))]);
                 // Drawn without a transition: updateChart runs again when the
                 // wind fetch lands, and the second call used to interrupt the
                 // first one's exit transition, leaving stale tick labels from
                 // the previous domain on the axis alongside the new ones.
-                svg.select(".yaxis").call(yAxis);
+                svg.select(".yaxis").call(yAxis).call(insetAxisLabels);
                 setAxisColor();
 
                 // Panel frames, 3-hour gridlines, and title rows. Inserted
@@ -758,14 +762,13 @@
                 svg.selectAll(".panel-chrome").remove();
                 const chrome = svg.insert("g", ":first-child").attr("class", "panel-chrome");
                 const panels = [[0, height]];
-                if (showWind) panels.push([windTop, windBottom]);
                 if (showTide) panels.push([tideTop, tideBottom]);
+                if (showWind) panels.push([windTop, windBottom]);
                 if (condDayPts.length) panels.push([condTop, chartBottom]);
                 for (const [top, bottom] of panels) {
-                    chrome.append("rect").attr("class", "plot-bg")
-                        .attr("x", 0).attr("y", top)
-                        .attr("width", width).attr("height", bottom - top)
-                        .attr("fill", themeColor('--panel', '#17181b'))
+                    chrome.append("line").attr("class", "plot-base")
+                        .attr("x1", 0).attr("x2", width)
+                        .attr("y1", bottom).attr("y2", bottom)
                         .attr("stroke", CHART.gridStrong);
                     for (let h = 3; h < 23; h += 3) {
                         chrome.append("line").attr("class", "hour-grid")
@@ -821,7 +824,7 @@
                 // direction arrows on each swell line, thinned on narrow
                 // screens so neighbors never overlap
                 const arrowEvery = Math.max(1, Math.ceil(24 / Math.max(x(1) - x(0), 1)));
-                const halo = themeColor('--panel', '#17181b');
+                const halo = themeColor('--bg', '#0e0f12');
                 const swellArrows = (cls, rows, field, degField, color, size) => {
                     svg.selectAll(`.${cls}`)
                         .data(rows.filter((d, i) => i % arrowEvery === 0 && parseFloat(d[field]) > 0))
@@ -863,51 +866,67 @@
                             .text('no wind data for this day');
                     } else {
                         const mph = w => w.s * 2.237;
-                        const maxMph = d3.max(windDayPts, mph);
-                        const yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.1, 10)]).nice(4).range([wdBase, plotTop]);
-                        // mph axis with gridlines, like the swell panel
+                        // one bar per hour, interpolated between the model's
+                        // 3-hourly samples, like the conditions bars beneath
+                        const { start: windDayStart } = localDayBounds(currentDate);
+                        const hourly = [];
+                        for (let h = 0; h <= 23; h++) {
+                            const t = new Date(windDayStart);
+                            t.setHours(h, 0, 0, 0);
+                            const w = windAtTime(t.getTime());
+                            if (w) hourly.push({ hour: h, s: w.s, d: w.d });
+                        }
+                        const maxMph = d3.max(hourly, mph) || 0;
+                        const yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 10)]).nice(4).range([wdBase, plotTop]);
+                        // mph gridlines, values inside the plot; any that
+                        // would run into the reading row are left off
                         for (const t of yw.ticks(3)) {
-                            if (t > 0) {
-                                lane.append("line")
-                                    .attr("x1", 0).attr("x2", width)
-                                    .attr("y1", yw(t)).attr("y2", yw(t))
-                                    .attr("stroke", CHART.grid);
-                            }
+                            if (t <= 0) continue;
+                            lane.append("line")
+                                .attr("x1", 0).attr("x2", width)
+                                .attr("y1", yw(t)).attr("y2", yw(t))
+                                .attr("stroke", CHART.grid);
+                            if (yw(t) - 3 < readingY + 12) continue;
                             lane.append("text").attr("class", "axis-label")
-                                .attr("x", -8).attr("y", yw(t)).attr("dy", '0.32em')
-                                .attr("text-anchor", 'end')
+                                .attr("x", 2).attr("y", yw(t) - 3)
                                 .attr("fill", CHART.axis)
                                 .text(t);
                         }
-                        lane.append("path").datum(windDayPts)
-                            .attr("fill", 'none').attr("stroke", CHART.wind).attr("stroke-width", 1.75)
-                            .attr("d", d3.line().x(w => x(w.hour)).y(w => yw(mph(w))).curve(d3.curveMonotoneX));
-                        // each model sample gets a direction arrow on the line
-                        // and its speed in the reading row; the interpolated
-                        // day-edge points only extend the line
-                        const windPeak = windDayPts.reduce((a, b) => (b.s > a.s ? b : a));
-                        const samples = windDayPts.filter(p => !p.pad);
-                        // thin arrows and readings so they never crowd on
-                        // narrow screens; the peak reading is always shown
-                        const stride = minPx => {
-                            const gap = samples.length > 1 ? x(samples[1].hour) - x(samples[0].hour) : width;
-                            return Math.max(1, Math.ceil(minPx / Math.max(gap, 1)));
-                        };
-                        const windArrowEvery = stride(24), readingEvery = stride(30);
-                        samples.forEach((w, i) => {
-                            if (i % windArrowEvery && w !== windPeak) return;
-                            lane.append("path")
-                                .attr("d", arrowPath(8))
-                                .attr("transform", `translate(${x(w.hour)}, ${yw(mph(w))}) rotate(${travelBearing(w.d)})`)
-                                .attr("fill", CHART.wind)
-                                .attr("stroke", themeColor('--panel', '#17181b')).attr("stroke-width", 1).attr("stroke-linejoin", 'round');
-                            if (w !== windPeak && (i % readingEvery || Math.abs(x(w.hour) - x(windPeak.hour)) < 30)) return;
+                        const windPeak = hourly.reduce((a, b) => (b.s > a.s ? b : a));
+                        // bars center on their hour; the first and last are
+                        // cropped at the plot edge
+                        const bw = Math.max(2, x(1) - x(0) - 3);
+                        const barX = w => Math.max(0, x(w.hour) - bw / 2);
+                        const barW = w => Math.min(width, x(w.hour) + bw / 2) - barX(w);
+                        lane.selectAll(".wind-bar").data(hourly).join("rect")
+                            .attr("class", "wind-bar")
+                            .attr("x", barX).attr("width", barW)
+                            .attr("y", w => yw(mph(w)))
+                            .attr("height", w => wdBase - yw(mph(w)))
+                            .attr("rx", 1.5)
+                            .attr("fill", CHART.wind)
+                            .attr("fill-opacity", w => (w === windPeak ? 0.95 : 0.6));
+                        // direction arrows above the bars and speeds in the
+                        // reading row, thinned so they never crowd on narrow
+                        // screens; the peak is always shown
+                        const stride = minPx => Math.max(1, Math.ceil(minPx / Math.max(x(1) - x(0), 1)));
+                        const arrowEvery = Math.max(3, stride(22)), readingEvery = Math.max(3, stride(30));
+                        hourly.forEach(w => {
+                            const isPeak = w === windPeak;
+                            if (w.hour % arrowEvery === 0 || isPeak) {
+                                lane.append("path")
+                                    .attr("d", arrowPath(6.5))
+                                    .attr("transform", `translate(${x(w.hour)}, ${yw(mph(w)) - 9}) rotate(${travelBearing(w.d)})`)
+                                    .attr("fill", CHART.wind)
+                                    .attr("stroke", themeColor('--bg', '#0e0f12')).attr("stroke-width", 1).attr("stroke-linejoin", 'round');
+                            }
+                            if (!isPeak && (w.hour % readingEvery || Math.abs(x(w.hour) - x(windPeak.hour)) < 30)) return;
                             lane.append("text").attr("class", "wind-reading")
                                 .attr("x", Math.max(8, Math.min(width - 8, x(w.hour))))
                                 .attr("y", readingY)
                                 .attr("text-anchor", 'middle')
                                 .attr("fill", CHART.wind)
-                                .attr("font-weight", w === windPeak ? 700 : 400)
+                                .attr("font-weight", isPeak ? 700 : 400)
                                 .text(mph(w).toFixed(0));
                         });
                         windSummary = `Peak ${mph(windPeak).toFixed(0)} mph ${cardinal(windPeak.d)} at ${fmtHour(windPeak.hour)}`;
@@ -936,8 +955,7 @@
                             .attr("stroke", t === 0 ? CHART.gridStrong : CHART.grid)
                             .attr("stroke-dasharray", t === 0 ? '3,3' : null);
                         lane.append("text").attr("class", "axis-label")
-                            .attr("x", -8).attr("y", yt(t)).attr("dy", '0.32em')
-                            .attr("text-anchor", 'end')
+                            .attr("x", 2).attr("y", yt(t) - 3)
                             .attr("fill", CHART.axis)
                             .text(t);
                     }
@@ -959,7 +977,7 @@
                             lane.append("circle")
                                 .attr("cx", ex).attr("cy", ey).attr("r", 2.5)
                                 .attr("fill", CHART.tide)
-                                .attr("stroke", themeColor('--panel', '#17181b')).attr("stroke-width", 1);
+                                .attr("stroke", themeColor('--bg', '#0e0f12')).attr("stroke-width", 1);
                             const when = new Date(e.t);
                             const hh = when.getHours(), mm = String(when.getMinutes()).padStart(2, '0');
                             lane.append("text").attr("class", "tide-reading")
@@ -984,7 +1002,7 @@
                         `Best ${fmtHour(dayBest.hour)} · ${dayBest.rating.toUpperCase()}`,
                         CONDITION_COLORS[dayBest.rating]);
                     const yc = d3.scaleLinear().domain([0, 100]).range([cdBase, cdTop]);
-                    for (const [rating, lo, hi] of COND_BANDS) {
+                    for (const [, lo] of COND_BANDS) {
                         if (lo > 0) {
                             lane.append("line")
                                 .attr("x1", 0).attr("x2", width)
@@ -992,12 +1010,6 @@
                                 .attr("stroke", CHART.gridStrong)
                                 .attr("stroke-dasharray", '3,3');
                         }
-                        lane.append("text").attr("class", "axis-label")
-                            .attr("x", -8).attr("y", yc((lo + hi) / 2)).attr("dy", '0.32em')
-                            .attr("text-anchor", 'end')
-                            .attr("fill", CONDITION_COLORS[rating])
-                            .attr("font-weight", 600)
-                            .text(rating.toUpperCase());
                     }
                     // bars center on their hour like the panels above; the
                     // first and last are cropped at the plot edge (a half
@@ -1013,6 +1025,15 @@
                         .attr("height", c => cdBase - yc(Math.max(c.score, 5)))
                         .attr("rx", 1.5)
                         .attr("fill", c => CONDITION_COLORS[c.rating]);
+                    // band names at the right end of the threshold each
+                    // starts at, over the bars on a halo
+                    for (const [rating, lo, hi] of COND_BANDS) {
+                        lane.append("text").attr("class", "axis-label band-label")
+                            .attr("x", width - 2).attr("y", yc(hi) + 9)
+                            .attr("text-anchor", 'end')
+                            .attr("fill", CONDITION_COLORS[rating])
+                            .text(rating.toUpperCase());
+                    }
                 }
 
                 const tooltip = d3.select("#tooltip");
@@ -1148,12 +1169,8 @@
             letter-spacing: 0.03em;
             margin-top: 2px;
         }
-        .swell-detail {
-            margin-top: 12px;
-            padding: 10px 10px 6px;
-            background: var(--raised);
-            border: 1px solid var(--line);
-        }
+        /* the selected day sits on the page background, full width */
+        .swell-detail { margin-top: 20px; }
         /* the selected day: the detail card's one loud element */
         #date-header { font-size: 15px; font-weight: 600; color: #fff; }
         #date-header .hdr-date { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--text-2); margin-left: 4px; }
@@ -1168,7 +1185,12 @@
         #chart text { font-family: var(--font-mono); font-size: 10px; }
         #chart .panel-title { font-size: 10px; font-weight: 600; letter-spacing: .04em; }
         #chart .panel-summary { font-size: 10px; font-weight: 600; }
-        #chart .plot-bg, #chart .hour-grid { shape-rendering: crispEdges; }
+        #chart .plot-base, #chart .hour-grid { shape-rendering: crispEdges; }
+        /* axis values sit on the plots; a halo in the page color keeps
+           them legible over the series */
+        #chart .axis-label { font-size: 9px; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+        #chart .band-label { font-weight: 700; letter-spacing: .04em; }
+        #chart .tide-reading, #chart .wind-reading { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
         /* pulse for the wind lane's loading placeholder */
         .wind-loading { animation: windPulse 1.4s ease-in-out infinite; }
         @keyframes windPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.85; } }
@@ -1211,9 +1233,6 @@
             .forecastcard .fc-height { font-size: 13px; margin-top: 4px; }
             .forecastcard .fc-cond { font-size: 9px; margin-top: 3px; }
         }
-        @media (max-width: 520px) {
-            .swell-detail { padding-inline: 6px; }
-        }
     </style>
 
     <!-- 16-day outlook: swell + wind lanes. The selected day is shown as a
@@ -1231,7 +1250,7 @@
     <div id="forecastContainer"></div>
     <div class="swell-detail">
         <!-- the selected day -->
-        <div class="px-1 mb-1">
+        <div class="mb-1">
             <div id="date-header"></div>
         </div>
         <!-- Hourly swell on top, then surface wind (wave-model grid), tide
