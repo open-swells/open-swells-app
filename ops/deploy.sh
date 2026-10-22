@@ -90,35 +90,76 @@ echo "Building with $GO_BIN..."
 chown root:"$APP_USER" "$APP_NAME"
 chmod 0750 "$APP_NAME"
 
-systemctl restart "$APP_NAME"
-systemctl --no-pager --full status "$APP_NAME"
+show_diagnostics() {
+  systemctl --no-pager --full status "$APP_NAME" >&2 || true
+  journalctl -u "$APP_NAME" -n 80 --no-pager >&2 || true
+}
+
+# Type=simple reports started before the application is listening.
+# Require HTTP readiness separately from systemd's process state.
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl is required on the server to verify deployment readiness." >&2
+  exit 1
+fi
+
+if ! systemctl restart "$APP_NAME"; then
+  show_diagnostics
+  exit 1
+fi
 
 PORT="$(awk -F= '/^[[:space:]]*PORT[[:space:]]*=/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); gsub(/^"|"$/, "", $2); print $2; exit}' "$SERVICE_ENV_FILE" 2>/dev/null || true)"
 PORT="${PORT:-8081}"
 
-if command -v curl >/dev/null 2>&1; then
-  echo "Checking http://127.0.0.1:$PORT/healthz ..."
-  if ! curl -fsS "http://127.0.0.1:$PORT/healthz"; then
-    echo
-    echo "Service is running, but /healthz did not return 200. Check logs with:"
-    echo "  journalctl -u $APP_NAME -f"
-  fi
+HEALTH_URL="http://127.0.0.1:$PORT/healthz"
+HEALTH_BODY="$(mktemp)"
+HEALTH_ERROR="$(mktemp)"
+trap 'rm -f "$HEALTH_BODY" "$HEALTH_ERROR"' EXIT
 
-  echo
-  echo "Checking embedded Firebase auth asset ..."
-  AUTH_ASSET_URL="http://127.0.0.1:$PORT/assets/firebase-auth.js"
-  AUTH_CONTENT_TYPE="$(curl -fsS -o /dev/null -w '%{content_type}' "$AUTH_ASSET_URL")" || {
-    echo "Firebase auth asset is unavailable at $AUTH_ASSET_URL." >&2
-    exit 1
-  }
-  case "$AUTH_CONTENT_TYPE" in
-    application/javascript*|text/javascript*) ;;
-    *)
-      echo "Firebase auth asset has unexpected Content-Type: $AUTH_CONTENT_TYPE" >&2
-      exit 1
-      ;;
-  esac
+echo "Waiting for $HEALTH_URL (up to 60 attempts)..."
+sleep 1
+READY=false
+for ((attempt = 1; attempt <= 60; attempt++)); do
+  HEALTH_STATUS="$(curl -sS --connect-timeout 2 --max-time 5 \
+    -o "$HEALTH_BODY" -w '%{http_code}' "$HEALTH_URL" 2>"$HEALTH_ERROR")" || HEALTH_STATUS=000
+  if [[ "$HEALTH_STATUS" == 200 ]]; then
+    READY=true
+    break
+  fi
+  if ! systemctl is-active --quiet "$APP_NAME"; then
+    echo "Service stopped before becoming ready." >&2
+    break
+  fi
+  if (( attempt < 60 )); then
+    sleep 1
+  fi
+done
+
+if [[ "$READY" != true ]]; then
+  echo "Deployment failed: $HEALTH_URL did not return 200 (last status: $HEALTH_STATUS)." >&2
+  cat "$HEALTH_ERROR" "$HEALTH_BODY" >&2
+  show_diagnostics
+  exit 1
 fi
+
+echo "Service is ready."
+echo "Checking embedded Firebase auth asset ..."
+AUTH_ASSET_URL="http://127.0.0.1:$PORT/assets/firebase-auth.js"
+AUTH_CONTENT_TYPE="$(curl -fsS --connect-timeout 2 --max-time 10 -o /dev/null -w '%{content_type}' "$AUTH_ASSET_URL")" || {
+  echo "Firebase auth asset is unavailable at $AUTH_ASSET_URL." >&2
+  show_diagnostics
+  exit 1
+}
+case "$AUTH_CONTENT_TYPE" in
+  application/javascript*|text/javascript*) ;;
+  *)
+    echo "Firebase auth asset has unexpected Content-Type: $AUTH_CONTENT_TYPE" >&2
+    show_diagnostics
+    exit 1
+    ;;
+esac
+
+systemctl --no-pager --full status "$APP_NAME"
+
 REMOTE_SCRIPT
 
 echo "Deploy complete: ssh $REMOTE 'journalctl -u $APP_NAME -f'"
