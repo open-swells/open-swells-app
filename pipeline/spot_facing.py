@@ -36,7 +36,7 @@ Coastline: GSHHG full resolution native binary (gshhs_f.b) from
 https://www.soest.hawaii.edu/pwessel/gshhg/ (LGPL). Usage:
 
     python -I spot_facing.py --gshhg /path/to/gshhs_f.b \\
-        --report facing_report.csv spots.json ../open-swells-app/data/spots.json
+        --report facing_report.csv spots.json ../app/data/spots.json
 
 Geometry runs in a spherical azimuthal equidistant projection centered on
 each spot, where distances and bearings from the center are exact.

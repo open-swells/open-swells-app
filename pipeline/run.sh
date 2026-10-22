@@ -3,7 +3,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL=false
 VERBOSE=false
 LIMIT=0
-LOCAL_DEST_PATH="${LOCAL_DEST_PATH:-"$SCRIPT_DIR/../open-swells-app/data/forecast"}"
+LOCAL_DEST_PATH="${LOCAL_DEST_PATH:-"$SCRIPT_DIR/../app/data/forecast"}"
 
 usage() {
     echo "Usage: $0 [--local] [--verbose] [--limit <n>]"
@@ -116,7 +116,7 @@ echo "Starting grib parse runner"
 "$SCRIPT_DIR/scripts/grib_parse_runner.sh"
 
 if [ "$LOCAL" = true ]; then
-    echo "Copying files locally to open-swells-app"
+    echo "Copying files locally to app/data/forecast"
     copy_files_locally
 else
     echo "Copying files to server"

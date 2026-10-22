@@ -15,9 +15,9 @@ This project was previously a 3 day forecast for my local beach using an LSTM ne
 
 ### Running the App
 
-You can run this app locally.
+You can run this app locally from the `app/` directory of the monorepo.
 
-1. clone repo
+1. clone repo and `cd app`
 2. `$ FIREBASE_CREDENTIALS=/path/to/service-account-key.json go run ./server`
 3. go to localhost:8081
 
@@ -47,8 +47,8 @@ Configuration (all optional except Firebase credentials):
 data is fresh (<24h), 503 otherwise — point uptime monitoring at it.
 
 The ignored `data/forecast/` directory contains generated forecast products.
-For local development it is populated by the sibling `grib-parse-collect`
-repository. In production, a separate forecast host delivers those files to
+For local development it is populated by `../pipeline/run.sh --local`.
+In production, the pipeline on the forecast host delivers those files to
 this directory over rsync. They remain available to the browser under the
 existing `/static/` URL path. Existing deployments may temporarily use
 `STATIC_DIR` as a fallback for `FORECAST_DIR`.
@@ -71,7 +71,8 @@ third-party storage. Before deploying a new hostname:
 
 ### Deploying to Linux
 
-`ops/deploy.sh` deploys the app to `/opt/open-swells-app` over SSH, builds it on
+`ops/deploy.sh` (or `./deploy.sh app` from the repository root) deploys
+the contents of `app/` to `/opt/open-swells-app` over SSH, builds it on
 the server, and restarts the existing `open-swells-app` systemd service. The
 tracked `ops/systemd/open-swells-app.service` file is provided for initial
 server setup;
@@ -108,7 +109,7 @@ Then run `systemctl daemon-reload` and deploy. The forecast producer should
 write to `/var/lib/open-swells/forecast`; the application account needs write
 access there because it creates cached `.gz` siblings.
 
-Add the server IP to `.env`:
+Add the server IP to `app/.env`:
 
 ```sh
 SERVER_IP=203.0.113.10

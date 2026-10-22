@@ -114,7 +114,7 @@ hand-tuned `swell_window` are left alone.
 # gshhg-bin-2.3.7.zip from https://www.soest.hawaii.edu/pwessel/gshhg/
 unzip gshhg-bin-2.3.7.zip gshhs_f.b -d ~/.cache/openswells-gshhg
 .venv/bin/python -I spot_facing.py --gshhg ~/.cache/openswells-gshhg/gshhs_f.b \
-    --report facing_report.csv spots.json ../open-swells-app/data/spots.json
+    --report facing_report.csv spots.json ../app/data/spots.json
 ```
 
 It takes a few minutes on 8 cores. `--report` writes a CSV with each spot's
@@ -135,12 +135,12 @@ results for a few spots without writing anything.
   a failed fetch keeps the server's previous file (`P` in publish.rules).
   also drives the app's hover readout.
 
-See `../webgl-swell-rendering.md` for the possible next step (client-side
-WebGL rendering with temporal interpolation).
+See `webgl-swell-rendering.md` (kept outside this repository) for the
+possible next step (client-side WebGL rendering with temporal interpolation).
 
 `run.sh --verbose` draws a live progress bar in the terminal (the log is
-unaffected); `--local` copies output to the sibling
-`open-swells-app/data/forecast` directory instead of the server. Override that
+unaffected); `--local` copies output to this monorepo's `app/data/forecast`
+directory instead of the server. Override that
 location for a one-off run with `LOCAL_DEST_PATH=/path/to/data/forecast`.
 `--limit <n>` processes only the first n forecast hours for quick render checks
 (don't publish a limited run to the server — see Publishing below). The application should set
