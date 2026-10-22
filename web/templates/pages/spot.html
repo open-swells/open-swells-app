@@ -155,33 +155,6 @@
                 .rp-map-col { flex: 0 0 auto; padding-right: 0 !important; }
                 .rp-label { margin: 0 0 10px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
 
-                .rp-now { margin-bottom: 18px; }
-                .rp-rating { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--condition-color, var(--text-2)); }
-                .rp-height { margin-top: 2px; font-size: 34px; font-weight: 600; line-height: 1.1; letter-spacing: -.02em; color: #fff; font-variant-numeric: tabular-nums; }
-                .rp-sub { margin-top: 4px; font-size: 11px; color: var(--text-3); }
-
-                /* swell trains on the left, wind and tide beside them */
-                .rp-props { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 24px; }
-                .rp-side { display: grid; align-content: start; gap: 14px; }
-                .rp-group[hidden] { display: none; }
-                .rp-cap { margin: 0 0 6px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
-                .rp-cap span { font-weight: 400; text-transform: none; letter-spacing: 0; }
-                .rp-group ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
-                .rp-group li { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
-                .rp-group .v { font-size: 13px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
-                .rp-group .m { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
-                .rp-arrow { flex: none; width: 14px; height: 14px; transform-origin: 50% 50%; }
-                /* a swell reads "3.6ft @ 14.0s" on one line; the period is
-                   its own span so phones can set it beneath the height */
-                .rp-swell .d { display: contents; }
-                .rp-swell .p { margin-left: -2px; font-size: 13px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
-                .rp-arrow path { fill: currentColor; }
-                .rp-arrow.primary { color: var(--swell); }
-                .rp-arrow.secondary { color: var(--swell-2); }
-                .rp-arrow.wind { color: var(--wind); }
-                .rp-arrow.wind-sea { color: var(--wind-sea); }
-                .rp-arrow.tide { color: var(--tide); }
-
                 .rp-today-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
                 .rp-today-head .rp-label { margin: 0; white-space: nowrap; }
                 .today-readout { min-width: 0; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

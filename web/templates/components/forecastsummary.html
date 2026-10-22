@@ -10,7 +10,6 @@
     .favorite-left { min-width: 0; }
     .favorite-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
     .favorite-name { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: #fff; }
-    .favorite-now { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
     .offline-flag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--warn); white-space: nowrap; }
     .location-meta { margin-top: 4px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
     .favorite-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
@@ -22,11 +21,7 @@
     .action-icon { width: 13px; height: 13px; flex: none; }
     .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: var(--negative); background: #281f22; border: 1px solid #553137; font-size: 18px; line-height: 1; cursor: pointer; }
     .remove-button:hover { color: #ff9299; background: #382429; border-color: #8f4952; }
-    .stat-row { display: flex; flex-wrap: wrap; gap: 12px 32px; margin-top: 16px; }
-    .stat-row > div { min-width: 0; }
     .stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
-    .stat-value { margin-top: 3px; font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; }
-    .stat-sub { margin-top: 1px; font-size: 10px; color: var(--text-2); white-space: nowrap; }
     .hour-block { margin-top: 16px; }
     .hour-strip { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 38px; align-items: end; border-bottom: 1px solid var(--line); }
     .hour-candle { position: relative; height: 100%; display: flex; align-items: flex-end; }
@@ -72,7 +67,7 @@
     .lane-wind { position: relative; margin-top: 8px; }
     .wind-graph { position: relative; height: 38px; padding-top: 8px; }
     .wind-graph svg { display: block; width: 100%; height: 30px; }
-    .wind-peak { position: absolute; top: 0; color: var(--positive); pointer-events: none; }
+    .wind-peak { position: absolute; top: 0; color: var(--wind); pointer-events: none; }
     .wind-peak::after { content: ''; position: absolute; top: 9px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px var(--panel); }
     .wind-peak span { position: absolute; top: 0; left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: var(--font-mono); font-size: 9px; line-height: 10px; white-space: nowrap; color: currentColor; }
     .lane-labels { display: flex; justify-content: space-between; padding-top: 6px; font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--text-3); }
@@ -82,15 +77,9 @@
     .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 9px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
     .location-badge-buoy { color: var(--kind-buoy); }
     .location-badge-beach { color: var(--kind-beach); }
-    .favorite-condition-card {
-        padding: 7px 8px; border: 1px solid var(--condition-color);
-        background: color-mix(in srgb, var(--condition-color) 12%, var(--raised));
-    }
-    .favorite-condition-label { font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--condition-color); }
-    .favorite-condition-main { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; white-space: nowrap; }
-    .favorite-condition-rating { color: var(--condition-color); font-size: 11px; font-weight: 700; text-transform: uppercase; }
-    .favorite-condition-height { color: #fff; font-size: 11px; font-weight: 600; }
-    .spot-stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+    .favorite-report { margin-top: 16px; }
+    .favorite-report .rp-now { margin-bottom: 14px; }
+    .favorites-compact .favorite-report .rp-height { font-size: 24px; }
     .compact-condition { margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
     .forecast-unavailable { justify-content: center; text-align: center; color: var(--text-2); }
     .forecast-unavailable strong { display: block; color: var(--text-1); font-size: 12px; font-weight: 600; }
@@ -99,11 +88,8 @@
     .favorites-compact .favorite-row { padding: 12px; background: var(--raised); border: 1px solid var(--line); }
     .favorites-compact .favorite-row + .favorite-row { margin-top: 8px; }
     .favorites-compact .favorite-name { font-size: 12px; }
-    .favorites-compact .stat-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin-top: 12px; }
-    .favorites-compact .stat-value { font-size: 11px; }
     @media (max-width: 900px) {
         .favorites-detailed .favorite-row { grid-template-columns: minmax(0, 1fr); }
-        .favorites-detailed .spot-stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         .favorite-outlook { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; }
         .spot-forecast-levels { display: none; }
         .spot-conditions-head { margin-top: 0; }
@@ -113,11 +99,6 @@
     }
     @media (max-width: 640px) {
         .favorite-row { padding: 14px; }
-        .favorites-detailed .stat-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; }
-        .favorites-detailed .stat-label { font-size: 9px; white-space: nowrap; }
-        .favorites-detailed .stat-value { font-size: 11px; }
-        .favorites-detailed .stat-sub { font-size: 9px; }
-        .favorites-detailed .spot-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
         .outlook-scroll { display: block; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
         .outlook-scroll > * { min-width: 480px; }
         [data-buoy-outlook] .outlook-scroll > * { min-width: 960px; }
@@ -141,7 +122,6 @@
                 <div class="min-w-0">
                     <div class="flex items-baseline gap-3 min-w-0">
                         <h3 class="favorite-name truncate">{{.Name}}</h3>
-                        {{if gt (len .Summary) 0}}{{$current := index .Summary 0}}<span class="favorite-now" style="color: #3b82f6;">{{$current.WaveHeight}} swell</span>{{end}}
                         {{if .Offline}}<span class="offline-flag">Offline since {{.OfflineSince}}</span>{{end}}
                     </div>
                     <div class="location-meta"><span class="location-badge location-badge-buoy" style="margin-right: 6px;">Buoy</span>{{.ID}}</div>
@@ -158,12 +138,7 @@
                     <button onclick="toggleFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">−</button>
                 </div>
             </div>
-            <div class="stat-row">
-                <div><div class="stat-label">Primary swell</div><div class="stat-value">{{if .SwellReport.PrimaryWaveHeight}}{{.SwellReport.PrimaryWaveHeight}}ft @ {{.SwellReport.PrimaryPeriod}}s{{else}}--{{end}}</div><div class="stat-sub">{{if .SwellReport.PrimaryDegrees}}{{.SwellReport.PrimaryDegrees}}&deg;{{else}}Direction --{{end}}</div></div>
-                <div><div class="stat-label">Secondary swell</div><div class="stat-value">{{if .SwellReport.SecondaryWaveHeight}}{{.SwellReport.SecondaryWaveHeight}}ft @ {{.SwellReport.SecondaryPeriod}}s{{else}}--{{end}}</div><div class="stat-sub">{{if .SwellReport.SecondaryDegrees}}{{.SwellReport.SecondaryDegrees}}&deg;{{else}}Direction --{{end}}</div></div>
-                <div><div class="stat-label">Wind</div><div class="stat-value">{{if .WindReport.WindSpeed}}{{.WindReport.WindSpeed}} mph{{else}}--{{end}}</div><div class="stat-sub">Gust {{if .WindReport.WindGust}}{{.WindReport.WindGust}} mph{{else}}--{{end}}</div></div>
-                <div><div class="stat-label">Temperature</div><div class="stat-value">{{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}&deg;C air{{else}}--{{end}}</div><div class="stat-sub">Water {{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;C{{else}}--{{end}}</div></div>
-            </div>
+            <section class="favorite-report" aria-label="Current conditions">{{template "buoynow" (buoyreport .SwellReport .WindReport)}}</section>
         </div>
         {{if and $.Detailed .HasError}}
         <div class="favorite-outlook forecast-unavailable" role="status">
@@ -208,22 +183,62 @@
                     <button onclick="toggleSpotFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">−</button>
                 </div>
             </div>
-            <div class="stat-row spot-stat-row">
+            {{/* the spot page's "now" report: rating and surf height, then
+                 the swell trains beside the wind */}}
+            <section class="favorite-report" aria-label="Current conditions">
                 {{if gt (len .Summary) 0}}
                 {{$current := index .Summary 0}}
-                <div class="favorite-condition-card" data-favorite-condition-card
-                     style="--condition-color: {{template "condcolor" $current.Condition}};">
-                    <div class="favorite-condition-label">Current conditions</div>
-                    <div class="favorite-condition-main">
-                        <span class="favorite-condition-rating">{{$current.Condition}}</span>
-                        <span class="favorite-condition-height">{{$current.WaveHeight}}</span>
+                <div class="rp-now" data-favorite-condition-card style="--condition-color: {{template "condcolor" $current.Condition}};">
+                    <div class="rp-rating">{{$current.Condition}}</div>
+                    <div class="rp-height">{{$current.WaveHeight}}</div>
+                </div>
+                {{else if .HasReport}}
+                <div class="rp-now">
+                    <div class="rp-height">{{if .Report.Surf}}{{.Report.Surf}}{{else}}{{.Report.PrimaryHeight}}ft{{end}}</div>
+                    <div class="rp-sub">{{if .Report.Surf}}Surf now{{else}}Wave height{{end}}</div>
+                </div>
+                {{end}}
+                {{if .HasReport}}{{$r := .Report}}
+                <div class="rp-props">
+                    <section class="rp-group rp-swell" aria-label="Swell">
+                        <h4 class="rp-cap">Swell</h4>
+                        <ul>
+                            <li title="{{if $r.SwellHeight}}Combined seas{{else if $r.PrimaryIsWindSea}}Wind sea{{else}}Primary swell{{end}}">
+                                <svg class="rp-arrow primary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.PrimaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v">{{$r.PrimaryHeight}}ft</span>
+                                <span class="d"><span class="p"><span class="at">@ </span>{{$r.PrimaryPeriod}}s</span> <span class="m">{{bearing $r.PrimaryDegrees}}</span></span>
+                            </li>
+                            {{if $r.HasSecondary}}
+                            <li title="Secondary swell">
+                                <svg class="rp-arrow secondary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.SecondaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v">{{$r.SecondaryHeight}}ft</span>
+                                <span class="d"><span class="p"><span class="at">@ </span>{{$r.SecondaryPeriod}}s</span> <span class="m">{{bearing $r.SecondaryDegrees}}</span></span>
+                            </li>
+                            {{end}}
+                            {{if and $r.HasWindSea (not $r.PrimaryIsWindSea)}}
+                            <li title="Wind sea">
+                                <svg class="rp-arrow wind-sea" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.WindSeaDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v">{{$r.WindSeaHeight}}ft</span>
+                                <span class="d"><span class="p"><span class="at">@ </span>{{$r.WindSeaPeriod}}s</span> <span class="m">{{bearing $r.WindSeaDegrees}}</span></span>
+                            </li>
+                            {{end}}
+                        </ul>
+                    </section>
+                    <div class="rp-side">
+                        <section class="rp-group" aria-label="Wind">
+                            <h4 class="rp-cap">Wind</h4>
+                            <ul><li>
+                                {{if $r.HasWind}}
+                                <svg class="rp-arrow wind" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.WindDir}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                                <span class="v">{{$r.WindSpeed}} mph</span>
+                                <span class="m">{{bearing $r.WindDir}}</span>
+                                {{else}}<span class="m">Unavailable</span>{{end}}
+                            </li></ul>
+                        </section>
                     </div>
                 </div>
                 {{end}}
-                <div><div class="stat-label">Primary swell</div><div class="stat-value">{{if .Primary}}{{.Primary}}{{else}}--{{end}}</div><div class="stat-sub">{{if .PrimarySub}}{{.PrimarySub}}&deg;{{else}}Direction --{{end}}</div></div>
-                <div><div class="stat-label">Secondary swell</div><div class="stat-value">{{if .Secondary}}{{.Secondary}}{{else}}--{{end}}</div><div class="stat-sub">{{if .SecondarySub}}{{.SecondarySub}}&deg;{{else}}Direction --{{end}}</div></div>
-                <div><div class="stat-label">Wind</div><div class="stat-value">{{if .HasWind}}{{.WindSpeed}} mph{{else}}--{{end}}</div><div class="stat-sub">{{if .HasWind}}{{.WindDir}}&deg;{{else}}Unavailable{{end}}</div></div>
-            </div>
+            </section>
             {{if and $.Detailed (gt (len .CurrentConditions) 0)}}
             <div class="hour-block">
                 <div class="hour-strip" data-hour-strip aria-label="Hourly conditions for today, midnight to midnight">

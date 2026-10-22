@@ -86,7 +86,7 @@ button, input, select, textarea { font: inherit; letter-spacing: 0; }
 .mono { font-family: var(--font-mono); }
 
 /* Readings line up column-to-column and stop jittering as values animate. */
-.mono, .stat-value, .report-value .main, .fc-height, [data-local-time] {
+.mono, .fc-height, [data-local-time] {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
 }
@@ -196,50 +196,37 @@ a { color: inherit; text-decoration: none; }
 body.embedded .standalone-only { display: none !important; }
 body.embedded .station-shell { padding-top: 14px; }
 
-/* --- Current-report cards --------------------------------------------- */
+/* --- "Now" report ----------------------------------------------------- */
+/* The rating (or observed) headline and height over the swell trains, wind,
+   tide, and water. Shared by the spot and buoy pages and the favorites
+   rows, so they all read as one design. */
 
-.report-cards {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-}
-.report-card {
-    min-width: 0;
-    padding: 12px;
-    background: var(--raised);
-    border: 1px solid var(--line);
-    transition: border-color 120ms ease;
-}
-.report-card:hover { border-color: var(--line-strong); }
-.report-card h2 {
-    margin: 0 0 10px;
-    font-family: var(--font-mono);
-    font-size: 10px; font-weight: 600;
-    letter-spacing: .05em; text-transform: uppercase;
-    color: var(--text-2);
-}
-.report-row { display: flex; align-items: center; gap: 10px; }
-.report-value { min-width: 0; }
-.report-value .main { color: #fff; font-size: 14px; font-weight: 600; white-space: nowrap; }
-.report-value .sub {
-    margin-top: 3px;
-    color: var(--text-2); font-size: 10px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.rp-now { margin-bottom: 18px; }
+.rp-rating { font-family: var(--font-mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--condition-color, var(--text-2)); }
+.rp-height { margin-top: 2px; font-size: 34px; font-weight: 600; line-height: 1.1; letter-spacing: -.02em; color: #fff; font-variant-numeric: tabular-nums; }
+.rp-sub { margin-top: 4px; font-size: 11px; color: var(--text-3); }
 
-.compass { width: 40px; height: 40px; flex: none; }
-.compass .ring { fill: none; stroke: #4a4c53; stroke-width: 1; }
-.compass .tick { stroke: #5a5c63; stroke-width: 1; }
-.compass .needle { fill: var(--swell); transform-box: view-box; transform-origin: 50% 50%; }
-
-@media (max-width: 719px) {
-    .report-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
-    .report-card { padding: 10px 8px; }
-    .report-card h2 { font-size: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .report-row { gap: 8px; }
-    .compass { width: 32px; height: 32px; }
-    .report-value .main { font-size: 12px; }
-}
+/* swell trains on the left, wind and tide beside them */
+.rp-props { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 24px; }
+.rp-side { display: grid; align-content: start; gap: 14px; }
+.rp-group[hidden] { display: none; }
+.rp-cap { margin: 0 0 6px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+.rp-cap span { font-weight: 400; text-transform: none; letter-spacing: 0; }
+.rp-group ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 7px; }
+.rp-group li { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.rp-group .v { font-size: 13px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+.rp-group .m { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
+.rp-arrow { flex: none; width: 14px; height: 14px; transform-origin: 50% 50%; }
+/* a swell reads "3.6ft @ 14.0s" on one line; the period is
+   its own span so phones can set it beneath the height */
+.rp-swell .d { display: contents; }
+.rp-swell .p { margin-left: -2px; font-size: 13px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
+.rp-arrow path { fill: currentColor; }
+.rp-arrow.primary { color: var(--swell); }
+.rp-arrow.secondary { color: var(--swell-2); }
+.rp-arrow.wind { color: var(--wind); }
+.rp-arrow.wind-sea { color: var(--wind-sea); }
+.rp-arrow.tide { color: var(--tide); }
 
 @media (max-width: 767px) {
     .station-shell { padding: 12px 12px 32px; }

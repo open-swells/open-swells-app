@@ -291,7 +291,13 @@ func TestLoadTemplates(t *testing.T) {
 			},
 		}},
 		Spots: []SpotFavorite{{
-			ID: "el-porto", Name: "El Porto", Region: "Los Angeles", WindSpeed: "12", WindDir: "270", HasWind: true,
+			ID: "el-porto", Name: "El Porto", Region: "Los Angeles",
+			Report: SpotReport{
+				PrimaryHeight: "3.2", PrimaryPeriod: "13", PrimaryDegrees: "250",
+				SecondaryHeight: "1.1", SecondaryPeriod: "8", SecondaryDegrees: "195", HasSecondary: true,
+				WindSpeed: "12", WindDir: "270", HasWind: true,
+			},
+			HasReport: true,
 			Forecast: ForecastData{Forecast: []ForecastRow{{
 				Time: time.Date(2026, 7, 20, 6, 0, 0, 0, time.UTC), PrimaryWaveHeight: "0.98",
 			}}},
@@ -304,7 +310,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "spot-forecast-levels", "day-wave-height", "data-day-label", "Mon 7/20", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "day-tick", "12 mph", "270&deg;", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "spot-forecast-levels", "day-wave-height", "data-day-label", "Mon 7/20", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "day-tick", "12 mph", "W 270°", "WSW 250°", "SSW 195°", "rotate(250deg)", "rp-swell", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}
@@ -332,7 +338,7 @@ func TestLoadTemplates(t *testing.T) {
 	unavailableSummary := summaryData
 	unavailableSummary.Buoys = []BuoyWithSummary{{
 		Buoy:        Buoy{ID: "46268", Name: "Test Buoy"},
-		SwellReport: SwellReport{PrimaryWaveHeight: "1.2", PrimaryPeriod: "12"},
+		SwellReport: SwellReport{WaveHeight: "1.2", SwellHeight: "1.0", SwellPeriod: "12", SwellDegrees: "225"},
 		HasError:    true, ErrorMsg: "Forecast not available",
 	}}
 	unavailableSummary.Detailed = true
@@ -340,7 +346,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&unavailableFavorite, "forecastsummary", unavailableSummary); err != nil {
 		t.Fatalf("unavailable favorite summary failed to render: %v", err)
 	}
-	for _, want := range []string{"1.2ft @ 12s", "Forecast not available", "Current buoy observations are still shown."} {
+	for _, want := range []string{"3.9ft", "3.3ft", "@ </span>12s", "SW 225°", "Forecast not available", "Current buoy observations are still shown."} {
 		if !bytes.Contains(unavailableFavorite.Bytes(), []byte(want)) {
 			t.Errorf("unavailable favorite summary is missing %q", want)
 		}
@@ -379,7 +385,7 @@ func TestEmbeddedThemeAsset(t *testing.T) {
 	if len(webstatic.ThemeCSS) == 0 {
 		t.Fatal("embedded theme stylesheet is empty")
 	}
-	for _, want := range []string{"--cond-good: #4fd1bc", "--text-2:", ".report-card", ".station-shell"} {
+	for _, want := range []string{"--cond-good: #4fd1bc", "--text-2:", ".rp-height", ".station-shell"} {
 		if !bytes.Contains(webstatic.ThemeCSS, []byte(want)) {
 			t.Errorf("theme stylesheet is missing %q", want)
 		}

@@ -113,16 +113,18 @@ type ConditionCandle struct {
 	Condition string
 }
 
+// SwellReport is the latest NDBC spectral wave summary (.spec), as reported:
+// heights in meters, periods in seconds, directions in degrees true (the
+// compass names NDBC uses for swell and wind-sea directions are converted).
+// Missing values are empty.
 type SwellReport struct {
-	StationId           string
-	Date                string
-	PrimaryWaveHeight   string
-	PrimaryPeriod       string
-	PrimaryDegrees      string
-	SecondaryWaveHeight string
-	SecondaryPeriod     string
-	SecondaryDegrees    string
-	Steepness           string
+	StationId                                    string
+	Date                                         string // "YYYY/MM/DD hh:mm" UTC
+	WaveHeight                                   string // significant wave height, all seas
+	SwellHeight, SwellPeriod, SwellDegrees       string
+	WindSeaHeight, WindSeaPeriod, WindSeaDegrees string
+	Steepness                                    string
+	MeanDegrees                                  string // mean wave direction
 }
 
 type WindReport struct {
@@ -307,21 +309,25 @@ func getSwellReport(stationId string) (SwellReport, error) {
 		return SwellReport{}, fmt.Errorf("insufficient data in response line")
 	}
 
-	secondaryDegrees := parts[10]
-	if degrees, ok := directionMap[secondaryDegrees]; ok {
-		secondaryDegrees = fmt.Sprintf("%.0f", degrees)
+	// .spec columns: YY MM DD hh mm WVHT SwH SwP WWH WWP SwD WWD STEEPNESS APD MWD
+	compass := func(v string) string {
+		if degrees, ok := directionMap[v]; ok {
+			return fmt.Sprintf("%.0f", degrees)
+		}
+		return ndbcValue(v)
 	}
-
 	report := SwellReport{
-		StationId:           stationId,
-		Date:                parts[0] + "/" + parts[1] + "/" + parts[2] + " " + parts[3] + ":" + parts[4],
-		PrimaryWaveHeight:   parts[5],
-		PrimaryPeriod:       parts[7],
-		PrimaryDegrees:      parts[14],
-		SecondaryWaveHeight: parts[8],
-		SecondaryPeriod:     parts[9],
-		SecondaryDegrees:    secondaryDegrees,
-		Steepness:           parts[12],
+		StationId:      stationId,
+		Date:           parts[0] + "/" + parts[1] + "/" + parts[2] + " " + parts[3] + ":" + parts[4],
+		WaveHeight:     ndbcValue(parts[5]),
+		SwellHeight:    ndbcValue(parts[6]),
+		SwellPeriod:    ndbcValue(parts[7]),
+		WindSeaHeight:  ndbcValue(parts[8]),
+		WindSeaPeriod:  ndbcValue(parts[9]),
+		SwellDegrees:   compass(parts[10]),
+		WindSeaDegrees: compass(parts[11]),
+		Steepness:      ndbcValue(parts[12]),
+		MeanDegrees:    ndbcValue(parts[14]),
 	}
 	return report, nil
 }
@@ -793,6 +799,7 @@ func loadTemplates(templateDir string) *template.Template {
 		"ripcolor":    ripRiskColor,
 		"formatcount": formatCount,
 		"bearing":     bearingLabel,
+		"buoyreport":  buoyReport,
 		// NWS remark fields are often a literal "None." — not worth a row
 		"notnone": func(s string) bool {
 			t := strings.ToLower(strings.TrimRight(strings.TrimSpace(s), "."))

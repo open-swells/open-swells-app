@@ -562,7 +562,8 @@
                     spanEl(labels[labels.length - 1] || ''));
             }
             const windLane = el.querySelector('[data-wind-lane]');
-            const windColor = isSpotOutlook ? '#e2b86b' : '#6fcf97';
+            // the forecast charts' wind color, from the theme
+            const windColor = getComputedStyle(document.documentElement).getPropertyValue('--wind').trim() || '#94a3b8';
             const hoverLine = document.createElement('div');
             hoverLine.className = 'outlook-hover-line';
             const panelTooltip = isSpotOutlook ? document.createElement('div') : null;
@@ -606,7 +607,7 @@
                         <div class="forecast-tooltip-row" style="--tooltip-color: #4f6fae;">
                             <i class="forecast-tooltip-dot"></i><span class="forecast-tooltip-label">SWELL</span><strong class="forecast-tooltip-value">${heights[index].toFixed(1)} ft</strong>
                         </div>
-                        <div class="forecast-tooltip-row" style="--tooltip-color: #e2b86b;">
+                        <div class="forecast-tooltip-row" style="--tooltip-color: var(--wind);">
                             <i class="forecast-tooltip-dot"></i><span class="forecast-tooltip-label">WIND</span><strong class="forecast-tooltip-value">${escapeHTML(wind)}</strong>
                         </div>
                         ${condition ? `<div class="forecast-tooltip-row" style="--tooltip-color: ${conditionColor};">

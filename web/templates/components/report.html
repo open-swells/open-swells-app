@@ -1,110 +1,58 @@
-{{define "report"}}
-<div>
-    <script>
-        let directionmap = {
-            'N': 0,
-            'NNE': 22.5,
-            'NE': 45,
-            'ENE': 67.5,
-            'E': 90,
-            'ESE': 112.5,
-            'SE': 135,
-            'SSE': 157.5,
-            'S': 180,
-            'SSW': 202.5,
-            'SW': 225,
-            'WSW': 247.5,
-            'W': 270,
-            'WNW': 292.5,
-            'NW': 315,
-            'NNW': 337.5
-        };
-
-        // NDBC sometimes reports the secondary direction as a compass name
-        // ("WNW") instead of degrees; convert it after template insertion.
-        window.initializeSwellDirection = function() {
-            let secondaryswell = "{{.SwellReport.SecondaryDegrees}}";
-            let swelldir = document.querySelector('.windswellsymbol');
-            if (swelldir) {
-                swelldir.style.transform = `rotate(${directionmap[secondaryswell] || secondaryswell || 0}deg)`;
-            }
-        };
-        initializeSwellDirection();
-    </script>
-    <!-- Card, compass, and value styling live in /assets/theme.css so the
-         buoy report and the spot report cannot drift apart. -->
-    <div class="report-cards">
-        <div class="report-card">
-            <h2>Primary swell</h2>
-            <div class="report-row">
-                <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
-                    <circle class="ring" cx="20" cy="20" r="16"/>
-                    <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
-                    <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
-                    <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
-                    <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
-                    <path class="needle swellsymbol" style="transform: rotate({{.SwellReport.PrimaryDegrees}}deg);"
-                          d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
-                </svg>
-                <div class="report-value">
-                    <div class="main">{{.SwellReport.PrimaryWaveHeight}}ft @ {{.SwellReport.PrimaryPeriod}}s</div>
-                    <div class="sub">{{.SwellReport.PrimaryDegrees}}&deg;{{if .SwellReport.Steepness}} &middot; {{.SwellReport.Steepness}}{{end}}</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="report-card">
-            <h2>Secondary swell</h2>
-            <div class="report-row">
-                <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
-                    <circle class="ring" cx="20" cy="20" r="16"/>
-                    <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
-                    <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
-                    <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
-                    <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
-                    <path class="needle windswellsymbol" style="transform: rotate({{.SwellReport.SecondaryDegrees}}deg);"
-                          d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
-                </svg>
-                <div class="report-value">
-                    <div class="main">{{.SwellReport.SecondaryWaveHeight}}ft @ {{.SwellReport.SecondaryPeriod}}s</div>
-                    <div class="sub">{{.SwellReport.SecondaryDegrees}}&deg;</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="report-card">
-            <h2>Wind</h2>
-            <div class="report-row">
-                <svg class="compass" viewBox="0 0 40 40" aria-hidden="true">
-                    <circle class="ring" cx="20" cy="20" r="16"/>
-                    <line class="tick" x1="20" y1="1.5" x2="20" y2="6"/>
-                    <line class="tick" x1="20" y1="34" x2="20" y2="38.5"/>
-                    <line class="tick" x1="1.5" y1="20" x2="6" y2="20"/>
-                    <line class="tick" x1="34" y1="20" x2="38.5" y2="20"/>
-                    {{if .WindReport.WindDir}}<path class="needle windsymbol" style="transform: rotate({{.WindReport.WindDir}}deg);"
-                          d="M18.9 11 L21.1 11 L21.1 22 L24.3 22 L20 28.5 L15.7 22 L18.9 22 Z"/>
-                    {{end}}
-                </svg>
-                <div class="report-value">
-                    <div class="main">{{if .WindReport.WindSpeed}}{{.WindReport.WindSpeed}} mph{{else}}--{{end}}</div>
-                    <div class="sub">Gust {{if .WindReport.WindGust}}{{.WindReport.WindGust}} mph{{else}}--{{end}}{{if .WindReport.WindDir}} &middot; {{.WindReport.WindDir}}&deg;{{end}}</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="report-card">
-            <h2>Weather</h2>
-            <div class="report-row" style="gap: 20px;">
-                <div class="report-value">
-                    <div class="sub" style="margin: 0 0 3px;">AIR</div>
-                    <div class="main">{{if .WindReport.AirTemp}}{{.WindReport.AirTemp}}&deg;C{{else}}--{{end}}</div>
-                </div>
-                <div class="report-value">
-                    <div class="sub" style="margin: 0 0 3px;">WATER</div>
-                    <div class="main">{{if .WindReport.WaterTemp}}{{.WindReport.WaterTemp}}&deg;C{{else}}--{{end}}</div>
-                </div>
-            </div>
-        </div>
+{{/* A buoy's latest observations in the spot report's "now" design: the
+     significant wave height, then the swell trains beside the wind and
+     water. Takes a BuoyReport (see buoyreport); styles are the .rp-*
+     rules in /assets/theme.css. */}}
+{{define "buoynow"}}
+<div class="rp-now">
+    <div class="rp-rating">Observed</div>
+    <div class="rp-height">{{if .HasSeas}}{{.Seas}}ft{{else}}--{{end}}</div>
+    <div class="rp-sub">Significant wave height{{if .Steepness}} &middot; {{.Steepness}}{{end}}</div>
+</div>
+<div class="rp-props">
+    <section class="rp-group rp-swell" aria-label="Swell">
+        <h4 class="rp-cap">Swell</h4>
+        <ul>
+            {{if .HasSwell}}
+            <li title="Swell">
+                {{if .SwellDegrees}}<svg class="rp-arrow primary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.SwellDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>{{end}}
+                <span class="v">{{.SwellHeight}}ft</span>
+                <span class="d"><span class="p"><span class="at">@ </span>{{.SwellPeriod}}s</span> <span class="m">{{bearing .SwellDegrees}}</span></span>
+            </li>
+            {{end}}
+            {{if .HasWindSea}}
+            <li title="Wind sea">
+                {{if .WindSeaDegrees}}<svg class="rp-arrow wind-sea" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.WindSeaDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>{{end}}
+                <span class="v">{{.WindSeaHeight}}ft</span>
+                <span class="d"><span class="p"><span class="at">@ </span>{{.WindSeaPeriod}}s</span> <span class="m">{{bearing .WindSeaDegrees}}</span></span>
+            </li>
+            {{end}}
+            {{if not (or .HasSwell .HasWindSea)}}<li><span class="m">Unavailable</span></li>{{end}}
+        </ul>
+    </section>
+    <div class="rp-side">
+        <section class="rp-group" aria-label="Wind">
+            <h4 class="rp-cap">Wind</h4>
+            <ul><li>
+                {{if .HasWind}}
+                {{if .WindDir}}<svg class="rp-arrow wind" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.WindDir}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>{{end}}
+                <span class="v">{{.WindSpeed}} mph</span>
+                <span class="m">{{bearing .WindDir}}{{if .WindGust}} &middot; G{{.WindGust}}{{end}}</span>
+                {{else}}<span class="m">Unavailable</span>{{end}}
+            </li></ul>
+        </section>
+        {{if or .WaterTemp .AirTemp}}
+        <section class="rp-group" aria-label="Temperature">
+            <h4 class="rp-cap">Water</h4>
+            <ul><li>
+                <span class="v">{{if .WaterTemp}}{{.WaterTemp}}&deg;C{{else}}--{{end}}</span>
+                {{if .AirTemp}}<span class="m">Air {{.AirTemp}}&deg;C</span>{{end}}
+            </li></ul>
+        </section>
+        {{end}}
     </div>
 </div>
+{{end}}
+
+{{define "report"}}
+<div class="buoy-report">{{template "buoynow" (buoyreport .SwellReport .WindReport)}}</div>
 {{end}}

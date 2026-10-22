@@ -823,19 +823,17 @@ func spotBeach(staticDir string, spot Spot) beach {
 // --- Favorites drawer entries ---------------------------------------------
 
 // SpotFavorite is one favorite-spot card in the forecast summary drawer.
-// Swell strings are pre-formatted from the first (current-hour) model row,
+// Report is the same current-hour model report the spot page leads with,
 // since spots have no live observations to show.
 type SpotFavorite struct {
-	ID, Name, Region        string
-	Latitude, Longitude     float64
-	Forecast                ForecastData
-	Summary                 []ForecastSummary
-	CurrentConditions       []ConditionCandle
-	Primary, PrimarySub     string
-	Secondary, SecondarySub string
-	WindSpeed, WindDir      string
-	HasWind                 bool
-	HasError                bool
+	ID, Name, Region    string
+	Latitude, Longitude float64
+	Forecast            ForecastData
+	Summary             []ForecastSummary
+	CurrentConditions   []ConditionCandle
+	Report              SpotReport
+	HasReport           bool
+	HasError            bool
 }
 
 func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
@@ -850,25 +848,9 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 	conditions := spotConditions(staticDir, spot, hours)
 	applyConditionSummary(entry.Summary, conditions)
 	entry.CurrentConditions = currentConditionCandles(conditions)
-	if report, ok := spotReport(staticDir, spot, forecastData); ok && report.HasWind {
-		entry.WindSpeed = report.WindSpeed
-		entry.WindDir = report.WindDir
-		entry.HasWind = true
-	}
-
-	row := forecastData.Forecast[0]
-	format := func(h, p, d string) (string, string) {
-		meters, err := strconv.ParseFloat(h, 64)
-		if err != nil {
-			return "", ""
-		}
-		return fmt.Sprintf("%.1fft @ %ss", meters*3.28084, p), d
-	}
-	entry.Primary, entry.PrimarySub = format(row.PrimaryWaveHeight, row.PrimaryPeriod, row.PrimaryDegrees)
-	entry.Secondary, entry.SecondarySub = format(row.SecondaryWaveHeight, row.SecondaryPeriod, row.SecondaryDegrees)
-	if entry.Primary == "" {
-		// No swell running: the wind sea is the whole sea state.
-		entry.Primary, entry.PrimarySub = format(row.WindSeaHeight, row.WindSeaPeriod, row.WindSeaDegrees)
+	entry.Report, entry.HasReport = spotReport(staticDir, spot, forecastData)
+	if c, ok := conditionNear(conditions, entry.Report.ValidUnixMs); ok && entry.HasReport {
+		entry.Report.Surf = c.Surf
 	}
 	return entry
 }
