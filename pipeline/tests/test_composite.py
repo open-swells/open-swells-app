@@ -1,9 +1,10 @@
 import datetime as dt
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
-from composite import composite_swell, composite_wind
+from composite import _Compositor, composite_swell, composite_wind
 
 VALID_DATE = dt.datetime(2026, 7, 13, tzinfo=dt.UTC)
 
@@ -55,6 +56,53 @@ def make_wind_data(lat_axis, lon_axis, value):
         "mask": np.zeros(shape, bool),
         "valid_date": VALID_DATE,
     }
+
+
+class CompositorEquivalenceTests(unittest.TestCase):
+    def test_matches_full_grid_selection(self):
+        # Nonconstant fields expose indexing errors, including nearest
+        # ties, masked edge rows, NaNs and an all-masked source.
+        hi_lat = np.array([2., 1., 0., -1.])
+        lo_lat = np.array([3., 1., -1., -3.])
+        hi_lon = np.array([0., 1., 2., 3.])
+        lo_lon = np.array([0., 2., 4.])
+        target_lat = np.array([3., 2., 1.5, 1., 0., -1., -2., -3.])
+        target_lon = np.array([0., 0.5, 1., 2., 3.])
+        hi = make_swell_data(hi_lat, hi_lon, 2.)
+        lo = make_swell_data(lo_lat, lo_lon, 5.)
+        rng = np.random.default_rng(42)
+        for dtype_hi, dtype_lo in ((np.float32, np.float32),
+                                  (np.float32, np.float64), (bool, bool)):
+            a = rng.normal(size=(4, 4)).astype(dtype_hi)
+            b = rng.normal(size=(4, 3)).astype(dtype_lo)
+            if dtype_hi is bool:
+                a &= np.eye(4, dtype=bool)
+            else:
+                a[1, 1] = np.nan
+                b[2, 2] = np.inf
+            for valid_rows in ([True] * 4, [False, True, True, False],
+                               [False] * 4):
+                with self.subTest(dtypes=(dtype_hi, dtype_lo), rows=valid_rows):
+                    mask = np.broadcast_to(~np.array(valid_rows)[:, None], (4, 4))
+                    with patch("composite._target_axes", return_value=(target_lat, target_lon)):
+                        compositor = _Compositor(hi, lo, mask)
+                    rows = hi_lat[valid_rows]
+                    use_hi = np.zeros(target_lat.size, bool)
+                    if rows.size:
+                        use_hi = ((target_lat >= rows.min() - 1e-6) &
+                                  (target_lat <= rows.max() + 1e-6))
+
+                    def expand(field, lat, lon):
+                        return field[np.ix_(
+                            np.abs(target_lat[:, None] - lat).argmin(axis=1),
+                            np.abs(target_lon[:, None] - lon).argmin(axis=1),
+                        )]
+
+                    expected = np.where(use_hi[:, None], expand(a, hi_lat, hi_lon),
+                                        expand(b, lo_lat, lo_lon))
+                    actual = compositor.pick(a, b)
+                    self.assertEqual(actual.dtype, expected.dtype)
+                    np.testing.assert_array_equal(actual, expected)
 
 
 class CompositeSwellTests(unittest.TestCase):

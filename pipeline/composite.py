@@ -56,12 +56,6 @@ class _Compositor:
         target_lat, target_lon = _target_axes()
         hi_lat, hi_lon = _axes(data_hi)
         lo_lat, lo_lon = _axes(data_lo)
-        self._hi_index = np.ix_(
-            _nearest(hi_lat, target_lat), _nearest(hi_lon, target_lon)
-        )
-        self._lo_index = np.ix_(
-            _nearest(lo_lat, target_lat), _nearest(lo_lon, target_lon)
-        )
         data_rows = hi_lat[~hi_mask.all(axis=1)]
         if data_rows.size:
             in_band = (target_lat >= data_rows.min() - 1e-6) & (
@@ -69,15 +63,27 @@ class _Compositor:
             )
         else:
             in_band = np.zeros(target_lat.shape, dtype=bool)
-        self._use_hi = in_band[:, None]
+        # Gather only the rows each source contributes. Expanding both
+        # sources to full grids before np.where doubles the gather work
+        # and keeps two full-size temporaries alive for every field.
+        self._hi_rows = np.flatnonzero(in_band)
+        self._lo_rows = np.flatnonzero(~in_band)
+        self._hi_index = np.ix_(
+            _nearest(hi_lat, target_lat[in_band]), _nearest(hi_lon, target_lon)
+        )
+        self._lo_index = np.ix_(
+            _nearest(lo_lat, target_lat[~in_band]), _nearest(lo_lon, target_lon)
+        )
+        self._shape = (target_lat.size, target_lon.size)
         self.lon_grid, self.lat_grid = np.meshgrid(
             target_lon.astype(np.float32), target_lat.astype(np.float32)
         )
 
     def pick(self, hi_array: np.ndarray, lo_array: np.ndarray) -> np.ndarray:
-        return np.where(
-            self._use_hi, hi_array[self._hi_index], lo_array[self._lo_index]
-        )
+        result = np.empty(self._shape, dtype=np.result_type(hi_array, lo_array))
+        result[self._hi_rows] = hi_array[self._hi_index]
+        result[self._lo_rows] = lo_array[self._lo_index]
+        return result
 
 
 def composite_swell(data_hi: dict | None, data_lo: dict | None) -> dict:
