@@ -457,20 +457,24 @@ func formatDate(date string) string {
 	return parsedDate.Format("Mon 1/2")
 }
 
+// forecastRunStart is the model run the forecast came from. Spot forecasts
+// carry earlier runs' hours before it, backfilled for the day views.
+func forecastRunStart(forecastData ForecastData) (time.Time, bool) {
+	start, err := time.Parse("2006010215", forecastData.Date)
+	return start, err == nil
+}
+
 // generateForecastSummary buckets rows into UTC days from the run's start
-// day on: spot forecasts carry earlier runs' hours before the start, which
-// fill out that day but would otherwise add a day before it.
+// on. Backfilled hours are left out: they are already past, and would
+// otherwise rate today by them or add a day before the run's.
 func generateForecastSummary(forecastData ForecastData) []ForecastSummary {
-	firstDay := ""
-	if start, err := time.Parse("2006010215", forecastData.Date); err == nil {
-		firstDay = start.Format("2006-01-02")
-	}
+	start, hasStart := forecastRunStart(forecastData)
 	groupedForecast := make(map[string][]ForecastRow)
 	for _, row := range forecastData.Forecast {
-		day := row.Time.UTC().Format("2006-01-02")
-		if day < firstDay {
+		if hasStart && row.Time.Before(start) {
 			continue
 		}
+		day := row.Time.UTC().Format("2006-01-02")
 		groupedForecast[day] = append(groupedForecast[day], row)
 	}
 

@@ -758,10 +758,11 @@ func gridSpotForecast(staticDir string, lat, lon float64) (ForecastData, []hourS
 }
 
 // spotWind is the spot's wind series: hourly from its own full-resolution
-// cell when the spot file covers it, else the coarse wind grids.
+// cell when the spot file covers it, else the coarse wind grids. Wind only
+// from backfilled hours doesn't count: the current run has none there.
 func spotWind(staticDir string, spot Spot) []WindSample {
 	if set, series, ok := spotSeriesFor(staticDir, spot.ID); ok {
-		if samples := series.wind(set.Hours); len(samples) > 0 {
+		if samples := series.wind(set.Hours); len(samples) > 0 && samples[len(samples)-1].Hour >= 0 {
 			return samples
 		}
 	}
@@ -828,6 +829,20 @@ func spotConditions(staticDir string, spot Spot, hours []hourSwells) []HourlyCon
 	return conditionSeries(hours, wind, windStart, err == nil, spotBeach(staticDir, spot))
 }
 
+// conditionsFromRun drops the hours backfilled before the forecast's run,
+// matching generateForecastSummary, so a day isn't rated by hours past.
+func conditionsFromRun(conds []HourlyCondition, forecastData ForecastData) []HourlyCondition {
+	start, ok := forecastRunStart(forecastData)
+	if !ok {
+		return conds
+	}
+	i := 0
+	for i < len(conds) && conds[i].UnixMs < start.UnixMilli() {
+		i++
+	}
+	return conds[i:]
+}
+
 // spotBeach gathers a spot's exposure for the classifier. Open water only
 // applies without a hand-tuned window, which already accounts for it.
 func spotBeach(staticDir string, spot Spot) beach {
@@ -865,7 +880,7 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 	entry.Forecast = forecastData
 	entry.Summary = generateForecastSummary(forecastData)
 	conditions := spotConditions(staticDir, spot, hours)
-	applyConditionSummary(entry.Summary, conditions)
+	applyConditionSummary(entry.Summary, conditionsFromRun(conditions, forecastData))
 	entry.CurrentConditions = currentConditionCandles(conditions)
 	entry.Report, entry.HasReport = spotReport(staticDir, spot, forecastData)
 	if c, ok := conditionNear(conditions, entry.Report.ValidUnixMs); ok && entry.HasReport {
@@ -1061,7 +1076,7 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 		report.Surf = c.Surf
 	}
 	summary := generateForecastSummary(forecastData)
-	applyConditionSummary(summary, conditions)
+	applyConditionSummary(summary, conditionsFromRun(conditions, forecastData))
 	b := spotBeach(staticDir, spot)
 	facing := ""
 	if b.HasFacing {
