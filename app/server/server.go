@@ -83,6 +83,7 @@ type LandingPageData struct {
 	SEO       SEOPage
 	SpotCount int
 	BuoyCount int
+	Live      LandingReport
 }
 
 type BuoyPageData struct {
@@ -1223,6 +1224,7 @@ func run() {
 			},
 			SpotCount: spotStore.Count(),
 			BuoyCount: stationStore.ActiveCount(),
+			Live:      landing.report(forecastDir, spotStore, surfZoneStore, siteURL, c.Query("spot")),
 		})
 	})
 

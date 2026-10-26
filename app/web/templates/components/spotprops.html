@@ -1,0 +1,43 @@
+{{/* A spot's current-hour model report as swell trains beside the wind,
+     in the spot page's "now" design, for the favorites rows. Takes a
+     SpotReport; styles are the .rp-* rules in /assets/theme.css. */}}
+{{define "spotprops"}}
+<div class="rp-props">
+    <section class="rp-group rp-swell" aria-label="Swell">
+        <h4 class="rp-cap">Swell</h4>
+        <ul>
+            <li title="{{if .SwellHeight}}Combined seas{{else if .PrimaryIsWindSea}}Wind sea{{else}}Primary swell{{end}}">
+                <svg class="rp-arrow primary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.PrimaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                <span class="v">{{.PrimaryHeight}}ft</span>
+                <span class="d"><span class="p"><span class="at">@ </span>{{.PrimaryPeriod}}s</span> <span class="m">{{bearing .PrimaryDegrees}}</span></span>
+            </li>
+            {{if .HasSecondary}}
+            <li title="Secondary swell">
+                <svg class="rp-arrow secondary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.SecondaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                <span class="v">{{.SecondaryHeight}}ft</span>
+                <span class="d"><span class="p"><span class="at">@ </span>{{.SecondaryPeriod}}s</span> <span class="m">{{bearing .SecondaryDegrees}}</span></span>
+            </li>
+            {{end}}
+            {{if and .HasWindSea (not .PrimaryIsWindSea)}}
+            <li title="Wind sea">
+                <svg class="rp-arrow wind-sea" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.WindSeaDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                <span class="v">{{.WindSeaHeight}}ft</span>
+                <span class="d"><span class="p"><span class="at">@ </span>{{.WindSeaPeriod}}s</span> <span class="m">{{bearing .WindSeaDegrees}}</span></span>
+            </li>
+            {{end}}
+        </ul>
+    </section>
+    <div class="rp-side">
+        <section class="rp-group" aria-label="Wind">
+            <h4 class="rp-cap">Wind</h4>
+            <ul><li>
+                {{if .HasWind}}
+                <svg class="rp-arrow wind" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.WindDir}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
+                <span class="v">{{.WindSpeed}} mph</span>
+                <span class="m">{{bearing .WindDir}}</span>
+                {{else}}<span class="m">Unavailable</span>{{end}}
+            </li></ul>
+        </section>
+    </div>
+</div>
+{{end}}
