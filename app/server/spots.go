@@ -1028,56 +1028,61 @@ func spotPageHandler(tmpl *template.Template, staticDir string, zones *SurfZoneS
 			c.JSON(http.StatusNotFound, gin.H{"error": "Unknown spot"})
 			return
 		}
-		forecastData, hours := spotForecast(staticDir, spot)
-		report, hasReport := spotReport(staticDir, spot, forecastData)
-		conditions := spotConditions(staticDir, spot, hours)
-		if c, ok := conditionNear(conditions, report.ValidUnixMs); ok && hasReport {
-			report.Surf = c.Surf
-		}
-		summary := generateForecastSummary(forecastData)
-		applyConditionSummary(summary, conditions)
-		b := spotBeach(staticDir, spot)
-		facing := ""
-		if b.HasFacing {
-			facing = facingLabel(b.Facing)
-		}
-		exposure, hasExposure := spotExposure(b, report, hasReport)
-		// The NWS surf zone report is matched on the spot itself (not the
-		// offshore sample point): zones cover the coastal strip.
-		zone, hasZone := zones.ZoneForPoint(spot.Lat, spot.Lon)
-		var tide SpotTide
-		hasTide := false
-		if rows := forecastData.Forecast; len(rows) > 0 {
-			// a day either side covers local midnight in every time zone
-			tide, hasTide = spotTide(staticDir, spot.ID,
-				rows[0].Time.Add(-24*time.Hour), rows[len(rows)-1].Time.Add(24*time.Hour))
-		}
-		seo := spotSEOPage(siteURL, spotStore, spot)
-		data := SpotPageData{
-			SEO:             seo,
-			ForecastData:    forecastData,
-			SwellReport:     SwellReport{StationId: spot.ID},
-			SpotName:        spot.Name,
-			Region:          spot.Region,
-			HasForecast:     len(forecastData.Forecast) > 0,
-			Report:          report,
-			HasReport:       hasReport,
-			Zone:            zone,
-			HasZone:         hasZone,
-			ForecastSummary: summary,
-			Conditions:      conditions,
-			HasConditions:   len(conditions) > 0,
-			Facing:          facing,
-			Exposure:        exposure,
-			HasExposure:     hasExposure,
-			PageHeading:     seo.OpenGraphTitle,
-			Coordinates:     coordinateLabel(spot.Lat, spot.Lon),
-			Latitude:        spot.Lat,
-			Longitude:       spot.Lon,
-			NearbySpots:     spotStore.Nearby(spot, 6),
-			Tide:            tide,
-			HasTide:         hasTide,
-		}
-		renderTemplate(c, tmpl, "spot.html", data)
+		renderTemplate(c, tmpl, "spot.html", spotPageData(staticDir, zones, siteURL, spot))
+	}
+}
+
+// spotPageData gathers everything the spot page (and the spotreport
+// component it shares with the landing page) renders for one spot.
+func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot Spot) SpotPageData {
+	forecastData, hours := spotForecast(staticDir, spot)
+	report, hasReport := spotReport(staticDir, spot, forecastData)
+	conditions := spotConditions(staticDir, spot, hours)
+	if c, ok := conditionNear(conditions, report.ValidUnixMs); ok && hasReport {
+		report.Surf = c.Surf
+	}
+	summary := generateForecastSummary(forecastData)
+	applyConditionSummary(summary, conditions)
+	b := spotBeach(staticDir, spot)
+	facing := ""
+	if b.HasFacing {
+		facing = facingLabel(b.Facing)
+	}
+	exposure, hasExposure := spotExposure(b, report, hasReport)
+	// The NWS surf zone report is matched on the spot itself (not the
+	// offshore sample point): zones cover the coastal strip.
+	zone, hasZone := zones.ZoneForPoint(spot.Lat, spot.Lon)
+	var tide SpotTide
+	hasTide := false
+	if rows := forecastData.Forecast; len(rows) > 0 {
+		// a day either side covers local midnight in every time zone
+		tide, hasTide = spotTide(staticDir, spot.ID,
+			rows[0].Time.Add(-24*time.Hour), rows[len(rows)-1].Time.Add(24*time.Hour))
+	}
+	seo := spotSEOPage(siteURL, spotStore, spot)
+	return SpotPageData{
+		SEO:             seo,
+		ForecastData:    forecastData,
+		SwellReport:     SwellReport{StationId: spot.ID},
+		SpotName:        spot.Name,
+		Region:          spot.Region,
+		HasForecast:     len(forecastData.Forecast) > 0,
+		Report:          report,
+		HasReport:       hasReport,
+		Zone:            zone,
+		HasZone:         hasZone,
+		ForecastSummary: summary,
+		Conditions:      conditions,
+		HasConditions:   len(conditions) > 0,
+		Facing:          facing,
+		Exposure:        exposure,
+		HasExposure:     hasExposure,
+		PageHeading:     seo.OpenGraphTitle,
+		Coordinates:     coordinateLabel(spot.Lat, spot.Lon),
+		Latitude:        spot.Lat,
+		Longitude:       spot.Lon,
+		NearbySpots:     spotStore.Nearby(spot, 6),
+		Tide:            tide,
+		HasTide:         hasTide,
 	}
 }

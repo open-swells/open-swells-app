@@ -198,46 +198,7 @@
                     <div class="rp-sub">{{if .Report.Surf}}Surf now{{else}}Wave height{{end}}</div>
                 </div>
                 {{end}}
-                {{if .HasReport}}{{$r := .Report}}
-                <div class="rp-props">
-                    <section class="rp-group rp-swell" aria-label="Swell">
-                        <h4 class="rp-cap">Swell</h4>
-                        <ul>
-                            <li title="{{if $r.SwellHeight}}Combined seas{{else if $r.PrimaryIsWindSea}}Wind sea{{else}}Primary swell{{end}}">
-                                <svg class="rp-arrow primary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.PrimaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
-                                <span class="v">{{$r.PrimaryHeight}}ft</span>
-                                <span class="d"><span class="p"><span class="at">@ </span>{{$r.PrimaryPeriod}}s</span> <span class="m">{{bearing $r.PrimaryDegrees}}</span></span>
-                            </li>
-                            {{if $r.HasSecondary}}
-                            <li title="Secondary swell">
-                                <svg class="rp-arrow secondary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.SecondaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
-                                <span class="v">{{$r.SecondaryHeight}}ft</span>
-                                <span class="d"><span class="p"><span class="at">@ </span>{{$r.SecondaryPeriod}}s</span> <span class="m">{{bearing $r.SecondaryDegrees}}</span></span>
-                            </li>
-                            {{end}}
-                            {{if and $r.HasWindSea (not $r.PrimaryIsWindSea)}}
-                            <li title="Wind sea">
-                                <svg class="rp-arrow wind-sea" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.WindSeaDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
-                                <span class="v">{{$r.WindSeaHeight}}ft</span>
-                                <span class="d"><span class="p"><span class="at">@ </span>{{$r.WindSeaPeriod}}s</span> <span class="m">{{bearing $r.WindSeaDegrees}}</span></span>
-                            </li>
-                            {{end}}
-                        </ul>
-                    </section>
-                    <div class="rp-side">
-                        <section class="rp-group" aria-label="Wind">
-                            <h4 class="rp-cap">Wind</h4>
-                            <ul><li>
-                                {{if $r.HasWind}}
-                                <svg class="rp-arrow wind" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.WindDir}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
-                                <span class="v">{{$r.WindSpeed}} mph</span>
-                                <span class="m">{{bearing $r.WindDir}}</span>
-                                {{else}}<span class="m">Unavailable</span>{{end}}
-                            </li></ul>
-                        </section>
-                    </div>
-                </div>
-                {{end}}
+                {{if .HasReport}}{{template "spotprops" .Report}}{{end}}
             </section>
             {{if and $.Detailed (gt (len .CurrentConditions) 0)}}
             <div class="hour-block">

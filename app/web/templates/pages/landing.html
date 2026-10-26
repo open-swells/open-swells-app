@@ -12,16 +12,25 @@
     <meta property="og:type" content="website">
     {{template "analytics"}}
     <script src="https://cdn.tailwindcss.com"></script>
+    {{if .Live.HasSpot}}
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    {{if .Live.Spot.HasExposure}}
+    <script src="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js" defer></script>
+    <link href="https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css" rel="stylesheet">
+    {{end}}
+    {{end}}
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/theme.css">
     <style>
+        /* The four facts, compact, in a strip under the search. */
         .feature-card {
-            background: var(--panel);
+            background: color-mix(in srgb, var(--panel) 88%, transparent);
             border: 1px solid var(--line);
-            padding: 20px;
-            transition: border-color 120ms ease, background 120ms ease;
+            padding: 10px 12px;
+            text-align: left;
         }
-        .feature-card:hover { border-color: var(--line-strong); background: var(--raised); }
+        .feature-card h2 { margin: 3px 0 2px; font-size: 13px; font-weight: 600; color: #fff; }
+        .feature-card p { margin: 0; font-size: 11px; line-height: 1.45; color: var(--text-2); }
         /* Hero buttons are a size up from the app-wide 32px control height. */
         .cta-button, .ghost-button { height: 36px; padding: 0 16px; font-size: 13px; }
 
@@ -29,13 +38,20 @@
            A quantized swell-height heatmap: a fine grid of cells coloured by
            a noisy field that steps forward in discrete ticks, like a wave
            model run. The canvas sits behind the hero, the SVG graticule sits
-           on top of it, and a radial shade keeps the text readable. */
-        .chart-field { position: absolute; inset: 0; overflow: hidden; }
+           on top of it, and a radial shade keeps the text readable. The field
+           is about a screen tall and fades out behind the live report, so the
+           report's height doesn't stretch it. */
+        .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+        .chart-field {
+            position: absolute; top: 0; left: 0; right: 0; height: min(100vh, 900px); overflow: hidden;
+            -webkit-mask-image: linear-gradient(to bottom, #000 65%, transparent);
+            mask-image: linear-gradient(to bottom, #000 65%, transparent);
+        }
         .chart-field canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
         .chart-field svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
         .hero-shade {
             position: absolute; inset: 0;
-            background: radial-gradient(ellipse 58% 52% at 50% 44%, rgba(14, 15, 18, 0.9) 0%, rgba(14, 15, 18, 0.5) 55%, transparent 78%);
+            background: radial-gradient(ellipse 60% 70% at 50% 45%, rgba(14, 15, 18, 0.9) 0%, rgba(14, 15, 18, 0.5) 55%, transparent 78%);
             pointer-events: none;
         }
         .chart-note {
@@ -46,7 +62,69 @@
             color: #6c6f77;
             pointer-events: none;
         }
+        /* --- Spot search ---------------------------------------------------
+           A combobox over /api/spots, loaded on first focus. Results open
+           the spot's full report. */
+        .spot-search { position: relative; flex: 1; min-width: 0; text-align: left; }
+        .spot-search-field {
+            height: 42px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+            background: var(--panel); border: 1px solid var(--line-strong);
+            transition: border-color 120ms ease;
+        }
+        .spot-search-field:focus-within { border-color: var(--accent-bright); }
+        .spot-search-field svg { flex: none; color: var(--text-3); }
+        .spot-search input { flex: 1; min-width: 0; height: 100%; background: transparent; border: 0; outline: none; color: #fff; font-size: 14px; }
+        .spot-search input::placeholder { color: var(--text-3); }
+        .spot-search input::-webkit-search-cancel-button { display: none; }
+        .spot-search kbd { flex: none; padding: 1px 6px; border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
+        .spot-search-results {
+            position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0;
+            margin: 0; padding: 4px 0; list-style: none;
+            background: var(--panel); border: 1px solid var(--line-strong); box-shadow: var(--shadow-pop);
+            max-height: 340px; overflow-y: auto;
+        }
+        .spot-search-results a { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 8px 12px; }
+        .spot-search-results [aria-selected="true"] a { background: var(--hover); }
+        .spot-search-results .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text); }
+        .spot-search-results .name mark { background: none; color: #fff; font-weight: 600; }
+        .spot-search-results .region { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); font-size: 10px; color: var(--text-3); }
+        .spot-search-results .empty { padding: 10px 12px; font-size: 12px; color: var(--text-2); }
+
+
+        /* --- Live report ---------------------------------------------------
+           The spot page's report for a break that is working right now. */
+        .live-card {
+            margin-top: 16px; padding: 18px 20px 20px; text-align: left;
+            background: var(--bg); border: 1px solid var(--line-strong);
+            box-shadow: var(--shadow-panel); scroll-margin-top: 12px;
+        }
+        .live-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
+        .live-kicker { display: flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); }
+        .live-kicker .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--positive); box-shadow: 0 0 0 3px color-mix(in srgb, var(--positive) 18%, transparent); }
+        .live-head h2 { margin: 6px 0 0; font-size: 20px; font-weight: 600; color: #fff; }
+        .live-head h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+        .live-actions { flex: none; display: flex; gap: 8px; }
+        @media (max-width: 640px) {
+            .spot-search kbd { display: none; }
+            .hero-actions { flex-direction: column; align-items: stretch; }
+            .live-head { flex-direction: column; align-items: flex-start; }
+            .live-card { padding: 14px 12px 16px; }
+            /* titles only, so the report starts on the first screen */
+            .feature-card p { display: none; }
+            .chart-note { display: none; }
+        }
     </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const formatter = new Intl.DateTimeFormat(undefined, {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+            });
+            document.querySelectorAll('[data-local-time]').forEach(el => {
+                const date = new Date(Number(el.dataset.localTime));
+                if (!Number.isNaN(date.getTime())) el.textContent = formatter.format(date);
+            });
+        });
+    </script>
 </head>
 <body class="min-h-screen flex flex-col">
     <!-- Header -->
@@ -66,71 +144,91 @@
                         <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
                     </svg>
                 </a>
-                <a href="/map" class="ghost-button ml-2 !h-8 text-xs">Open map</a>
             </nav>
         </div>
     </header>
 
-    <!-- Hero over the chart field -->
-    <main class="flex-grow relative flex flex-col items-center justify-center px-6 py-16">
+    <!-- Hero over the chart field: search, the map, and the four facts -->
+    <section class="hero flex-grow">
         <div class="chart-field" aria-hidden="true">
             <canvas id="heatmap"></canvas>
             <svg id="contourChart" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
                 <g id="graticule"></g>
             </svg>
             <div class="hero-shade"></div>
-            <div class="chart-note" style="left: 18px; bottom: 14px;">GFS-WAVE &middot; 0.25&deg; &middot; SIG. HEIGHT (M)</div>
+            <div class="chart-note hidden sm:block" style="left: 18px; top: 14px;">GFS-WAVE &middot; 0.25&deg; &middot; SIG. HEIGHT (M)</div>
             <div class="chart-note hidden sm:block" style="right: 18px; top: 14px;">33.8&deg;N &nbsp;121.5&deg;W</div>
         </div>
 
-        <div class="relative z-10 max-w-2xl w-full text-center">
-            <div class="mono inline-flex items-center gap-2 px-3 py-1 mb-8 text-[11px] text-[#a6aab2] border border-[#2f3137] bg-[#17181b]">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#6fcf97]"></span>
-                LIVE &middot; UPDATED EVERY 6 HOURS
-            </div>
-            <h1 class="text-5xl md:text-6xl font-semibold tracking-tight text-white">
+        <div class="relative z-10 max-w-6xl mx-auto px-6 pt-10 pb-12 text-center">
+            <h1 class="text-4xl md:text-5xl font-semibold tracking-tight text-white">
                 OpenSwells<span class="text-[#3b82f6]">;</span>
             </h1>
-            <div class="mono mt-4 text-[12px] uppercase tracking-[0.25em] text-[#a6aab2]">
-                Free 16-day swell forecast
-            </div>
-            <p class="mt-5 text-base text-[#b7bac1] leading-relaxed max-w-xl mx-auto">
-                Global wave model forecasts for {{formatcount .SpotCount}} surf spots and real-time reports from {{formatcount .BuoyCount}} buoy stations.
-                Open source, no subscription.
+            <p class="mt-3 text-[15px] text-[#b7bac1]">
+                Free surf reports and 16-day swell forecasts for {{formatcount .SpotCount}} spots. Open source, no subscription.
             </p>
-            <div class="mt-8 flex items-center justify-center gap-3">
-                <a href="/map" class="cta-button">
-                    Start mapping
+            <div class="hero-actions mt-6 max-w-xl mx-auto flex items-center gap-2">
+                <div class="spot-search" data-spot-search>
+                    <div class="spot-search-field">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                        <input id="spotSearch" type="search" placeholder="Search {{formatcount .SpotCount}} surf spots" autocomplete="off" spellcheck="false"
+                            role="combobox" aria-label="Search surf spots" aria-autocomplete="list" aria-expanded="false" aria-controls="spotSearchResults">
+                        <kbd aria-hidden="true">/</kbd>
+                    </div>
+                    <ul id="spotSearchResults" class="spot-search-results" role="listbox" aria-label="Matching surf spots" hidden></ul>
+                </div>
+                <a href="/map" class="cta-button !h-[42px] flex-none">
+                    Open the map
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </a>
-                <a href="/about" class="ghost-button">Learn more</a>
             </div>
-        </div>
 
-        <!-- Features -->
-        <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-3 mt-16 max-w-3xl w-full">
-            <div class="feature-card">
-                <div class="mono text-[10px] font-medium uppercase text-[#a6aab2] mb-2">Coverage</div>
-                <h2 class="text-sm font-semibold text-white mb-1.5">{{formatcount .SpotCount}} surf spots</h2>
-                <p class="text-[13px] leading-relaxed text-[#b7bac1]">Explore global model forecasts for every location in our spot directory, alongside {{formatcount .BuoyCount}} live buoy stations.</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-8">
+                <div class="feature-card">
+                    <div class="mono text-[10px] font-medium uppercase text-[#a6aab2]">Coverage</div>
+                    <h2>{{formatcount .SpotCount}} surf spots</h2>
+                    <p>Model forecasts everywhere, plus {{formatcount .BuoyCount}} live buoys.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="mono text-[10px] font-medium uppercase text-[#a6aab2]">Reports</div>
+                    <h2>Real-time buoy data</h2>
+                    <p>Readings as soon as <a href="https://www.ndbc.noaa.gov/faq/realtime.shtml" class="text-[#bfdbfe] underline underline-offset-2 decoration-[#565961]">NDBC</a> receives them.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="mono text-[10px] font-medium uppercase text-[#a6aab2]">Forecast</div>
+                    <h2>16-day outlook</h2>
+                    <p>NOAA wave models, refreshed every 6 hours.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="mono text-[10px] font-medium uppercase text-[#a6aab2]">Pricing</div>
+                    <h2>Free</h2>
+                    <p>Sign in with Google to save favorite spots.</p>
+                </div>
             </div>
-            <div class="feature-card">
-                <div class="mono text-[10px] font-medium uppercase text-[#a6aab2] mb-2">Reports</div>
-                <h2 class="text-sm font-semibold text-white mb-1.5">Real-time buoy data</h2>
-                <p class="text-[13px] leading-relaxed text-[#b7bac1]">Readings are available as soon as they are received by <a href="https://www.ndbc.noaa.gov/faq/realtime.shtml" class="text-[#3b82f6] hover:text-white underline underline-offset-2 decoration-[#565961]">NDBC</a>.</p>
-            </div>
-            <div class="feature-card">
-                <div class="mono text-[10px] font-medium uppercase text-[#a6aab2] mb-2">Forecast</div>
-                <h2 class="text-sm font-semibold text-white mb-1.5">16-day global outlook</h2>
-                <p class="text-[13px] leading-relaxed text-[#b7bac1]">Extended wave predictions from NOAA wave models, refreshed every 6 hours.</p>
-            </div>
-            <div class="feature-card">
-                <div class="mono text-[10px] font-medium uppercase text-[#a6aab2] mb-2">Pricing</div>
-                <h2 class="text-sm font-semibold text-white mb-1.5">Free</h2>
-                <p class="text-[13px] leading-relaxed text-[#b7bac1]">No subscription. Sign in with Google to save your favorite spots.</p>
-            </div>
+
+            {{if .Live.HasSpot}}
+            {{$s := .Live.Spot}}
+            <!-- Live report: the spot page's report and forecast for a break working now -->
+            <section id="live" class="live-card" aria-labelledby="liveTitle">
+                <div class="live-head">
+                    <div class="min-w-0">
+                        <div class="live-kicker"><span class="dot" aria-hidden="true"></span>Live report</div>
+                        <h2 id="liveTitle"><a href="/surf-spots/{{.Live.ID}}">{{$s.SpotName}}</a></h2>
+                        <div class="station-meta">{{if $s.Region}}{{$s.Region}} &middot; {{end}}{{$s.Coordinates}}{{if $s.Facing}} &middot; FACES {{$s.Facing}}{{end}}</div>
+                    </div>
+                    <div class="live-actions">
+                        <a href="/map?spot={{.Live.ID}}" class="ghost-button">On the map</a>
+                        <a href="/surf-spots/{{.Live.ID}}" class="cta-button">
+                            Full spot page
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                    </div>
+                </div>
+                {{template "spotreport" $s}}
+            </section>
+            {{end}}
         </div>
-    </main>
+    </section>
 
     <!-- Footer -->
     <footer class="w-full border-t border-[#2f3137] relative z-20 bg-[#0e0f12]">
@@ -307,6 +405,112 @@
                 draw(tick);
             }, TICK_MS);
         }
+    })();
+    </script>
+
+    <script>
+    // Spot search: the spot directory loads on first focus; matches rank
+    // name prefixes, then word starts, then anywhere in the name or region.
+    (function () {
+        const input = document.getElementById('spotSearch');
+        const list = document.getElementById('spotSearchResults');
+        if (!input || !list) return;
+        const LIMIT = 8;
+        let spots = null, loading = null, matches = [], active = -1;
+
+        const escapeHTML = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const fold = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+        function load() {
+            loading ||= fetch('/api/spots')
+                .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+                .then(data => {
+                    spots = data.map(s => ({ ...s, key: fold(s.name), regionKey: fold(s.region || '') }));
+                    if (input.value.trim()) search();
+                })
+                .catch(() => { loading = null; showMessage('Could not load the spot directory. Try again shortly.'); });
+            return loading;
+        }
+
+        function rank(spot, q, terms) {
+            if (!terms.every(t => spot.key.includes(t) || spot.regionKey.includes(t))) return -1;
+            if (spot.key.startsWith(q)) return 0;
+            if (spot.key.includes(' ' + q) || spot.key.includes('(' + q)) return 1;
+            if (spot.key.includes(q)) return 2;
+            return 3;
+        }
+
+        function highlight(name, q) {
+            const i = fold(name).indexOf(q);
+            if (i < 0 || !q) return escapeHTML(name);
+            return escapeHTML(name.slice(0, i)) + '<mark>' + escapeHTML(name.slice(i, i + q.length)) + '</mark>' + escapeHTML(name.slice(i + q.length));
+        }
+
+        function open(on) {
+            list.hidden = !on;
+            input.setAttribute('aria-expanded', String(on));
+            if (!on) setActive(-1);
+        }
+
+        function showMessage(text) {
+            matches = [];
+            list.innerHTML = `<li class="empty" role="presentation">${escapeHTML(text)}</li>`;
+            open(true);
+        }
+
+        function search() {
+            const q = fold(input.value.trim());
+            if (!q) { open(false); return; }
+            if (!spots) { showMessage('Loading spots…'); load(); return; }
+            const terms = q.split(/\s+/);
+            const scored = [];
+            for (const spot of spots) {
+                const r = rank(spot, q, terms);
+                if (r >= 0) scored.push([r, spot]);
+            }
+            scored.sort((a, b) => a[0] - b[0] || a[1].name.length - b[1].name.length || a[1].name.localeCompare(b[1].name));
+            matches = scored.slice(0, LIMIT).map(([, spot]) => spot);
+            if (!matches.length) { showMessage('No matching spots.'); return; }
+            list.innerHTML = matches.map((spot, i) =>
+                `<li id="spot-opt-${i}" role="option" aria-selected="false"><a href="/surf-spots/${encodeURIComponent(spot.id)}" tabindex="-1">` +
+                `<span class="name">${highlight(spot.name, q)}</span><span class="region">${escapeHTML(spot.region || '')}</span></a></li>`
+            ).join('');
+            open(true);
+            setActive(0);
+        }
+
+        function setActive(i) {
+            active = i;
+            list.querySelectorAll('[role="option"]').forEach((el, j) => el.setAttribute('aria-selected', String(j === i)));
+            const el = i >= 0 ? document.getElementById(`spot-opt-${i}`) : null;
+            if (el) { input.setAttribute('aria-activedescendant', el.id); el.scrollIntoView({ block: 'nearest' }); }
+            else input.removeAttribute('aria-activedescendant');
+        }
+
+        input.addEventListener('focus', () => { load(); if (input.value.trim()) search(); });
+        input.addEventListener('input', search);
+        input.addEventListener('keydown', e => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                if (!matches.length) return;
+                e.preventDefault();
+                const step = e.key === 'ArrowDown' ? 1 : -1;
+                setActive((active + step + matches.length) % matches.length);
+            } else if (e.key === 'Enter') {
+                const spot = matches[Math.max(0, active)];
+                if (spot) { e.preventDefault(); location.assign(`/surf-spots/${encodeURIComponent(spot.id)}`); }
+            } else if (e.key === 'Escape') {
+                if (!list.hidden) { e.preventDefault(); open(false); } else input.blur();
+            }
+        });
+        input.addEventListener('blur', () => setTimeout(() => open(false), 120));
+        list.addEventListener('mousedown', e => e.preventDefault()); // keep focus so the click lands
+        document.addEventListener('keydown', e => {
+            const t = e.target;
+            if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+            if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable) return;
+            e.preventDefault();
+            input.focus();
+        });
     })();
     </script>
 </body>
