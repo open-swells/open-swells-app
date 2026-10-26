@@ -12,21 +12,29 @@ import (
 
 func writeSpotForecastFixture(t *testing.T, dir, metadataStart, fileStart string, spots map[string]any) {
 	t.Helper()
+	// Hourly, then the 3-hourly tail, like a real run.
+	writeSpotForecastRun(t, dir, metadataStart, fileStart, []int{0, 1, 2, 3, 6}, spots)
+}
+
+// writeSpotForecastRun publishes a run like the pipeline does: a new file
+// renamed over the old one, which leaves archived links to it intact.
+func writeSpotForecastRun(t *testing.T, dir, metadataStart, fileStart string, hours []int, spots map[string]any) {
+	t.Helper()
 	meta := `{"forecast_start":"` + metadataStart + `"}`
 	if err := os.WriteFile(filepath.Join(dir, "metadata.json"), []byte(meta), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	f, err := os.Create(filepath.Join(dir, spotForecastsFile))
+	path := filepath.Join(dir, spotForecastsFile)
+	f, err := os.Create(path + ".tmp")
 	if err != nil {
 		t.Fatal(err)
 	}
 	zw := gzip.NewWriter(f)
 	payload := map[string]any{
 		"forecast_start": fileStart,
-		// Hourly, then the 3-hourly tail, like a real run.
-		"hours":  []int{0, 1, 2, 3, 6},
-		"fields": []string{"hs", "h1", "p1", "d1", "ws", "wd"},
-		"spots":  spots,
+		"hours":          hours,
+		"fields":         []string{"hs", "h1", "p1", "d1", "ws", "wd"},
+		"spots":          spots,
 	}
 	if err := json.NewEncoder(zw).Encode(payload); err != nil {
 		t.Fatal(err)
@@ -37,6 +45,40 @@ func writeSpotForecastFixture(t *testing.T, dir, metadataStart, fileStart string
 	if err := f.Close(); err != nil {
 		t.Fatal(err)
 	}
+	// A distinct mtime per run, so the loader's cache sees the change.
+	if prev, err := os.Stat(path); err == nil {
+		mod := prev.ModTime().Add(time.Minute)
+		if err := os.Chtimes(f.Name(), mod, mod); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Rename(f.Name(), path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// hourlySpot is a spot with n hourly values, height h1 = base + 0.1*i.
+func hourlySpot(n int, base float64) map[string]any {
+	hs, h1, p1, d1, ws, wd := []any{}, []any{}, []any{}, []any{}, []any{}, []any{}
+	for i := 0; i < n; i++ {
+		h := math.Round((base+0.1*float64(i))*10) / 10
+		hs = append(hs, h+0.5)
+		h1 = append(h1, h)
+		p1 = append(p1, 12.0)
+		d1 = append(d1, 270)
+		ws = append(ws, 4.0)
+		wd = append(wd, 90)
+	}
+	return map[string]any{"cell": []float64{0.5, 0}, "km": 55.6,
+		"hs": hs, "h1": h1, "p1": p1, "d1": d1, "ws": ws, "wd": wd}
+}
+
+func hourRange(n int) []int {
+	hours := make([]int, n)
+	for i := range hours {
+		hours[i] = i
+	}
+	return hours
 }
 
 func fixtureSpot() map[string]any {
@@ -218,5 +260,110 @@ func TestSpotReportFallsBackToWindSeaWithoutSwell(t *testing.T) {
 	}
 	if !report.PrimaryIsWindSea || report.PrimaryHeight != "2.6" || report.PrimaryPeriod != "4.4" {
 		t.Errorf("report = %+v, want the wind sea as primary", report)
+	}
+}
+
+func TestSpotForecastBackfillsHoursBeforeRunFromEarlierRuns(t *testing.T) {
+	dir := t.TempDir()
+	// Runs 18Z and 00Z are seen (and archived) before the 06Z run lands.
+	writeSpotForecastRun(t, dir, "20260719_18Z", "20260719_18Z", hourRange(13), map[string]any{"a": hourlySpot(13, 5.0)})
+	if _, _, ok := spotSeriesFor(dir, "a"); !ok {
+		t.Fatal("18Z run not loaded")
+	}
+	writeSpotForecastRun(t, dir, "20260720_00Z", "20260720_00Z", hourRange(13), map[string]any{"a": hourlySpot(13, 1.0)})
+	if _, _, ok := spotSeriesFor(dir, "a"); !ok {
+		t.Fatal("00Z run not loaded")
+	}
+	writeSpotForecastRun(t, dir, "20260720_06Z", "20260720_06Z", hourRange(4), map[string]any{"a": hourlySpot(4, 3.0)})
+
+	forecast, hours := spotForecast(dir, Spot{ID: "a"})
+	// 06Z-12h .. 06Z+3h: 18Z's hours 6..11, 00Z's hours 0..5, then 06Z's own.
+	if got := len(forecast.Forecast); got != 16 {
+		t.Fatalf("rows = %d, want 16", got)
+	}
+	if len(hours) != 16 {
+		t.Fatalf("classifier hours = %d, want 16", len(hours))
+	}
+	if got, want := forecast.Forecast[0].Time, time.Date(2026, 7, 19, 18, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Fatalf("first row at %v, want %v", got, want)
+	}
+	checks := []struct {
+		row  int
+		want string
+	}{
+		{0, "5.0"},  // 18Z f000: no newer run has 18Z
+		{5, "5.5"},  // 18Z f005
+		{6, "1.0"},  // 00Z f000 beats 18Z f006
+		{11, "1.5"}, // 00Z f005
+		{12, "3.0"}, // the current run from its start
+		{15, "3.3"},
+	}
+	for _, c := range checks {
+		if got := forecast.Forecast[c.row].PrimaryWaveHeight; got != c.want {
+			t.Fatalf("row %d primary = %s, want %s", c.row, got, c.want)
+		}
+	}
+	if forecast.Date != "2026072006" {
+		t.Fatalf("forecast date = %s, want the current run", forecast.Date)
+	}
+
+	// Wind carries the same hours, before the run as negative hours.
+	wind := spotWind(dir, Spot{ID: "a"})
+	if len(wind) != 16 || wind[0].Hour != -12 || wind[12].Hour != 0 {
+		t.Fatalf("wind = %+v", wind)
+	}
+
+	// The summary starts at the run's day, not the backfilled day before.
+	summary := generateForecastSummary(forecast)
+	if len(summary) != 1 || summary[0].Date != "2026-07-20" {
+		t.Fatalf("summary = %+v", summary)
+	}
+
+	// Archives older than the backfill window are pruned; the rest stay.
+	writeSpotForecastRun(t, dir, "20260721_06Z", "20260721_06Z", hourRange(4), map[string]any{"a": hourlySpot(4, 3.0)})
+	if _, _, ok := spotSeriesFor(dir, "a"); !ok {
+		t.Fatal("next day's run not loaded")
+	}
+	runs := archivedSpotForecastRuns(dir)
+	if _, ok := runs["20260719_18Z"]; ok {
+		t.Fatal("18Z archive outlived the backfill window")
+	}
+	if _, ok := runs["20260720_06Z"]; !ok {
+		t.Fatalf("06Z archive pruned too early: %v", runs)
+	}
+}
+
+func TestSpotForecastBackfillStopsAtGap(t *testing.T) {
+	dir := t.TempDir()
+	old := hourlySpot(6, 1.0)
+	old["hs"].([]any)[3] = nil // 00Z f003 failed
+	writeSpotForecastRun(t, dir, "20260720_00Z", "20260720_00Z", hourRange(6), map[string]any{"a": old})
+	if _, _, ok := spotSeriesFor(dir, "a"); !ok {
+		t.Fatal("00Z run not loaded")
+	}
+	writeSpotForecastRun(t, dir, "20260720_06Z", "20260720_06Z", hourRange(2), map[string]any{"a": hourlySpot(2, 3.0)})
+
+	forecast, _ := spotForecast(dir, Spot{ID: "a"})
+	// Only 00Z f004..f005 join without bridging the failed hour.
+	if got := len(forecast.Forecast); got != 4 {
+		t.Fatalf("rows = %d, want 4", got)
+	}
+	if got := forecast.Forecast[0].PrimaryWaveHeight; got != "1.4" {
+		t.Fatalf("first row primary = %s, want 00Z f004's 1.4", got)
+	}
+}
+
+func TestSpotForecastIgnoresBackfillWithoutCurrentRun(t *testing.T) {
+	dir := t.TempDir()
+	writeSpotForecastRun(t, dir, "20260720_00Z", "20260720_00Z", hourRange(13), map[string]any{"a": hourlySpot(13, 1.0)})
+	if _, _, ok := spotSeriesFor(dir, "a"); !ok {
+		t.Fatal("00Z run not loaded")
+	}
+	current := hourlySpot(2, 3.0)
+	current["hs"] = []any{nil, nil}
+	writeSpotForecastRun(t, dir, "20260720_06Z", "20260720_06Z", hourRange(2), map[string]any{"a": current})
+
+	if forecast, _ := spotForecast(dir, Spot{ID: "a"}); len(forecast.Forecast) != 0 {
+		t.Fatalf("rows = %d, want none: only past hours", len(forecast.Forecast))
 	}
 }

@@ -624,21 +624,36 @@ func spotForecast(staticDir string, spot Spot) (ForecastData, []hourSwells) {
 	return gridSpotForecast(staticDir, lat, lon)
 }
 
-// fileSpotForecast uses the spot's own series. Only the leading gap-free
-// run of hours is used, as with the grids: a failed hour is null in the
-// file and rows past it would bridge a hole in the forecast.
+// fileSpotForecast uses the spot's own series. Only the gap-free run of
+// hours around the run's start is used, as with the grids: a failed hour
+// is null in the file and rows past it would bridge a hole in the
+// forecast. Hours before the start come from earlier runs (see
+// backfillSpotForecasts).
 func fileSpotForecast(staticDir string, set *spotForecastSet, series *spotSeries, lat, lon float64) (ForecastData, []hourSwells) {
-	start, err := time.Parse("20060102_15Z", set.ForecastStart)
+	start, err := time.Parse(forecastRunLayout, set.ForecastStart)
 	if err != nil {
 		return ForecastData{}, nil
 	}
+	first := 0
+	for first < len(set.Hours) && set.Hours[first] < 0 {
+		first++
+	}
+	if _, ok := series.point(first); !ok {
+		return ForecastData{}, nil // nothing from this run: don't show only the past
+	}
+	for first > 0 {
+		if _, ok := series.point(first - 1); !ok {
+			break
+		}
+		first--
+	}
 	var samples []spotSample
-	for i, hour := range set.Hours {
+	for i := first; i < len(set.Hours); i++ {
 		p, ok := series.point(i)
 		if !ok {
 			break
 		}
-		samples = append(samples, spotSample{hour: hour, p: p})
+		samples = append(samples, spotSample{hour: set.Hours[i], p: p})
 	}
 	attachNwps(staticDir, samples, lat, lon)
 	return buildSpotForecast(start, samples)
@@ -646,6 +661,7 @@ func fileSpotForecast(staticDir string, set *spotForecastSet, series *spotSeries
 
 // attachNwps adds the nearshore sample to each hour. NWPS point grids are
 // 3-hourly, so hours between them interpolate the neighboring samples.
+// Hours backfilled from earlier runs have none: those runs' grids are gone.
 func attachNwps(staticDir string, samples []spotSample, lat, lon float64) {
 	domains := nwpsPointDomains(staticDir)
 	if len(domains) == 0 {
@@ -662,6 +678,9 @@ func attachNwps(staticDir string, samples []spotSample, lat, lon float64) {
 	}
 	for i := range samples {
 		hour := samples[i].hour
+		if hour < 0 {
+			continue
+		}
 		base := hour - hour%3
 		if base == hour {
 			samples[i].nwps = nwpsAt(hour)

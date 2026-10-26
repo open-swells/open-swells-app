@@ -457,10 +457,20 @@ func formatDate(date string) string {
 	return parsedDate.Format("Mon 1/2")
 }
 
+// generateForecastSummary buckets rows into UTC days from the run's start
+// day on: spot forecasts carry earlier runs' hours before the start, which
+// fill out that day but would otherwise add a day before it.
 func generateForecastSummary(forecastData ForecastData) []ForecastSummary {
+	firstDay := ""
+	if start, err := time.Parse("2006010215", forecastData.Date); err == nil {
+		firstDay = start.Format("2006-01-02")
+	}
 	groupedForecast := make(map[string][]ForecastRow)
 	for _, row := range forecastData.Forecast {
-		day := row.Time.Format("2006-01-02")
+		day := row.Time.UTC().Format("2006-01-02")
+		if day < firstDay {
+			continue
+		}
 		groupedForecast[day] = append(groupedForecast[day], row)
 	}
 
