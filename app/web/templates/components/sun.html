@@ -1,0 +1,78 @@
+{{/* Sunrise and sunset for the forecast charts. Takes page data with
+     Latitude/Longitude (spot or buoy) and sets window.SUN_SITE to them,
+     or null when the location is unknown. window.SUN is defined once
+     per page, however many components include this. */}}
+{{define "sunscript"}}
+<script>
+    window.SUN_SITE = {{if or .Latitude .Longitude}}{ lat: {{.Latitude}}, lon: {{.Longitude}} }{{else}}null{{end}};
+    window.SUN = window.SUN || (() => {
+        const rad = Math.PI / 180;
+        // The sun's elevation in degrees: NOAA's low-precision solar
+        // position, the same as sunElevation in server/landing.go.
+        function elevation(lat, lon, ms) {
+            const d = new Date(ms);
+            const y = d.getUTCFullYear();
+            const day = Math.round((Date.UTC(y, d.getUTCMonth(), d.getUTCDate()) - Date.UTC(y, 0, 1)) / 864e5) + 1;
+            const hour = (((ms % 864e5) + 864e5) % 864e5) / 36e5;
+            const g = 2 * Math.PI / 365 * (day - 1 + (hour - 12) / 24); // fractional year
+            const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g)
+                - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g)
+                - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+            const eqTime = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g)
+                - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g)); // minutes
+            const hourAngle = ((hour * 60 + eqTime + 4 * lon) / 4 - 180) * rad;
+            const sinElev = Math.sin(lat * rad) * Math.sin(decl)
+                + Math.cos(lat * rad) * Math.cos(decl) * Math.cos(hourAngle);
+            return Math.asin(sinElev) / rad;
+        }
+
+        // the sun's upper limb on the horizon, with refraction
+        const HORIZON = -0.833;
+
+        // Sunrises, sunsets, and the stretches of night between startMs
+        // and endMs. Found by stepping the elevation in 10-minute steps
+        // and bisecting each crossing, so polar days and nights (no
+        // crossing at all) fall out without special cases.
+        function between(site, startMs, endMs) {
+            const res = { rises: [], sets: [], nights: [] };
+            if (!site || !(endMs > startMs)) return res;
+            const up = t => elevation(site.lat, site.lon, t) > HORIZON;
+            const crossing = (a, b) => {
+                const ua = up(a);
+                for (let i = 0; i < 14; i++) {
+                    const m = (a + b) / 2;
+                    if (up(m) === ua) a = m; else b = m;
+                }
+                return Math.round((a + b) / 2);
+            };
+            let prev = startMs, prevUp = up(startMs);
+            let nightStart = prevUp ? null : startMs;
+            while (prev < endMs) {
+                const t = Math.min(prev + 600e3, endMs);
+                const u = up(t);
+                if (u !== prevUp) {
+                    const c = crossing(prev, t);
+                    if (u) {
+                        res.rises.push(c);
+                        res.nights.push({ start: nightStart, end: c });
+                        nightStart = null;
+                    } else {
+                        res.sets.push(c);
+                        nightStart = c;
+                    }
+                }
+                prev = t;
+                prevUp = u;
+            }
+            if (nightStart !== null) res.nights.push({ start: nightStart, end: endMs });
+            return res;
+        }
+
+        const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+        // "6:42am"
+        const shortTime = ms => timeFmt.format(new Date(ms)).toLowerCase().replace(/\s/g, '');
+
+        return { elevation, between, shortTime };
+    })();
+</script>
+{{end}}

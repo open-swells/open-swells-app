@@ -4,6 +4,7 @@
      uses the page's d3 (and maplibre when .HasExposure) and document-level
      selectors, so a page can hold only one. */}}
 {{define "spotnow"}}
+{{template "sunscript" .}}
 <div class="section-label mb-2 min-w-0">Report {{if .HasReport}}<span class="normal-case font-normal tracking-normal text-[#8b9099]">&middot; model, valid <span data-local-time="{{.Report.ValidUnixMs}}">{{.Report.Valid}}</span></span>{{end}}</div>
 {{if .HasReport}}
 <style>
@@ -312,6 +313,8 @@
         const turns = tideEvents.filter(e => e.t >= +dayStart && e.t < +dayEnd);
         const windHours = hours.filter(h => h.haswind);
         const hasWind = windHours.length > 0;
+        // sunrise and sunset at the spot, in the viewer's day
+        const sun = SUN.between(window.SUN_SITE, +dayStart, +dayEnd);
 
         const best = hours.reduce((a, b) => (b.score > a.score ? b : a));
         const peakSurf = hours.reduce((a, b) => (b.ft_hi > a.ft_hi ? b : a));
@@ -420,6 +423,13 @@
                         .attr('y', 0).attr('height', lane.h)
                         .attr('fill', h => RATING[h.rating] || RATING.poor);
                 }
+                // night veils the lane's marks; its labels stay on top
+                for (const n of sun.nights) {
+                    g.append('rect').attr('class', 'sun-veil')
+                        .attr('x', x(new Date(n.start))).attr('width', x(new Date(n.end)) - x(new Date(n.start)))
+                        .attr('y', 0).attr('height', lane.h);
+                }
+                g.selectAll('text').raise();
                 // the lane's name, set on the plot (inside the
                 // rating bars, in the page color)
                 if (lane.key === 'cond') {
@@ -427,6 +437,25 @@
                 } else {
                     g.append('text').attr('class', 'lane-label').attr('x', 0).attr('y', 9).text(lane.label);
                 }
+            }
+
+            // sunrise and sunset: a faint line through the lanes, the
+            // time beside it on the night side, atop the surf lane
+            const sunMarks = [...sun.rises.map(t => ({ t, rise: true })), ...sun.sets.map(t => ({ t, rise: false }))];
+            // labels already on the top row (lane name, peak, y ticks)
+            const taken = svg.selectAll('text').nodes().map(n => n.getBBox()).filter(b => b.y < 14);
+            const clear = b => b.x >= left && b.x + b.width <= width - right
+                && taken.every(o => b.x > o.x + o.width + 3 || b.x + b.width < o.x - 3 || b.y > o.y + o.height || b.y + b.height < o.y);
+            for (const m of sunMarks) {
+                const sx = x(new Date(m.t));
+                svg.append('line').attr('class', 'sun-line').attr('x1', sx).attr('x2', sx).attr('y1', 0).attr('y2', height - axisH);
+                if (narrow) continue;
+                const text = svg.append('text').attr('class', 'sun-label').attr('y', 9)
+                    .text(`${m.rise ? 'sunrise' : 'sunset'} ${SUN.shortTime(m.t)}`);
+                // the night side, else the day side, else left off
+                const place = before => text.attr('x', before ? sx - 4 : sx + 4).attr('text-anchor', before ? 'end' : 'start');
+                const placed = [m.rise, !m.rise].some(before => clear(place(before).node().getBBox()));
+                if (placed) taken.push(text.node().getBBox()); else text.remove();
             }
 
             svg.append('line').attr('class', 'now-line').attr('x1', nx).attr('x2', nx).attr('y1', 0).attr('y2', height - axisH);
