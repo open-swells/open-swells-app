@@ -325,7 +325,7 @@ func TestSpotForecastBackfillsHoursBeforeRunFromEarlierRuns(t *testing.T) {
 	}
 
 	// The summary covers the run's own hours only: backfilled ones are past.
-	summary := generateForecastSummary(forecast)
+	summary := generateForecastSummary(forecast, time.UTC)
 	if len(summary) != 1 || summary[0].Date != "2026-07-20" || summary[0].WaveHeight != "10.3ft" {
 		t.Fatalf("summary = %+v, want the average of 06Z..09Z alone, 3.15m", summary)
 	}

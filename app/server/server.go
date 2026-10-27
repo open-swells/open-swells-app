@@ -464,17 +464,17 @@ func forecastRunStart(forecastData ForecastData) (time.Time, bool) {
 	return start, err == nil
 }
 
-// generateForecastSummary buckets rows into UTC days from the run's start
-// on. Backfilled hours are left out: they are already past, and would
-// otherwise rate today by them or add a day before the run's.
-func generateForecastSummary(forecastData ForecastData) []ForecastSummary {
+// generateForecastSummary buckets rows into loc's calendar days from the
+// run's start on. Backfilled hours are left out: they are already past, and
+// would otherwise rate today by them or add a day before the run's.
+func generateForecastSummary(forecastData ForecastData, loc *time.Location) []ForecastSummary {
 	start, hasStart := forecastRunStart(forecastData)
 	groupedForecast := make(map[string][]ForecastRow)
 	for _, row := range forecastData.Forecast {
 		if hasStart && row.Time.Before(start) {
 			continue
 		}
-		day := row.Time.UTC().Format("2006-01-02")
+		day := row.Time.In(loc).Format("2006-01-02")
 		groupedForecast[day] = append(groupedForecast[day], row)
 	}
 
@@ -515,7 +515,20 @@ type BuoyWithSummary struct {
 	OfflineSince string // e.g. "Jul 3"; only set when Offline
 }
 
-func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache *Cache, uid string, db *sql.DB, staticDir string, detailed bool) {
+// viewerLocation resolves the browser's IANA time zone (e.g.
+// "America/Los_Angeles"), falling back to UTC when absent or unknown.
+func viewerLocation(name string) *time.Location {
+	if name == "" || len(name) > 64 {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}
+
+func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache *Cache, uid string, db *sql.DB, staticDir string, detailed bool, loc *time.Location) {
 	buoyIDs, err := getBuoysForUser(db, uid)
 	if err != nil {
 		log.Printf("Failed to get buoys for user: %v", err)
@@ -539,7 +552,7 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 	spots := make([]SpotFavorite, 0, len(spotIDs))
 	for _, spotID := range spotIDs {
 		if spot, ok := spotStore.Get(spotID); ok {
-			spots = append(spots, spotFavoriteEntry(staticDir, spot))
+			spots = append(spots, spotFavoriteEntry(staticDir, spot, loc))
 		}
 	}
 
@@ -559,7 +572,7 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 			}
 			if since, offline := stationStore.OfflineSince(buoyID); offline {
 				entry.Offline = true
-				entry.OfflineSince = since.Format("Jan 2")
+				entry.OfflineSince = since.In(loc).Format("Jan 2")
 			}
 			if swellReport, reportErr := getSwellReport(buoyID); reportErr != nil {
 				log.Printf("Error fetching swell report for buoy %s: %v", buoyID, reportErr)
@@ -578,7 +591,7 @@ func renderForecastSummary(w http.ResponseWriter, tmpl *template.Template, cache
 				entry.HasError = true
 				entry.ErrorMsg = "Forecast not available"
 			} else {
-				entry.Summary = generateForecastSummary(forecastData)
+				entry.Summary = generateForecastSummary(forecastData, loc)
 				entry.Buoy.Forecast = forecastData
 			}
 			buoys[i] = entry
@@ -1323,7 +1336,7 @@ func run() {
 			HasSwellError:    swellErr != nil,
 			HasWindError:     windErr != nil,
 			HasForecastError: forecastErr != nil,
-			ForecastSummary:  generateForecastSummary(forecastdata),
+			ForecastSummary:  generateForecastSummary(forecastdata, time.UTC),
 		}
 		renderTemplate(c, tmpl, "buoy.html", returndata)
 	})
@@ -1355,7 +1368,7 @@ func run() {
 
 	router.GET("/forecast-summary", requireAuth(), summaryIPLimiter.middleware(clientIPKey), userLimiter.middleware(authenticatedUserKey), summaryConcurrency, func(c *gin.Context) {
 		c.Header("Content-Type", "text/html; charset=utf-8")
-		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db, forecastDir, c.Query("detailed") == "1")
+		renderForecastSummary(c.Writer, tmpl, cache, c.GetString("uid"), db, forecastDir, c.Query("detailed") == "1", viewerLocation(c.Query("tz")))
 	})
 
 	realtimeHandler := func(c *gin.Context, extension string) {

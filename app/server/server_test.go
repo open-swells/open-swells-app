@@ -82,7 +82,7 @@ func TestGenerateForecastSummary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	summary := generateForecastSummary(ForecastData{Forecast: rows, Date: "2026070606"})
+	summary := generateForecastSummary(ForecastData{Forecast: rows, Date: "2026070606"}, time.UTC)
 	if len(summary) != 2 {
 		t.Fatalf("expected 2 days in summary, got %d: %+v", len(summary), summary)
 	}
@@ -94,6 +94,38 @@ func TestGenerateForecastSummary(t *testing.T) {
 	}
 	if summary[0].HeightFt <= 0 || summary[0].DayNum != "6" {
 		t.Errorf("summary is missing outlook fields: %+v", summary[0])
+	}
+}
+
+func TestGenerateForecastSummaryViewerDays(t *testing.T) {
+	la, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 06Z–23Z on Jul 6 UTC spans 11pm Jul 5 to 4pm Jul 6 in Los Angeles
+	start := time.Date(2026, 7, 6, 6, 0, 0, 0, time.UTC)
+	var rows []ForecastRow
+	for h := 0; h < 18; h++ {
+		rows = append(rows, ForecastRow{Time: start.Add(time.Duration(h) * time.Hour), PrimaryWaveHeight: "1.0"})
+	}
+	data := ForecastData{Forecast: rows, Date: "2026070606"}
+	if got := generateForecastSummary(data, time.UTC); len(got) != 1 || got[0].Date != "2026-07-06" {
+		t.Errorf("UTC summary days wrong: %+v", got)
+	}
+	got := generateForecastSummary(data, la)
+	if len(got) != 2 || got[0].Date != "2026-07-05" || got[1].Date != "2026-07-06" {
+		t.Errorf("Los Angeles summary days wrong: %+v", got)
+	}
+}
+
+func TestViewerLocation(t *testing.T) {
+	if got := viewerLocation("America/New_York"); got.String() != "America/New_York" {
+		t.Errorf("expected America/New_York, got %v", got)
+	}
+	for _, name := range []string{"", "Not/AZone", "../../etc/passwd"} {
+		if got := viewerLocation(name); got != time.UTC {
+			t.Errorf("viewerLocation(%q) = %v, want UTC", name, got)
+		}
 	}
 }
 
