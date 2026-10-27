@@ -1,5 +1,6 @@
 {{ define "forecast" }}
 <div>
+    {{template "sunscript" .}}
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // Every chart color comes from the theme's custom properties, so
@@ -665,6 +666,7 @@
                 svg.selectAll(".wind-lane").remove();
                 svg.selectAll(".tide-lane").remove();
                 svg.selectAll(".cond-lane").remove();
+                svg.selectAll(".sun-veil-layer, .sun-marks").remove();
 
                 // wind samples for the selected day, as fractional hours so
                 // they share the swell chart's x scale
@@ -1036,6 +1038,48 @@
                             .attr("text-anchor", 'end')
                             .attr("fill", CONDITION_COLORS[rating])
                             .text(rating.toUpperCase());
+                    }
+                }
+
+                // Night: a veil over each panel's dark hours, over the
+                // series but beneath the labels, and a faint line at
+                // sunrise and sunset with its time atop the swell panel
+                if (currentDate) {
+                    const { start: sunDayStart, end: sunDayEnd } = localDayBounds(currentDate);
+                    const sun = SUN.between(window.SUN_SITE, +sunDayStart, +sunDayEnd);
+                    // on the chart's local clock-hour axis, which ends at 23
+                    const sunHour = ms => Math.min(23, ms >= +sunDayEnd ? 24 : localHour(new Date(ms)));
+                    const veil = (g, top, bottom) => {
+                        for (const n of sun.nights) {
+                            const x0 = x(sunHour(n.start)), x1 = x(sunHour(n.end));
+                            if (x1 <= x0) continue;
+                            g.append("rect").attr("class", "sun-veil")
+                                .attr("x", x0).attr("width", x1 - x0)
+                                .attr("y", top).attr("height", bottom - top);
+                        }
+                    };
+                    veil(svg.append("g").attr("class", "sun-veil-layer"), 0, height);
+                    svg.select(".yaxis").raise();
+                    for (const [cls, top, bottom] of [[".tide-lane", tideTop, tideBottom], [".wind-lane", windTop, windBottom], [".cond-lane", condTop, chartBottom]]) {
+                        const lane = svg.select(cls);
+                        if (lane.empty()) continue;
+                        veil(lane, top, bottom);
+                        lane.selectAll("text").raise();
+                    }
+                    const marks = svg.append("g").attr("class", "sun-marks");
+                    const sunMarks = [...sun.rises.map(t => ({ t, rise: true })), ...sun.sets.map(t => ({ t, rise: false }))];
+                    for (const m of sunMarks) {
+                        const sx = x(sunHour(m.t));
+                        for (const [top, bottom] of panels) {
+                            marks.append("line").attr("class", "sun-line")
+                                .attr("x1", sx).attr("x2", sx).attr("y1", top).attr("y2", bottom);
+                        }
+                        // night side, unless it would run off the plot
+                        const before = m.rise ? sx > 100 : sx > width - 95;
+                        marks.append("text").attr("class", "sun-label")
+                            .attr("x", before ? sx - 4 : sx + 4).attr("y", 11)
+                            .attr("text-anchor", before ? 'end' : 'start')
+                            .text(`${m.rise ? 'sunrise' : 'sunset'} ${SUN.shortTime(m.t)}`);
                     }
                 }
 

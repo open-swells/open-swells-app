@@ -95,6 +95,9 @@ type BuoyPageData struct {
 	HasWindError     bool
 	HasForecastError bool
 	ForecastSummary  []ForecastSummary
+	// the station's position, for sunrise and sunset on the charts;
+	// zero when the station isn't in the store
+	Latitude, Longitude float64
 }
 
 type ForecastSummary struct {
@@ -1337,6 +1340,10 @@ func run() {
 			HasWindError:     windErr != nil,
 			HasForecastError: forecastErr != nil,
 			ForecastSummary:  generateForecastSummary(forecastdata, time.UTC),
+		}
+		if location, ok := stationStore.Location(stationId); ok {
+			returndata.Latitude = location.Latitude
+			returndata.Longitude = location.Longitude
 		}
 		renderTemplate(c, tmpl, "buoy.html", returndata)
 	})
