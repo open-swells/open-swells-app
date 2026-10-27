@@ -257,10 +257,13 @@
             // then charts surf height rather than the primary swell.
             const SURF_MODE = CONDS.length > 0 && typeof CONDS[0].surf === 'string';
 
-            // a day rates as its best hour. Ratings come only from the
-            // classifier, so buoy pages (no surf spot) show none.
+            // a day rates as its best hour from the model run on (backfilled
+            // hours are past). Ratings come only from the classifier, so buoy
+            // pages (no surf spot) show none.
             const condDayBest = {}; // local date key -> best HourlyCondition
+            const runStart = window.SPOT_RUN_START || 0;
             for (const c of CONDS) {
+                if (+c.t < runStart) continue;
                 const key = dateKeyOf(c.t);
                 if (!condDayBest[key] || c.score > condDayBest[key].score) condDayBest[key] = c;
             }

@@ -870,7 +870,7 @@ type SpotFavorite struct {
 	HasError            bool
 }
 
-func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
+func spotFavoriteEntry(staticDir string, spot Spot, loc *time.Location) SpotFavorite {
 	entry := SpotFavorite{ID: spot.ID, Name: spot.Name, Region: spot.Region, Latitude: spot.Lat, Longitude: spot.Lon}
 	forecastData, hours := spotForecast(staticDir, spot)
 	if len(forecastData.Forecast) == 0 {
@@ -878,9 +878,9 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 		return entry
 	}
 	entry.Forecast = forecastData
-	entry.Summary = generateForecastSummary(forecastData)
+	entry.Summary = generateForecastSummary(forecastData, loc)
 	conditions := spotConditions(staticDir, spot, hours)
-	applyConditionSummary(entry.Summary, conditionsFromRun(conditions, forecastData))
+	applyConditionSummary(entry.Summary, conditionsFromRun(conditions, forecastData), loc)
 	entry.CurrentConditions = currentConditionCandles(conditions)
 	entry.Report, entry.HasReport = spotReport(staticDir, spot, forecastData)
 	if c, ok := conditionNear(conditions, entry.Report.ValidUnixMs); ok && entry.HasReport {
@@ -1026,16 +1026,19 @@ type SpotPageData struct {
 	ForecastSummary []ForecastSummary
 	Conditions      []HourlyCondition
 	HasConditions   bool
-	Facing          string // e.g. "SW 225°", empty when unknown
-	Exposure        SpotExposure
-	HasExposure     bool
-	PageHeading     string
-	Coordinates     string
-	Latitude        float64
-	Longitude       float64
-	NearbySpots     []NearbySpot
-	Tide            SpotTide
-	HasTide         bool
+	// RunStartUnixMs is when the forecast's model run starts; the browser
+	// rates days only from it on, like the server's summaries.
+	RunStartUnixMs int64
+	Facing         string // e.g. "SW 225°", empty when unknown
+	Exposure       SpotExposure
+	HasExposure    bool
+	PageHeading    string
+	Coordinates    string
+	Latitude       float64
+	Longitude      float64
+	NearbySpots    []NearbySpot
+	Tide           SpotTide
+	HasTide        bool
 }
 
 // facingLabel renders a facing bearing as "SW 225°" for the page header.
@@ -1075,8 +1078,14 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 	if c, ok := conditionNear(conditions, report.ValidUnixMs); ok && hasReport {
 		report.Surf = c.Surf
 	}
-	summary := generateForecastSummary(forecastData)
-	applyConditionSummary(summary, conditionsFromRun(conditions, forecastData))
+	// The page doesn't know the viewer's zone; the browser re-rates the
+	// current day by local time (see spotreport and forecast).
+	var runStartMs int64
+	if start, ok := forecastRunStart(forecastData); ok {
+		runStartMs = start.UnixMilli()
+	}
+	summary := generateForecastSummary(forecastData, time.UTC)
+	applyConditionSummary(summary, conditionsFromRun(conditions, forecastData), time.UTC)
 	b := spotBeach(staticDir, spot)
 	facing := ""
 	if b.HasFacing {
@@ -1108,6 +1117,7 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 		ForecastSummary: summary,
 		Conditions:      conditions,
 		HasConditions:   len(conditions) > 0,
+		RunStartUnixMs:  runStartMs,
 		Facing:          facing,
 		Exposure:        exposure,
 		HasExposure:     hasExposure,

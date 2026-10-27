@@ -99,7 +99,7 @@ func TestApplyConditionSummary(t *testing.T) {
 		{UnixMs: day.UnixMilli(), Score: 20, Rating: "poor"},
 		{UnixMs: day.Add(6 * time.Hour).UnixMilli(), Score: 85, Rating: "epic"},
 	}
-	applyConditionSummary(summary, conds)
+	applyConditionSummary(summary, conds, time.UTC)
 	if summary[0].Condition != "epic" {
 		t.Errorf("day condition should follow the best hour, got %s", summary[0].Condition)
 	}
@@ -201,7 +201,7 @@ func TestApplyConditionSummaryUsesSurfRange(t *testing.T) {
 		{UnixMs: day.UnixMilli(), Score: 40, Rating: "fair", Surf: "2–3ft", SurfHiFt: 2.6},
 		{UnixMs: day.Add(3 * time.Hour).UnixMilli(), Score: 60, Rating: "good", Surf: "3–4ft", SurfHiFt: 3.8},
 	}
-	applyConditionSummary(summary, conds)
+	applyConditionSummary(summary, conds, time.UTC)
 	if summary[0].WaveHeight != "3–4ft" || summary[0].HeightFt != 3.8 {
 		t.Errorf("day height should be the best hour's surf, got %q (%.1f)", summary[0].WaveHeight, summary[0].HeightFt)
 	}

@@ -407,11 +407,12 @@ func conditionSeries(hours []hourSwells, wind []WindSample, windStart time.Time,
 
 // applyConditionSummary upgrades the daily summary's height-only condition
 // to the classifier's view of each day: a day is as good as its best hour,
-// and its height is that hour's surf range.
-func applyConditionSummary(summary []ForecastSummary, conds []HourlyCondition) {
+// and its height is that hour's surf range. Days are loc's calendar days,
+// matching generateForecastSummary.
+func applyConditionSummary(summary []ForecastSummary, conds []HourlyCondition, loc *time.Location) {
 	best := map[string]HourlyCondition{}
 	for _, c := range conds {
-		day := time.UnixMilli(c.UnixMs).UTC().Format("2006-01-02")
+		day := time.UnixMilli(c.UnixMs).In(loc).Format("2006-01-02")
 		if b, ok := best[day]; !ok || c.Score > b.Score {
 			best[day] = c
 		}

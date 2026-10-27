@@ -284,11 +284,23 @@
         // --- Today: the viewer's local day as four lanes --------
         const el = document.querySelector('[data-today-chart]');
         const conds = (window.SPOT_CONDITIONS || []).map(c => ({ ...c, t: new Date(c.t) }));
-        if (!el || !window.d3 || !conds.length) return;
         const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
         const hours = conds.filter(c => c.t >= dayStart && c.t < dayEnd);
-        if (!hours.length) return;
+
+        // The server rates the current card by the UTC day; re-rate it by
+        // the viewer's local day, which rates as its best hour from the run on.
+        const runStart = window.SPOT_RUN_START || 0;
+        const dayBest = hours.filter(c => +c.t >= runStart)
+            .reduce((b, c) => (!b || c.score > b.score ? c : b), null);
+        if (dayBest && RATING[dayBest.rating]) {
+            document.querySelectorAll('[data-current-condition-card]').forEach(card => {
+                card.style.setProperty('--condition-color', RATING[dayBest.rating]);
+                card.querySelector('[data-current-condition]').textContent = dayBest.rating;
+                if (dayBest.surf) card.querySelector('[data-current-height]').textContent = dayBest.surf;
+            });
+        }
+        if (!el || !window.d3 || !hours.length) return;
         document.querySelector('[data-today-title]').textContent = `Today · ${dayFmt.format(now)}`;
 
         const tideCurve = [];
@@ -445,6 +457,9 @@
     // The forecast component renders it as lanes aligned with the
     // swell and wind timelines.
     window.SPOT_CONDITIONS = {{json .Conditions}};
+    // Hours before the model run are backfilled from earlier runs: charted,
+    // but left out of day ratings (as in the server's summaries).
+    window.SPOT_RUN_START = {{.RunStartUnixMs}};
 </script>
 {{end}}
 {{if .HasTide}}

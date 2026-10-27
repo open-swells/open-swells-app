@@ -410,7 +410,9 @@
             filters.classList.add('hidden');
             filterEmpty.classList.add('hidden');
             try {
-                const [favoritesResponse, summaryResponse] = await Promise.all([authFetch('/api/favorites'), authFetch('/forecast-summary?detailed=1')]);
+                // the outlook's days are bucketed in the viewer's time zone
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+                const [favoritesResponse, summaryResponse] = await Promise.all([authFetch('/api/favorites'), authFetch(`/forecast-summary?detailed=1&tz=${encodeURIComponent(tz)}`)]);
                 if (!favoritesResponse.ok || !summaryResponse.ok) throw new Error('Favorites request failed');
                 const data = await favoritesResponse.json();
                 userBuoys = data.buoys || [];
@@ -453,21 +455,23 @@
                 if (!sourceCandles.length) return;
                 const now = Date.now();
                 const today = new Date(now);
-                const sameDay = date => date.getFullYear() === today.getFullYear() &&
-                    date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
-                const byHour = new Map();
-                sourceCandles.forEach(candle => {
-                    const date = new Date(Number(candle.dataset.ts));
-                    if (sameDay(date) && !byHour.has(date.getHours())) byHour.set(date.getHours(), candle);
-                });
-                const candles = Array.from({ length: 24 }, (_, hour) => {
-                    if (byHour.has(hour)) return byHour.get(hour);
+                // Step real hours from local midnight to the next, so DST
+                // days get their 23 or 25 slots; a candle fills the slot it
+                // starts in (half-hour zones start candles mid-slot).
+                const dayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+                const dayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1).getTime();
+                const slots = [];
+                for (let t = dayStart; t < dayEnd; t += 3600e3) slots.push(t);
+                const candles = slots.map(slot => {
+                    const found = sourceCandles.find(candle => {
+                        const ts = Number(candle.dataset.ts);
+                        return ts >= slot && ts < slot + 3600e3;
+                    });
+                    if (found) return found;
                     const candle = document.createElement('div');
-                    const slot = new Date(today);
-                    slot.setHours(hour, 0, 0, 0);
                     candle.className = 'hour-candle is-unavailable';
-                    candle.dataset.ts = String(slot.getTime());
-                    candle.title = `${hourFmt.format(slot)} · Forecast unavailable`;
+                    candle.dataset.ts = String(slot);
+                    candle.title = `${hourFmt.format(new Date(slot))} · Forecast unavailable`;
                     candle.innerHTML = '<i></i>';
                     return candle;
                 });
