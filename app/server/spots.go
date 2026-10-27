@@ -624,21 +624,36 @@ func spotForecast(staticDir string, spot Spot) (ForecastData, []hourSwells) {
 	return gridSpotForecast(staticDir, lat, lon)
 }
 
-// fileSpotForecast uses the spot's own series. Only the leading gap-free
-// run of hours is used, as with the grids: a failed hour is null in the
-// file and rows past it would bridge a hole in the forecast.
+// fileSpotForecast uses the spot's own series. Only the gap-free run of
+// hours around the run's start is used, as with the grids: a failed hour
+// is null in the file and rows past it would bridge a hole in the
+// forecast. Hours before the start come from earlier runs (see
+// backfillSpotForecasts).
 func fileSpotForecast(staticDir string, set *spotForecastSet, series *spotSeries, lat, lon float64) (ForecastData, []hourSwells) {
-	start, err := time.Parse("20060102_15Z", set.ForecastStart)
+	start, err := time.Parse(forecastRunLayout, set.ForecastStart)
 	if err != nil {
 		return ForecastData{}, nil
 	}
+	first := 0
+	for first < len(set.Hours) && set.Hours[first] < 0 {
+		first++
+	}
+	if _, ok := series.point(first); !ok {
+		return ForecastData{}, nil // nothing from this run: don't show only the past
+	}
+	for first > 0 {
+		if _, ok := series.point(first - 1); !ok {
+			break
+		}
+		first--
+	}
 	var samples []spotSample
-	for i, hour := range set.Hours {
+	for i := first; i < len(set.Hours); i++ {
 		p, ok := series.point(i)
 		if !ok {
 			break
 		}
-		samples = append(samples, spotSample{hour: hour, p: p})
+		samples = append(samples, spotSample{hour: set.Hours[i], p: p})
 	}
 	attachNwps(staticDir, samples, lat, lon)
 	return buildSpotForecast(start, samples)
@@ -646,6 +661,7 @@ func fileSpotForecast(staticDir string, set *spotForecastSet, series *spotSeries
 
 // attachNwps adds the nearshore sample to each hour. NWPS point grids are
 // 3-hourly, so hours between them interpolate the neighboring samples.
+// Hours backfilled from earlier runs have none: those runs' grids are gone.
 func attachNwps(staticDir string, samples []spotSample, lat, lon float64) {
 	domains := nwpsPointDomains(staticDir)
 	if len(domains) == 0 {
@@ -662,6 +678,9 @@ func attachNwps(staticDir string, samples []spotSample, lat, lon float64) {
 	}
 	for i := range samples {
 		hour := samples[i].hour
+		if hour < 0 {
+			continue
+		}
 		base := hour - hour%3
 		if base == hour {
 			samples[i].nwps = nwpsAt(hour)
@@ -739,10 +758,11 @@ func gridSpotForecast(staticDir string, lat, lon float64) (ForecastData, []hourS
 }
 
 // spotWind is the spot's wind series: hourly from its own full-resolution
-// cell when the spot file covers it, else the coarse wind grids.
+// cell when the spot file covers it, else the coarse wind grids. Wind only
+// from backfilled hours doesn't count: the current run has none there.
 func spotWind(staticDir string, spot Spot) []WindSample {
 	if set, series, ok := spotSeriesFor(staticDir, spot.ID); ok {
-		if samples := series.wind(set.Hours); len(samples) > 0 {
+		if samples := series.wind(set.Hours); len(samples) > 0 && samples[len(samples)-1].Hour >= 0 {
 			return samples
 		}
 	}
@@ -809,6 +829,20 @@ func spotConditions(staticDir string, spot Spot, hours []hourSwells) []HourlyCon
 	return conditionSeries(hours, wind, windStart, err == nil, spotBeach(staticDir, spot))
 }
 
+// conditionsFromRun drops the hours backfilled before the forecast's run,
+// matching generateForecastSummary, so a day isn't rated by hours past.
+func conditionsFromRun(conds []HourlyCondition, forecastData ForecastData) []HourlyCondition {
+	start, ok := forecastRunStart(forecastData)
+	if !ok {
+		return conds
+	}
+	i := 0
+	for i < len(conds) && conds[i].UnixMs < start.UnixMilli() {
+		i++
+	}
+	return conds[i:]
+}
+
 // spotBeach gathers a spot's exposure for the classifier. Open water only
 // applies without a hand-tuned window, which already accounts for it.
 func spotBeach(staticDir string, spot Spot) beach {
@@ -846,7 +880,7 @@ func spotFavoriteEntry(staticDir string, spot Spot) SpotFavorite {
 	entry.Forecast = forecastData
 	entry.Summary = generateForecastSummary(forecastData)
 	conditions := spotConditions(staticDir, spot, hours)
-	applyConditionSummary(entry.Summary, conditions)
+	applyConditionSummary(entry.Summary, conditionsFromRun(conditions, forecastData))
 	entry.CurrentConditions = currentConditionCandles(conditions)
 	entry.Report, entry.HasReport = spotReport(staticDir, spot, forecastData)
 	if c, ok := conditionNear(conditions, entry.Report.ValidUnixMs); ok && entry.HasReport {
@@ -1042,7 +1076,7 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 		report.Surf = c.Surf
 	}
 	summary := generateForecastSummary(forecastData)
-	applyConditionSummary(summary, conditions)
+	applyConditionSummary(summary, conditionsFromRun(conditions, forecastData))
 	b := spotBeach(staticDir, spot)
 	facing := ""
 	if b.HasFacing {

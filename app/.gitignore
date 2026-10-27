@@ -4,6 +4,7 @@ firebase-config.json
 metadata.json
 .DS_Store
 data/forecast/
+data/spot_forecast_history.json.gz
 gosurf
 /open-swells
 /open-swells-app

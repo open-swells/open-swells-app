@@ -53,6 +53,13 @@ this directory over rsync. They remain available to the browser under the
 existing `/static/` URL path. Existing deployments may temporarily use
 `STATIC_DIR` as a fallback for `FORECAST_DIR`.
 
+The app writes `spot_forecast_history.json.gz` beside (not inside) the
+forecast directory, e.g. `/var/lib/open-swells/`, so it isn't served or
+touched by the pipeline's publish. It holds a day either side of the latest
+run's start, and fills in today's hours before the current run began. The
+app's user needs write access there; deleting it is safe (day views are
+then partial until the next run or two arrive).
+
 Per-user endpoints (`/api/favorites`, `/forecast-summary`) require a
 Firebase ID token in the `Authorization: Bearer` header; the uid is always
 derived from the verified token.

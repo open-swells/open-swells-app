@@ -10,6 +10,11 @@ package main
 // Payload (see grib-parse-collect/spot_forecasts.py): "hours" is the run's
 // forecast hour list and each spot holds one array per field aligned with
 // it, null where a forecast hour failed.
+//
+// A run starts at its cycle time, so on its own it has none of today's
+// hours before then. Those hours are backfilled from earlier runs kept in
+// the spot history file (spot_history.go), as negative forecast hours, so
+// day views can show today midnight to midnight.
 
 import (
 	"bytes"
@@ -67,6 +72,23 @@ func (s *floatSeries) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON writes NaN as null, the inverse of UnmarshalJSON.
+func (s floatSeries) MarshalJSON() ([]byte, error) {
+	out := make([]byte, 0, 2+len(s)*5)
+	out = append(out, '[')
+	for i, v := range s {
+		if i > 0 {
+			out = append(out, ',')
+		}
+		if math.IsNaN(float64(v)) {
+			out = append(out, "null"...)
+		} else {
+			out = strconv.AppendFloat(out, float64(v), 'g', -1, 32)
+		}
+	}
+	return append(out, ']'), nil
+}
+
 // at returns value i, or NaN when the series is short or absent.
 func (s floatSeries) at(i int) float64 {
 	if i < 0 || i >= len(s) {
@@ -95,6 +117,34 @@ type spotSeries struct {
 	HW floatSeries `json:"hw"`
 	PW floatSeries `json:"pw"`
 	DW floatSeries `json:"dw"`
+
+	// Backfilled hours before the run's start, which lead Hours; nil
+	// when the set has none.
+	pre *spotSeries
+}
+
+// spotSeriesFields names the series fields() returns, in order.
+var spotSeriesFields = []string{
+	"hs", "h1", "p1", "d1", "h2", "p2", "d2", "h3", "p3", "d3", "ws", "wd", "hw", "pw", "dw",
+}
+
+// fields lists the series aligned with the run's hours.
+func (s *spotSeries) fields() []*floatSeries {
+	return []*floatSeries{
+		&s.HS, &s.H1, &s.P1, &s.D1, &s.H2, &s.P2, &s.D2, &s.H3, &s.P3, &s.D3,
+		&s.WindSpeed, &s.WindDir, &s.HW, &s.PW, &s.DW,
+	}
+}
+
+// locate maps an index into the set's Hours to the series holding it.
+func (s *spotSeries) locate(i int) (*spotSeries, int) {
+	if s.pre == nil {
+		return s, i
+	}
+	if n := len(s.pre.HS); i >= n {
+		return s, i - n
+	}
+	return s.pre, i
 }
 
 type spotForecastSet struct {
@@ -117,28 +167,44 @@ var (
 // loaders. A file from a different run than metadata.json (the pipeline
 // skipped spots on a later run, leaving an old copy behind) is ignored so
 // its values never land on the wrong timeline.
+//
+// A newly read file is backfilled from the spot history, and then folded
+// into it (outside the lock, so readers aren't held up by the write).
 func loadSpotForecasts(staticDir string) (*spotForecastSet, error) {
-	path := filepath.Join(staticDir, spotForecastsFile)
-	info, err := os.Stat(path)
+	set, history, fresh, err := cachedSpotForecasts(staticDir)
 	if err != nil {
 		return nil, err
 	}
-
-	spotForecastMu.Lock()
-	defer spotForecastMu.Unlock()
-	cached, ok := spotForecastCache[path]
-	set := cached.set
-	if !ok || cached.modTime != info.ModTime().UnixNano() {
-		set, err = readSpotForecasts(path)
-		if err != nil {
-			return nil, err
-		}
-		spotForecastCache[path] = spotForecastEntry{modTime: info.ModTime().UnixNano(), set: set}
+	if fresh {
+		updateSpotHistory(staticDir, set, history)
 	}
 	if start := windForecastStart(staticDir); set.ForecastStart != start {
 		return nil, fmt.Errorf("%s is for run %s, metadata is %s", spotForecastsFile, set.ForecastStart, start)
 	}
 	return set, nil
+}
+
+func cachedSpotForecasts(staticDir string) (set *spotForecastSet, history *spotHistory, fresh bool, err error) {
+	path := filepath.Join(staticDir, spotForecastsFile)
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, nil, false, err
+	}
+
+	spotForecastMu.Lock()
+	defer spotForecastMu.Unlock()
+	cached, ok := spotForecastCache[path]
+	if ok && cached.modTime == info.ModTime().UnixNano() {
+		return cached.set, nil, false, nil
+	}
+	set, err = readSpotForecasts(path)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	history = readSpotHistory(staticDir)
+	backfillSpotForecasts(set, history)
+	spotForecastCache[path] = spotForecastEntry{modTime: info.ModTime().UnixNano(), set: set}
+	return set, history, true, nil
 }
 
 func readSpotForecasts(path string) (*spotForecastSet, error) {
@@ -159,7 +225,8 @@ func readSpotForecasts(path string) (*spotForecastSet, error) {
 	return &set, nil
 }
 
-// spotSeriesFor returns the spot's series from the current run's file.
+// spotSeriesFor returns the spot's series from the current run's file,
+// with any hours backfilled before it.
 func spotSeriesFor(staticDir, spotID string) (*spotForecastSet, *spotSeries, bool) {
 	set, err := loadSpotForecasts(staticDir)
 	if err != nil {
@@ -172,6 +239,7 @@ func spotSeriesFor(staticDir, spotID string) (*spotForecastSet, *spotSeries, boo
 // point converts hour index i into the grid-sample shape the forecast
 // builder shares with the coarse-grid path; ok is false for a failed hour.
 func (s *spotSeries) point(i int) (swellPoint, bool) {
+	s, i = s.locate(i)
 	if math.IsNaN(s.HS.at(i)) {
 		return swellPoint{}, false
 	}
@@ -199,7 +267,8 @@ func (s *spotSeries) point(i int) (swellPoint, bool) {
 func (s *spotSeries) wind(hours []int) []WindSample {
 	samples := []WindSample{}
 	for i, hour := range hours {
-		speed, dir := s.WindSpeed.at(i), s.WindDir.at(i)
+		src, j := s.locate(i)
+		speed, dir := src.WindSpeed.at(j), src.WindDir.at(j)
 		if math.IsNaN(speed) || math.IsNaN(dir) {
 			continue
 		}
