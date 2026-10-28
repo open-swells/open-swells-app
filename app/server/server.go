@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -824,6 +825,10 @@ func validBuoyID(id string) bool {
 	return stationStore.Has(id)
 }
 
+// themeCSSURL carries a hash of the embedded stylesheet, so browsers and
+// caches fetch it anew whenever it changes.
+var themeCSSURL = fmt.Sprintf("/assets/theme.css?v=%x", sha256.Sum256(webstatic.ThemeCSS))[:len("/assets/theme.css?v=")+12]
+
 func loadTemplates(templateDir string) *template.Template {
 	tmpl := template.New("").Funcs(template.FuncMap{
 		"json":        jsonForTemplate,
@@ -831,6 +836,10 @@ func loadTemplates(templateDir string) *template.Template {
 		"formatcount": formatCount,
 		"bearing":     bearingLabel,
 		"buoyreport":  buoyReport,
+		// themecss is the theme stylesheet's URL, versioned by its
+		// content so a deploy never pairs new markup with a cached
+		// stylesheet that lacks its rules
+		"themecss": func() string { return themeCSSURL },
 		// NWS remark fields are often a literal "None." — not worth a row
 		"notnone": func(s string) bool {
 			t := strings.ToLower(strings.TrimRight(strings.TrimSpace(s), "."))

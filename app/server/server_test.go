@@ -436,7 +436,7 @@ func TestEmbeddedThemeAsset(t *testing.T) {
 		if err := tmpl.ExecuteTemplate(&page, name, data); err != nil {
 			t.Fatalf("%s failed to render: %v", name, err)
 		}
-		if !bytes.Contains(page.Bytes(), []byte(`href="/assets/theme.css"`)) {
+		if !bytes.Contains(page.Bytes(), []byte(`href="/assets/theme.css?v=`)) {
 			t.Errorf("%s does not link the shared theme stylesheet", name)
 		}
 	}
