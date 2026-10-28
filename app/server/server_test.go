@@ -280,7 +280,7 @@ func TestLoadTemplates(t *testing.T) {
 	}
 	var spotPage bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&spotPage, "spot.html", SpotPageData{
-		SpotName: "Test Spot", HasForecast: true, HasReport: true,
+		SpotName: "Test Spot", TimeZone: "Pacific/Honolulu", HasForecast: true, HasReport: true,
 		Report: SpotReport{PrimaryHeight: "3.0", PrimaryPeriod: "12", PrimaryDegrees: "225"},
 		ForecastData: ForecastData{Date: "2026072000", Forecast: []ForecastRow{{
 			Date: "20 00", Time: time.Date(2026, 7, 20, 0, 0, 0, 0, time.UTC), PrimaryWaveHeight: "0.9",
@@ -289,7 +289,7 @@ func TestLoadTemplates(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("spot template failed to render: %v", err)
 	}
-	for _, want := range []string{"Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #4fd1bc", "stripHoverLine", "stripTooltip", "readoutHTML", "readout-rating"} {
+	for _, want := range []string{`window.createForecastClock("Pacific/Honolulu")`, "data-spot-timezone", "Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #4fd1bc", "stripHoverLine", "stripTooltip", "readoutHTML", "readout-rating"} {
 		if !bytes.Contains(spotPage.Bytes(), []byte(want)) {
 			t.Errorf("spot condition summary is missing %q", want)
 		}

@@ -3,6 +3,7 @@
      or null when the location is unknown. window.SUN is defined once
      per page, however many components include this. */}}
 {{define "sunscript"}}
+{{template "forecastclock" ""}}
 <script>
     window.SUN_SITE = {{if or .Latitude .Longitude}}{ lat: {{.Latitude}}, lon: {{.Longitude}} }{{else}}null{{end}};
     window.SUN = window.SUN || (() => {
@@ -68,7 +69,7 @@
             return res;
         }
 
-        const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+        const timeFmt = window.FORECAST_CLOCK.formatter({ hour: 'numeric', minute: '2-digit' });
         // "6:42am"
         const shortTime = ms => timeFmt.format(new Date(ms)).toLowerCase().replace(/\s/g, '');
 

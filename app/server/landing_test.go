@@ -45,7 +45,7 @@ func TestLandingRendersLiveReport(t *testing.T) {
 	live := LandingReport{
 		ID: "pipeline", HasSpot: true,
 		Spot: SpotPageData{
-			SpotName: "Pipeline", Region: "USA, Hawaii, Oahu", HasForecast: true,
+			TimeZone: "Pacific/Honolulu", SpotName: "Pipeline", Region: "USA, Hawaii, Oahu", HasForecast: true,
 			SwellReport:     SwellReport{StationId: "pipeline"},
 			Report:          SpotReport{PrimaryHeight: "7.5", PrimaryPeriod: "15.7", PrimaryDegrees: "315", Surf: "6–8ft"},
 			HasReport:       true,
@@ -58,6 +58,8 @@ func TestLandingRendersLiveReport(t *testing.T) {
 	}
 	for _, want := range []string{
 		`id="spotSearch"`,
+		`window.createForecastClock("Pacific/Honolulu")`,
+		`data-spot-timezone`,
 		`href="/surf-spots/pipeline"`,
 		`6–8ft`,
 		`16 day forecast`,

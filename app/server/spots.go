@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -26,16 +27,19 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zsefvlol/timezonemapper"
 )
 
 var spotStore *SpotStore
 
 type Spot struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Lat    float64 `json:"lat"`
-	Lon    float64 `json:"lon"`
-	Region string  `json:"region,omitempty"`
+	// Optional IANA override for small islands the coordinate lookup misses.
+	TimeZone string  `json:"timezone,omitempty"`
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Lat      float64 `json:"lat"`
+	Lon      float64 `json:"lon"`
+	Region   string  `json:"region,omitempty"`
 	// Optional hand-tuned point to sample the wave grid at, for spots
 	// where the nearest grid cell to the beach itself picks badly
 	// (deep bays, island shadows).
@@ -1012,7 +1016,27 @@ func conditionNear(conds []HourlyCondition, unixMs int64) (HourlyCondition, bool
 	return HourlyCondition{}, false
 }
 
+// spotLocation uses the beach coordinates, rather than the offshore model point.
+func spotLocation(spot Spot) *time.Location {
+	name := spot.TimeZone
+	if name != "" {
+		if loc, err := time.LoadLocation(name); err == nil {
+			return loc
+		}
+		log.Printf("spot %q has invalid timezone override %q; using coordinate lookup", spot.ID, name)
+	}
+	name = timezonemapper.LatLngToTimezoneString(spot.Lat, spot.Lon)
+	if name != "" {
+		if loc, err := time.LoadLocation(name); err == nil {
+			return loc
+		}
+	}
+	log.Printf("spot %q timezone lookup failed at %.6f, %.6f (zone %q); using UTC", spot.ID, spot.Lat, spot.Lon, name)
+	return time.UTC
+}
+
 type SpotPageData struct {
+	TimeZone        string
 	SEO             SEOPage
 	ForecastData    ForecastData
 	SwellReport     SwellReport // StationId feeds the template's wind fetch
@@ -1078,14 +1102,14 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 	if c, ok := conditionNear(conditions, report.ValidUnixMs); ok && hasReport {
 		report.Surf = c.Surf
 	}
-	// The page doesn't know the viewer's zone; the browser re-rates the
-	// current day by local time (see spotreport and forecast).
+	// Summaries and browser charts share the beach's local calendar days.
+	loc := spotLocation(spot)
 	var runStartMs int64
 	if start, ok := forecastRunStart(forecastData); ok {
 		runStartMs = start.UnixMilli()
 	}
-	summary := generateForecastSummary(forecastData, time.UTC)
-	applyConditionSummary(summary, conditionsFromRun(conditions, forecastData), time.UTC)
+	summary := generateForecastSummary(forecastData, loc)
+	applyConditionSummary(summary, conditionsFromRun(conditions, forecastData), loc)
 	b := spotBeach(staticDir, spot)
 	facing := ""
 	if b.HasFacing {
@@ -1104,6 +1128,7 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 	}
 	seo := spotSEOPage(siteURL, spotStore, spot)
 	return SpotPageData{
+		TimeZone:        loc.String(),
 		SEO:             seo,
 		ForecastData:    forecastData,
 		SwellReport:     SwellReport{StationId: spot.ID},

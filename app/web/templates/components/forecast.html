@@ -34,23 +34,13 @@
             // arrows show where it travels, matching the current report.
             const travelBearing = fromDegrees => (Number(fromDegrees) + 180) % 360;
 
-            const headerDateFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
-            const resolvedTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
-            const zoneName = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' })
-                .formatToParts(new Date()).find(part => part.type === 'timeZoneName')?.value || resolvedTimeZone;
-
-            function localDateKey(date) {
-                return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-            }
-
-            function localDayBounds(key) {
-                const parts = key.split('-').map(Number);
-                const start = new Date(parts[0], parts[1] - 1, parts[2]);
-                const end = new Date(parts[0], parts[1] - 1, parts[2] + 1);
-                return { start, end };
-            }
-
-            const localHour = date => date.getHours() + date.getMinutes() / 60;
+            const clock = window.FORECAST_CLOCK;
+            const headerDateFmt = clock.formatter({ month: 'short', day: 'numeric' });
+            const resolvedTimeZone = clock.timeZone;
+            const zoneName = clock.zoneName();
+            const localDateKey = clock.dateKey;
+            const localDayBounds = clock.dayBounds;
+            const localHour = clock.hour;
 
             const timezoneLabel = document.getElementById('forecastTimezone');
             if (timezoneLabel) {
@@ -59,11 +49,10 @@
             }
 
             // weekday of the selected day, for the hover readout
-            const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+            const weekdayFmt = clock.formatter({ weekday: 'short' });
             const currentDayName = () => {
                 if (!currentDate) return '';
-                const [yy, mm, dd] = currentDate.split('-').map(Number);
-                return weekdayFmt.format(new Date(yy, mm - 1, dd));
+                return weekdayFmt.format(localDayBounds(currentDate).start);
             };
 
             function displayClicked(date) {
@@ -73,12 +62,10 @@
                 currentDate = date;
 
                 const dateHeader = document.getElementById('date-header');
-                const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-                const parts = date.split('-');
-                const tempdate = new Date(parts[0], parts[1] - 1, parts[2]);
+                const tempdate = localDayBounds(date).start;
 
-                dateHeader.innerHTML = `${days[tempdate.getDay()]} <span class="hdr-date">${headerDateFmt.format(tempdate)}</span>`;
+                dateHeader.innerHTML = `${clock.formatter({ weekday: 'long' }).format(tempdate)} <span class="hdr-date">${headerDateFmt.format(tempdate)}</span>`;
                 updateStripSelection(date);
             }
 
@@ -202,16 +189,13 @@
             let currentDay = [];
             let currentDate = null;
             let data = convertToDate({{json .ForecastData.Forecast}}, "{{.ForecastData.Date}}");
-            const localToday = new Date();
-            localToday.setHours(0, 0, 0, 0);
+            const localToday = localDayBounds(localDateKey(new Date())).start;
             data = data.filter(item => item.dateObj >= localToday);
             let dataGroupedByDay = groupDataByDay(data);
 
             // --- Day cards -------------------------------------------------
             // Built client-side from the same local-day grouping the strip
-            // uses, so the day columns line up by construction. (The server
-            // buckets days in UTC, which drifted half a day for non-UTC
-            // users and caused the strip/card misalignment.)
+            // uses, so the day columns line up across timezones and DST changes.
             const dayKeys = Object.keys(dataGroupedByDay).sort().slice(0, 16);
             const includedDays = new Set(dayKeys);
             data = data.filter(item => includedDays.has(localDateKey(item.dateObj)));
@@ -273,7 +257,7 @@
                 if (title) title.innerHTML = `${SURF_MODE ? 'Surf' : 'Swell'} · wind · conditions · 16 day outlook · <span title="${resolvedTimeZone}">${zoneName}</span>`;
             }
 
-            const cardDayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+            const cardDayFmt = clock.formatter({ weekday: 'short' });
 
             function buildDayCards() {
                 const container = document.getElementById('forecastContainer');
@@ -292,12 +276,12 @@
                     const label = SURF_MODE && best ? best.surf : `${avgFt.toFixed(1)}ft`;
                     dayStats[key] = { avgFt, cond, label, surf: SURF_MODE && !!best };
                     const parts = key.split('-');
-                    const d = new Date(parts[0], parts[1] - 1, parts[2]);
+                    const d = localDayBounds(key).start;
                     const card = document.createElement('div');
                     card.className = 'forecastcard text-white';
                     card.setAttribute('data-date', key);
                     card.innerHTML =
-                        `<div class="fc-day">${cardDayFmt.format(d)} ${d.getMonth() + 1}/${d.getDate()}</div>` +
+                        `<div class="fc-day">${cardDayFmt.format(d)} ${Number(parts[1])}/${Number(parts[2])}</div>` +
                         `<div class="fc-height">${label}</div>` +
                         // buoys have no rating; an empty row keeps the card
                         // the same height as a surf spot's
@@ -345,8 +329,8 @@
                 return localDateKey(t);
             }
 
-            const stripTimeFmt = d3.timeFormat('%a %-d, %-I %p');
-            const stripDayFmt = d3.timeFormat('%a %-d');
+            const stripTimeFmt = clock.formatter({ weekday: 'short', day: 'numeric', hour: 'numeric' }).format;
+            const stripDayFmt = clock.formatter({ weekday: 'short', day: 'numeric' }).format;
 
             function stripMono(sel, size, color) {
                 return sel.attr('fill', color).attr('font-size', size)
@@ -363,10 +347,8 @@
 
                 // Domain comes from the card day list itself, so both views
                 // share one day grid.
-                const p0 = dayKeys[0].split('-');
-                const pN = dayKeys[dayKeys.length - 1].split('-');
-                const domainStart = new Date(p0[0], p0[1] - 1, p0[2]);
-                const domainEnd = new Date(pN[0], pN[1] - 1, +pN[2] + 1);
+                const domainStart = localDayBounds(dayKeys[0]).start;
+                const domainEnd = localDayBounds(dayKeys[dayKeys.length - 1]).end;
                 const x = d3.scaleTime().domain([domainStart, domainEnd]).range([0, width]);
                 stripX = x;
 
@@ -404,7 +386,7 @@
 
                 // day grid: hairlines through both lanes, labels at the bottom
                 const labelStep = width < 520 ? 4 : 2;
-                const days = d3.timeDay.range(d3.timeDay.offset(d3.timeDay.floor(domainStart), 1), domainEnd);
+                const days = dayKeys.slice(1).map(key => localDayBounds(key).start);
                 days.forEach((day, i) => {
                     svg.append('line')
                         .attr('x1', x(day)).attr('x2', x(day))
@@ -683,8 +665,7 @@
                     if (windDayPts.length) {
                         for (const hour of [0, 23]) {
                             if (!windDayPts.some(w => w.hour === hour)) {
-                                const sampleTime = new Date(windDayStart);
-                                sampleTime.setHours(hour, 0, 0, 0);
+                                const sampleTime = clock.atHour(currentDate, hour);
                                 const w = windAtTime(sampleTime.getTime());
                                 if (w) windDayPts.push({ hour, s: w.s, d: w.d, pad: true });
                             }
@@ -873,11 +854,9 @@
                         const mph = w => w.s * 2.237;
                         // one bar per hour, interpolated between the model's
                         // 3-hourly samples, like the conditions bars beneath
-                        const { start: windDayStart } = localDayBounds(currentDate);
                         const hourly = [];
                         for (let h = 0; h <= 23; h++) {
-                            const t = new Date(windDayStart);
-                            t.setHours(h, 0, 0, 0);
+                            const t = clock.atHour(currentDate, h);
                             const w = windAtTime(t.getTime());
                             if (w) hourly.push({ hour: h, s: w.s, d: w.d });
                         }
@@ -984,7 +963,8 @@
                                 .attr("fill", CHART.tide)
                                 .attr("stroke", themeColor('--bg', '#0e0f12')).attr("stroke-width", 1);
                             const when = new Date(e.t);
-                            const hh = when.getHours(), mm = String(when.getMinutes()).padStart(2, '0');
+                            const { hour: hh, minute } = clock.parts(when);
+                            const mm = String(minute).padStart(2, '0');
                             lane.append("text").attr("class", "tide-reading")
                                 // half a label's width from either edge
                                 .attr("x", Math.max(46, Math.min(width - 46, ex)))
