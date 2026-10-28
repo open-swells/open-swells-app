@@ -2,6 +2,7 @@
 <html lang="en" class="dark">
     <head>
         <meta charset="UTF-8">
+        {{template "forecastclock" .TimeZone}}
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>{{.SEO.Title}}</title>
         <meta name="description" content="{{.SEO.Description}}">
@@ -50,7 +51,7 @@
         <script>
             if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));
             document.addEventListener('DOMContentLoaded', () => {
-                const formatter = new Intl.DateTimeFormat(undefined, {
+                const formatter = window.FORECAST_CLOCK.formatter({
                     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
                 });
                 document.querySelectorAll('[data-local-time]').forEach(el => {
@@ -70,6 +71,7 @@
             <!-- Spot Name -->
             <div class="w-full min-w-0">
                 <h1 class="station-title">{{.PageHeading}}</h1>
+                <div class="station-meta" data-spot-timezone></div>
                 <div class="station-meta">{{if .Region}}{{.Region}} &middot; {{end}}{{.Coordinates}} &middot; GFS-WAVE MODEL FORECAST{{if .Facing}} &middot; FACES {{.Facing}}{{end}}</div>
             </div>
 

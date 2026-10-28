@@ -2,6 +2,7 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
+    {{template "forecastclock" .Live.Spot.TimeZone}}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.SEO.Title}}</title>
     <meta name="description" content="{{.SEO.Description}}">
@@ -116,7 +117,7 @@
     </style>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const formatter = new Intl.DateTimeFormat(undefined, {
+            const formatter = window.FORECAST_CLOCK.formatter({
                 month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
             });
             document.querySelectorAll('[data-local-time]').forEach(el => {
@@ -214,6 +215,7 @@
                     <div class="min-w-0">
                         <div class="live-kicker"><span class="dot" aria-hidden="true"></span>Live report</div>
                         <h2 id="liveTitle"><a href="/surf-spots/{{.Live.ID}}">{{$s.SpotName}}</a></h2>
+                        <div class="station-meta" data-spot-timezone></div>
                         <div class="station-meta">{{if $s.Region}}{{$s.Region}} &middot; {{end}}{{$s.Coordinates}}{{if $s.Facing}} &middot; FACES {{$s.Facing}}{{end}}</div>
                     </div>
                     <div class="live-actions">

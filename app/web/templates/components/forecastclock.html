@@ -1,0 +1,60 @@
+{{/* Spot pages provide an IANA zone; other forecast pages keep the browser zone.
+     Dates remain real instants. Only calendar grouping and formatting use this clock. */}}
+{{define "forecastclock"}}
+<script>
+    window.createForecastClock = window.createForecastClock || (timeZone => {
+        timeZone = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        const formatter = options => new Intl.DateTimeFormat(undefined, { ...options, timeZone });
+        const calendar = new Intl.DateTimeFormat('en-US', {
+            timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'
+        });
+        const parts = date => Object.fromEntries(calendar.formatToParts(date)
+            .filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)]));
+        const dateKey = date => {
+            const p = parts(date);
+            return `${p.year}-${String(p.month).padStart(2, '0')}-${String(p.day).padStart(2, '0')}`;
+        };
+        const offset = date => {
+            const p = parts(date);
+            return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(+date / 1000) * 1000;
+        };
+        // Resolve a wall-clock time independently for each date, including DST changes.
+        const atHour = (key, hour) => {
+            const [y, m, d] = key.split('-').map(Number);
+            const wall = Date.UTC(y, m - 1, d, hour);
+            // Try offsets on both sides of a transition. Repeated times use
+            // the first occurrence; skipped times move forward across the gap,
+            // just as a browser Date constructor does for its own timezone.
+            const offsets = new Set([-36, 0, 36].map(h => offset(new Date(wall + h * 3600e3))));
+            const candidates = [...offsets].map(o => {
+                const instant = wall - o;
+                return { instant, local: instant + offset(new Date(instant)) };
+            });
+            const exact = candidates.filter(c => c.local === wall).sort((a, b) => a.instant - b.instant);
+            const forward = candidates.filter(c => c.local > wall).sort((a, b) => a.local - b.local);
+            return new Date((exact[0] || forward[0]).instant);
+        };
+        const dayBounds = key => ({ start: atHour(key, 0), end: atHour(key, 24) });
+        const hour = date => { const p = parts(date); return p.hour + p.minute / 60; };
+        const zoneName = (date = new Date()) => formatter({ timeZoneName: 'short' })
+            .formatToParts(date).find(p => p.type === 'timeZoneName').value;
+        const note = (date = new Date()) => {
+            const minutes = Math.round((offset(date) + date.getTimezoneOffset() * 60000) / 60000);
+            if (!minutes) return `Times in ${zoneName(date)} · same time as you`;
+            const magnitude = Math.abs(minutes);
+            const duration = [Math.floor(magnitude / 60) ? `${Math.floor(magnitude / 60)}h` : '',
+                magnitude % 60 ? `${magnitude % 60}m` : ''].filter(Boolean).join(' ');
+            return `Times in ${zoneName(date)} · ${duration} ${minutes > 0 ? 'ahead of' : 'behind'} you`;
+        };
+        return { timeZone, formatter, parts, dateKey, atHour, dayBounds, hour, zoneName, note };
+    });
+    window.FORECAST_CLOCK = window.FORECAST_CLOCK || window.createForecastClock({{.}});
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[data-spot-timezone]').forEach(el => {
+            el.textContent = window.FORECAST_CLOCK.note();
+            el.title = window.FORECAST_CLOCK.timeZone;
+        });
+    });
+</script>
+{{end}}
