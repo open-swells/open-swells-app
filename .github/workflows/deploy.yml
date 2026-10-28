@@ -1,0 +1,140 @@
+# Deploy the pipeline and/or web app when main changes, using the same
+# scripts as ./deploy.sh. Credentials live only in the `production`
+# environment's secrets:
+#
+#   SSH_KNOWN_HOSTS    host keys for both servers (ssh-keyscan output)
+#   APP_HOST           app server address (deploys as root, like app/ops/deploy.sh)
+#   APP_SSH_KEY        private key authorized for root on the app server
+#   PIPELINE_HOST      pipeline server address (deploys as evan)
+#   PIPELINE_SSH_KEY   private key authorized for evan on the pipeline server
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "pipeline/**"
+      - "deploy.sh"
+      - ".github/workflows/deploy.yml"
+      - ".github/scripts/setup-ssh.sh"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to deploy
+        type: choice
+        options: [all, app, pipeline]
+        default: all
+
+permissions:
+  contents: read
+
+# Never run two deploys at once, and never cancel one halfway through.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+      pipeline: ${{ steps.diff.outputs.pipeline }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          TARGET: ${{ inputs.target }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          app=false
+          pipeline=false
+          if [[ "$EVENT" == workflow_dispatch ]]; then
+            [[ "$TARGET" == all || "$TARGET" == app ]] && app=true
+            [[ "$TARGET" == all || "$TARGET" == pipeline ]] && pipeline=true
+          elif ! changed="$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null)"; then
+            # Unknown base (first push, force push): deploy everything.
+            app=true
+            pipeline=true
+          else
+            grep -q '^app/' <<<"$changed" && app=true
+            grep -q '^pipeline/' <<<"$changed" && pipeline=true
+            if grep -qE '^(deploy\.sh|\.github/)' <<<"$changed"; then
+              app=true
+              pipeline=true
+            fi
+          fi
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "pipeline=$pipeline" >> "$GITHUB_OUTPUT"
+          echo "Deploying: app=$app pipeline=$pipeline"
+
+  pipeline:
+    needs: changes
+    if: needs.changes.outputs.pipeline == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    # Leaves room to wait out an in-progress forecast run.
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          enable-cache: true
+          cache-dependency-glob: pipeline/uv.lock
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.PIPELINE_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          HOST_ALIAS: pipeline-host
+          HOST_NAME: ${{ secrets.PIPELINE_HOST }}
+          HOST_USER: evan
+        run: .github/scripts/setup-ssh.sh
+      - name: Deploy pipeline
+        env:
+          PIPELINE_HOST: pipeline-host
+          WAIT_FOR_RUN: "7200"
+        run: ./deploy.sh pipeline
+      - name: Stop SSH agent
+        if: always()
+        run: ssh-agent -k >/dev/null 2>&1 || true
+
+  app:
+    needs: [changes, pipeline]
+    # Like `./deploy.sh all`, a failed pipeline deploy stops the app deploy.
+    if: >-
+      always() &&
+      needs.changes.outputs.app == 'true' &&
+      (needs.pipeline.result == 'success' || needs.pipeline.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: app/go.mod
+          cache-dependency-path: app/go.sum
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.APP_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          HOST_ALIAS: app-host
+          HOST_NAME: ${{ secrets.APP_HOST }}
+          HOST_USER: root
+        run: .github/scripts/setup-ssh.sh
+      - name: Deploy app
+        env:
+          SERVER_IP: app-host
+        run: ./deploy.sh app
+      - name: Stop SSH agent
+        if: always()
+        run: ssh-agent -k >/dev/null 2>&1 || true

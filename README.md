@@ -35,3 +35,16 @@ directory:
   scripts and imports. The host's `.env`, `.venv`, `files/`, `logs/` and its
   cron entry are left untouched. Override the target with `PIPELINE_HOST`
   (an SSH alias, default `rochester-remote-evan`) and `PIPELINE_DIR`.
+
+#### Automatic deploys
+
+`.github/workflows/deploy.yml` runs the same scripts on every push to `main`
+that touches `app/` or `pipeline/` (and can be run by hand from the Actions
+tab). Only the part that changed is deployed; when both change, the pipeline
+goes first. A pipeline deploy that lands during a forecast run waits up to
+two hours for the run to finish (`WAIT_FOR_RUN`).
+
+Credentials are stored only as secrets in the repository's `production`
+environment: `SSH_KNOWN_HOSTS`, `APP_HOST`, `APP_SSH_KEY`, `PIPELINE_HOST`
+and `PIPELINE_SSH_KEY`. Keys are loaded into an `ssh-agent`, not written to
+disk, and host keys are pinned.
