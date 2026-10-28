@@ -12,15 +12,16 @@ DEPLOY_USER="${DEPLOY_USER:-root}"
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/open-swells-app}"
 SERVICE_ENV_FILE="${SERVICE_ENV_FILE:-/etc/open-swells/open-swells-app.env}"
 
-if [[ ! -f "$ENV_FILE" ]]; then
+# CI passes SERVER_IP in the environment instead of shipping an .env file.
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+elif [[ -z "${SERVER_IP:-${DEPLOY_IP:-}}" ]]; then
   echo "Missing $ENV_FILE. Add SERVER_IP to it before deploying." >&2
   exit 1
 fi
-
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
 
 SERVER_IP="${SERVER_IP:-${DEPLOY_IP:-}}"
 if [[ -z "$SERVER_IP" ]]; then

@@ -14,6 +14,9 @@ PIPELINE_HOST="${PIPELINE_HOST:-rochester-remote-evan}"
 PIPELINE_DIR="${PIPELINE_DIR:-/home/evan/grib-parse-collect}"
 # Set FORCE=1 to deploy while a forecast run is in progress.
 FORCE="${FORCE:-0}"
+# Seconds to wait for an in-progress run to finish before giving up (CI sets
+# this so a push doesn't fail just because it landed mid-run).
+WAIT_FOR_RUN="${WAIT_FOR_RUN:-0}"
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "uv is required locally to run the pipeline tests." >&2
@@ -26,7 +29,17 @@ uv run --frozen python -m unittest discover -s tests
 echo "Checking for an in-progress run on $PIPELINE_HOST..."
 # A run spawns worker processes that import modules fresh, so swapping code
 # underneath it could mix versions within one forecast.
-if ssh "$PIPELINE_HOST" "pgrep -f -- '$PIPELINE_DIR/(run\\.sh|gfs_to_contours\\.py)'" >/dev/null; then
+run_in_progress() {
+  ssh "$PIPELINE_HOST" "pgrep -f -- '$PIPELINE_DIR/(run\\.sh|gfs_to_contours\\.py)'" >/dev/null
+}
+if [[ "$FORCE" != 1 ]] && (( WAIT_FOR_RUN > 0 )) && run_in_progress; then
+  echo "A forecast run is in progress; waiting up to ${WAIT_FOR_RUN}s for it to finish..."
+  deadline=$((SECONDS + WAIT_FOR_RUN))
+  while (( SECONDS < deadline )) && run_in_progress; do
+    sleep 60
+  done
+fi
+if run_in_progress; then
   if [[ "$FORCE" != 1 ]]; then
     echo "A forecast run is in progress on $PIPELINE_HOST. Retry when it finishes, or set FORCE=1." >&2
     exit 1
