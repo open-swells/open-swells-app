@@ -69,6 +69,7 @@
                 <h1 class="station-title truncate">{{.ZoneName}}</h1>
                 <div class="station-meta">SURF ZONE {{.ZoneID}} &middot; NWS {{.Office}} &middot; ISSUED <span data-local-time="{{.Issued.UnixMilli}}">{{.Issued.Format "Jan 2 15:04"}} UTC</span></div>
             </div>
+                <button type="button" class="page-header-action page-open-button close-button page-close-button" onclick="window.parent.closeForecast()" aria-label="Close forecast" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
         </div>
 
         {{if .Beaches}}<div class="text-[11.5px] leading-relaxed text-[#a6aab2] mb-2">{{.Beaches}}</div>{{end}}
