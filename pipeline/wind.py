@@ -1,12 +1,11 @@
 """Extract and publish wind fields carried inside GFS-Wave GRIB files."""
 
-import gzip
 import logging
 
-import geojson
 import numpy as np
 import pygrib
-from geojson import Feature, FeatureCollection
+
+from bundle import pack_grid
 
 logger = logging.getLogger("GFSWaveContours")
 
@@ -42,15 +41,14 @@ def extract_wind(filepath: str) -> dict:
         grbs.close()
 
 
-def write_wind_arrows(data: dict, path: str, *, stride: int = 10) -> int:
-    """Write coarse wind vectors as GeoJSON points.
+def pack_wind(data: dict, *, stride: int = 10) -> dict[str, bytes]:
+    """Pack coarse wind vectors for the wind bundle.
 
-    Compact properties are: ``s`` speed in m/s, ``d`` direction wind comes
-    from in degrees true, and ``u``/``v`` vector components in m/s.
+    Vars are ``s`` speed in m/s, ``d`` direction wind comes from in degrees
+    true, and ``u``/``v`` vector components in m/s. A cell is stored only
+    where all four are valid.
     """
     slices = np.s_[::stride, ::stride]
-    lon = data["lon"][slices]
-    lat = data["lat"][slices]
     speed = data["speed"][slices]
     direction = data["direction"][slices]
     u = data["u"][slices]
@@ -59,30 +57,9 @@ def write_wind_arrows(data: dict, path: str, *, stride: int = 10) -> int:
     mask = data.get("mask")
     if mask is not None:
         valid &= ~mask[slices]
-
-    features = []
-    for lo, la, speed_value, direction_value, u_value, v_value in zip(
-        lon[valid], lat[valid], speed[valid], direction[valid], u[valid], v[valid]
-    ):
-        features.append(
-            Feature(
-                geometry={
-                    "type": "Point",
-                    "coordinates": [round(float(lo), 2), round(float(la), 2)],
-                },
-                properties={
-                    "s": round(float(speed_value), 1),
-                    "d": int(round(float(direction_value))) % 360,
-                    "u": round(float(u_value), 1),
-                    "v": round(float(v_value), 1),
-                },
-            )
-        )
-
-    payload = geojson.dumps(FeatureCollection(features))
-    with open(path, "w") as output:
-        output.write(payload)
-    with gzip.open(path + ".gz", "wt", encoding="utf-8", compresslevel=6) as output:
-        output.write(payload)
-    logger.info("Wind arrows saved to %s (%d points)", path, len(features))
-    return len(features)
+    return {
+        "s": pack_grid(speed, 0.1, valid),
+        "d": pack_grid(np.round(direction) % 360, 1, valid),
+        "u": pack_grid(u, 0.1, valid),
+        "v": pack_grid(v, 0.1, valid),
+    }

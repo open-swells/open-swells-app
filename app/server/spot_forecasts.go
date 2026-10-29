@@ -3,7 +3,7 @@ package main
 // Per-spot forecasts from spot_forecasts.json.gz: the pipeline samples every
 // spot at its nearest wet cell of the full-resolution (1/6 deg) wave grid,
 // hourly to f120 and 3-hourly after, for the whole run in one file. This
-// replaces reading the map's ~1.67 deg swell_partitions/wind grids, which
+// replaces reading the map's ~1.67 deg swell and wind bundles, which
 // remain the fallback for spots the file doesn't cover (a stale or missing
 // file, or a spot added to the app but not yet to the pipeline's copy).
 //

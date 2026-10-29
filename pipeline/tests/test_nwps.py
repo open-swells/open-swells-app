@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import numpy as np
 
+import bundle
 import gfs_to_contours
 import nwps
 
@@ -145,10 +146,6 @@ class MosaicTests(unittest.TestCase):
 
 class PointsTests(unittest.TestCase):
     def test_write_points_skips_land_and_rounds(self):
-        domain = {
-            "lat": np.array([32.0, 32.5]),
-            "lon": np.array([240.0, 240.5, 241.0]),
-        }
         height = np.array([[1.234, 2.0, 3.0], [4.0, 5.0, 6.0]], dtype=np.float32)
         mask = np.zeros_like(height, dtype=bool)
         mask[0, 1] = True  # land cell
@@ -159,25 +156,32 @@ class PointsTests(unittest.TestCase):
             "period": np.full_like(height, 12.34),
             "direction": np.full_like(height, 359.6),
         }
+        no_period = {"height": height, "mask": mask}
+        domain = {
+            "lat": np.array([32.0, 32.5]),
+            "lon": np.array([240.0, 240.5, 241.0]),
+            "steps": {0: fields, 3: no_period},
+            "frames": {12: 0, 15: 3},
+            "cycle": "20260712_06Z",
+        }
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "pts.geojson")
-            count = nwps.write_nwps_points(domain, fields, path)
-            with open(path) as f:
-                doc = json.load(f)
-            self.assertTrue(os.path.exists(path + ".gz"))
-        self.assertEqual(count, 5)
-        self.assertEqual(len(doc["features"]), 5)
-        first = doc["features"][0]
-        self.assertEqual(first["geometry"]["coordinates"], [240.0, 32.0])
-        self.assertEqual(first["properties"]["h"], 1.23)
-        self.assertEqual(first["properties"]["s"], 1.05)
-        self.assertEqual(first["properties"]["p"], 12.3)
-        self.assertEqual(first["properties"]["d"], 0)  # 360 wraps to 0
-        lons = [f["geometry"]["coordinates"][0] for f in doc["features"]]
-        self.assertNotIn(
-            240.5, [lon for f, lon in zip(doc["features"], lons)
-                    if f["geometry"]["coordinates"][1] == 32.0]
-        )
+            path = os.path.join(tmp, "nwps_points_lox_cg1.bin")
+            nwps.write_nwps_points(domain, [12, 15], path)
+            header, frames = bundle.read_bundle(path)
+        self.assertEqual(header["hours"], [12, 15])
+        self.assertEqual(header["lat"], [32.0, 32.5])
+        self.assertEqual(header["lon"], [240.0, 240.5, 241.0])
+        self.assertEqual(header["run"], "20260712_06Z")
+        first = frames[12]
+        self.assertEqual(int(np.isfinite(first["h"]).sum()), 5)
+        self.assertTrue(np.isnan(first["h"][0, 1]))  # land stays empty
+        self.assertAlmostEqual(first["h"][0, 0], 1.23)
+        self.assertAlmostEqual(first["s"][0, 0], 1.05, places=2)
+        self.assertAlmostEqual(first["p"][0, 0], 12.3)
+        self.assertEqual(first["d"][0, 0], 0)  # 360 wraps to 0
+        # Optional fields missing from a step are NODATA; height remains.
+        self.assertTrue(np.all(np.isnan(frames[15]["p"])))
+        self.assertAlmostEqual(frames[15]["h"][1, 2], 6.0)
 
 
 class RenderAlphaTests(unittest.TestCase):

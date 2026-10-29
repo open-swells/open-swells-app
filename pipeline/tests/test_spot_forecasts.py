@@ -198,9 +198,9 @@ class LoadSpotsTests(unittest.TestCase):
 class ProcessHoursSpotSamplesTests(unittest.TestCase):
     def test_samples_collected_by_position(self):
         results = {
-            0: ("000", True, None, {"hour": 0}),
-            3: ("003", False, None, None),
-            6: ("006", True, None, {"hour": 6}),
+            0: ("000", True, None, {"hour": 0}, None),
+            3: ("003", False, None, None, None),
+            6: ("006", True, None, {"hour": 6}, None),
         }
         run_info = {}
         with patch.object(

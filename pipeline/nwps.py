@@ -18,10 +18,10 @@ alpha-feathered so it blends into the global heatmap underneath. The PNG
 shows the same instant as the global heatmap_<HHH>.png and overlays it
 directly; hours no domain covers are simply absent from the metadata.
 
-For beach point forecasts each domain also emits 3-hourly
-nwps_points_<wfo>_<grid>_<HHH>.geojson grids of every wet cell: compact
-properties h (combined height m), p (primary mean period s) and
-d (primary direction from, deg true).
+For beach point forecasts each domain also emits one
+nwps_points_<wfo>_<grid>_<run>.bin grid bundle (see bundle.py), 3-hourly: vars
+h (combined height m), s (total swell height m), p (primary mean period s)
+and d (primary direction from, deg true), NODATA on land.
 
 Domains come from NWPS_DOMAINS as comma-separated region/wfo pairs, e.g.
 "wr/lox,wr/sgx" (see https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/
@@ -29,8 +29,6 @@ prod/ for regions and offices). Grids come from NWPS_GRIDS (default CG1).
 """
 
 import datetime as dt
-import gzip
-import json
 import logging
 import os
 
@@ -38,6 +36,8 @@ import numpy as np
 import pygrib
 import requests
 from scipy.ndimage import distance_transform_edt
+
+from bundle import bundle_name, pack_grid, write_bundle
 
 logger = logging.getLogger("GFSWaveContours")
 
@@ -299,48 +299,47 @@ class _Mosaic:
         return alpha
 
 
-def _write_geojson(payload: str, geojson_path: str) -> None:
-    with open(geojson_path, "w") as f:
-        f.write(payload)
-    with gzip.open(geojson_path + ".gz", "wt", encoding="utf-8", compresslevel=6) as f:
-        f.write(payload)
+# Vars of the nwps_points bundles; read by the web app.
+POINTS_VARS = [
+    {"name": "h", "scale": 0.01},
+    {"name": "s", "scale": 0.01},
+    {"name": "p", "scale": 0.1},
+    {"name": "d", "scale": 1},
+]
 
 
-def write_nwps_points(domain: dict, step_fields: dict, geojson_path: str) -> int:
-    """Write every wet cell of one forecast step as compact point features."""
+def pack_nwps_points(step_fields: dict) -> dict[str, bytes]:
+    """Pack one forecast step: every wet cell, NODATA on land.
+
+    Swell, period and direction are optional inputs; where one is missing
+    (or the whole field is) it is NODATA while the height stays.
+    """
     height = step_fields["height"]
-    mask = step_fields["mask"]
-    swell = step_fields.get("swell")
-    period = step_fields.get("period")
+    wet = ~step_fields["mask"] & np.isfinite(height)
+    blank = np.full(height.shape, np.nan, dtype=np.float32)
     direction = step_fields.get("direction")
-    rows, cols = np.nonzero(~mask & np.isfinite(height))
-    features = []
-    for r, c in zip(rows.tolist(), cols.tolist()):
-        properties = {"h": round(float(height[r, c]), 2)}
-        if swell is not None and np.isfinite(swell[r, c]):
-            properties["s"] = round(float(swell[r, c]), 2)
-        if period is not None and np.isfinite(period[r, c]):
-            properties["p"] = round(float(period[r, c]), 1)
-        if direction is not None and np.isfinite(direction[r, c]):
-            properties["d"] = int(round(float(direction[r, c]))) % 360
-        features.append(
-            {
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": [
-                        round(float(domain["lon"][c]), 3),
-                        round(float(domain["lat"][r]), 3),
-                    ],
-                },
-                "properties": properties,
-            }
-        )
-    payload = json.dumps(
-        {"type": "FeatureCollection", "features": features}, separators=(",", ":")
+    return {
+        "h": pack_grid(height, 0.01, wet),
+        "s": pack_grid(step_fields.get("swell", blank), 0.01, wet),
+        "p": pack_grid(step_fields.get("period", blank), 0.1, wet),
+        "d": pack_grid(np.round(direction) % 360 if direction is not None else blank, 1, wet),
+    }
+
+
+def write_nwps_points(domain: dict, hours: list[int], path: str) -> None:
+    """Write a domain's 3-hourly steps as one grid bundle; returns its hours."""
+    chunks = {hour: pack_nwps_points(domain["steps"][domain["frames"][hour]]) for hour in hours}
+    write_bundle(
+        path,
+        kind="grid",
+        hours=hours,
+        variables=POINTS_VARS,
+        chunks=chunks,
+        lat=domain["lat"],
+        lon=domain["lon"],
+        run=domain.get("cycle"),
+        axis_decimals=3,
     )
-    _write_geojson(payload, geojson_path)
-    return len(features)
 
 
 def process_nwps_domains(
@@ -468,21 +467,18 @@ def process_nwps_domains(
                     hour for hour in sorted(d["frames"])
                     if hour % POINTS_HOUR_STEP == 0
                 ]
-                for hour in point_hours:
-                    write_nwps_points(
-                        d,
-                        d["steps"][d["frames"][hour]],
-                        os.path.join(
-                            files_dir,
-                            f"nwps_points_{d['wfo']}_{grid_slug}_{hour:03}.geojson",
-                        ),
-                    )
+                # Named by the GFS run being published, not the NWPS cycle.
+                file_name = bundle_name(
+                    f"nwps_points_{d['wfo']}_{grid_slug}", forecast_start.strftime("%Y%m%d_%HZ")
+                )
+                write_nwps_points(d, point_hours, os.path.join(files_dir, file_name))
                 points.append(
                     {
                         "wfo": d["wfo"],
                         "grid": grid_slug,
                         "cycle": d["cycle"],
                         "hours": point_hours,
+                        "file": file_name,
                     }
                 )
                 logger.info(

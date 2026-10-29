@@ -186,12 +186,37 @@ class CompositeSwellTests(unittest.TestCase):
         }
         self.assertIsNone(composite_swell(hi, lo)["wind_sea"])
 
-    def test_single_grid_passes_through_unchanged(self):
+    def test_single_grid_lands_on_the_shared_lattice(self):
+        # Every hour of a run must share one lattice (the bundles store a
+        # single grid), so a lone source is regridded rather than returned.
+        hi = make_swell_data(HI_LAT, HI_LON, 2.0)
         lo = make_swell_data(LO_LAT, LO_LON, 5.0)
-        self.assertIs(composite_swell(None, lo), lo)
-        self.assertIs(composite_swell(lo, None), lo)
+        full = composite_swell(hi, lo)
+
+        coarse_only = composite_swell(None, lo)
+        self.assertEqual(coarse_only["height"].shape, full["height"].shape)
+        np.testing.assert_array_equal(coarse_only["lat"], full["lat"])
+        self.assertTrue(np.all(coarse_only["height"] == 5.0))
+
+        fine_only = composite_swell(hi, None)
+        self.assertEqual(fine_only["height"].shape, full["height"].shape)
+        band = (full["lat"][:, 0] <= 52.5) & (full["lat"][:, 0] >= -15.0)
+        self.assertTrue(np.all(fine_only["height"][band] == 2.0))
+        # Outside the fine grid's band there is no data, not smeared edges.
+        self.assertTrue(np.all(np.isnan(fine_only["height"][~band])))
+        self.assertTrue(np.all(fine_only["height_mask"][~band]))
+        self.assertTrue(np.all(np.isnan(fine_only["swell_partitions"][0]["height"][~band])))
+
         with self.assertRaises(ValueError):
             composite_swell(None, None)
+
+    def test_single_wind_grid_lands_on_the_shared_lattice(self):
+        hi = make_wind_data(HI_LAT, HI_LON, 4.0)
+        lo = make_wind_data(LO_LAT, LO_LON, 8.0)
+        full = composite_wind(hi, lo)
+        fine_only = composite_wind(hi, None)
+        self.assertEqual(fine_only["speed"].shape, full["speed"].shape)
+        self.assertTrue(np.all(composite_wind(None, lo)["speed"] == 8.0))
 
     def test_mismatched_valid_dates_raise(self):
         hi = make_swell_data(HI_LAT, HI_LON, 2.0)

@@ -11,6 +11,7 @@
         <meta property="og:url" content="{{.SEO.Canonical}}">
         <meta property="og:type" content="website">
         {{template "analytics"}}
+        {{template "forecastbundle"}}
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
             tailwind.config = {
@@ -791,6 +792,18 @@
                 return runQuery ? `${path}?${runQuery}` : path;
             }
 
+            // Each product is one bundle per run (see forecastbundle), named
+            // in metadata.json's "bundles" (set by fetchMetadata). The
+            // per-hour filenames below are the format before the bundles,
+            // still read when a run lists none.
+            const forecastBundles = window.createForecastBundles();
+            let bundleFiles = {};
+            function openBundle(product) {
+                const file = bundleFiles[product];
+                return file ? forecastBundles.open(`/static/${file}`) : null;
+            }
+            const SWELL_SYSTEM_VARS = ['h1', 'p1', 'd1', 'h2', 'p2', 'd2', 'h3', 'p3', 'd3'];
+
             function hourToFilename(hour) {
                 return runUrl(`/static/contours_${String(hour).padStart(3, '0')}.geojson`);
             }
@@ -1304,6 +1317,29 @@
                 if (legendReadout && !wantsHeatmap()) legendReadout.textContent = '';
             });
 
+            // The swell systems at the grid point nearest the cursor, as
+            // [{h, p, d}], or null when there is none.
+            async function swellSystemsAt(hour, lngLat) {
+                const bundle = await openBundle('swell');
+                if (!bundle) {
+                    const fc = await loadFrame(hourToPartitionsFilename(hour));
+                    const f = fc.features && nearestPointFeature(fc.features, lngLat);
+                    if (!f) return null;
+                    return [1, 2, 3]
+                        .filter(k => f.properties[`h${k}`] !== undefined)
+                        .map(k => ({ h: f.properties[`h${k}`], p: f.properties[`p${k}`], d: f.properties[`d${k}`] }));
+                }
+                const grid = await cachedFrame(`${bundle.url}#${hour}`,
+                    () => forecastBundles.grid(bundle, hour, SWELL_SYSTEM_VARS), null);
+                if (!grid) return null;
+                const cell = forecastBundles.nearestCell(grid,
+                    c => [1, 2, 3].some(k => grid.value(`h${k}`, c) !== null), lngLat);
+                if (cell < 0) return null;
+                return [1, 2, 3]
+                    .filter(k => grid.value(`h${k}`, cell) !== null)
+                    .map(k => ({ h: grid.value(`h${k}`, cell), p: grid.value(`p${k}`, cell), d: grid.value(`d${k}`, cell) }));
+            }
+
             function nearestPointFeature(features, lngLat, maxDist2 = 4) {
                 let best = null;
                 let bestDist = maxDist2; // squared degrees
@@ -1320,8 +1356,7 @@
             }
 
             // Hovering an arrow shows the full swell reading; the individual
-            // swell systems from swell_partitions_XXX.geojson stream in once
-            // that frame is cached.
+            // swell systems stream in once that hour of the swell bundle is cached.
             const arrowPopup = new maplibregl.Popup({
                 closeButton: false,
                 closeOnClick: false,
@@ -1333,16 +1368,10 @@
                 const base = `<div class="text-xs">${p.h} m @ ${p.p} s from ${p.d}&deg;</div>`;
                 arrowPopup.setLngLat(lngLat).setHTML(base).addTo(map);
 
-                loadFrame(hourToPartitionsFilename(forecastHours[currentIndex])).then(fc => {
-                    if (!arrowPopup.isOpen() || !fc.features || !fc.features.length) return;
-                    const f = nearestPointFeature(fc.features, lngLat);
-                    if (!f) return;
-                    const rows = [];
-                    for (let k = 1; k <= 3; k++) {
-                        const h = f.properties[`h${k}`];
-                        if (h === undefined) continue;
-                        rows.push(`<div class="text-xs" style="color: #d5d7dc;">${h} m @ ${f.properties[`p${k}`]} s from ${f.properties[`d${k}`]}&deg;</div>`);
-                    }
+                swellSystemsAt(forecastHours[currentIndex], lngLat).catch(() => null).then(systems => {
+                    if (!arrowPopup.isOpen() || !systems) return;
+                    const rows = systems.map(s =>
+                        `<div class="text-xs" style="color: #d5d7dc;">${s.h} m @ ${s.p} s from ${s.d}&deg;</div>`);
                     if (rows.length > 1) {
                         arrowPopup.setHTML(base +
                             `<div class="mono" style="margin: 6px 0 2px; font-size: 9px; color: #a6aab2; text-transform: uppercase;">Swell systems</div>` +
@@ -1384,6 +1413,7 @@
                     
                     forecastStartTime = new Date(Date.UTC(year, month - 1, day, hour));
                     runQuery = `run=${encodeURIComponent(metadata.forecast_start)}`;
+                    bundleFiles = metadata.bundles || {};
 
                     // The hours this run actually published: a failed hour
                     // has no frame, so the timeline skips it rather than
@@ -1480,27 +1510,63 @@
 
             // Parsed frames are cached (LRU) and the next few hours prefetched,
             // so scrubbing and playback don't wait on the network per frame.
-            const frameCache = new Map(); // url -> Promise<geojson>
+            const frameCache = new Map(); // key -> Promise<frame>
 
-            function loadFrame(url) {
-                if (frameCache.has(url)) {
-                    const cached = frameCache.get(url);
-                    frameCache.delete(url);
-                    frameCache.set(url, cached); // refresh LRU position
+            // An absent frame (null) or a failure resolves to fallback, so a
+            // missing hour clears the layer instead of breaking playback. A
+            // failure's fallback is kept only for FAILED_FRAME_RETRY_MS, then
+            // the frame is tried again, without playback and prefetch retrying
+            // it on every tick.
+            const FAILED_FRAME_RETRY_MS = 15000;
+            function cachedFrame(key, load, fallback = EMPTY_FC) {
+                if (frameCache.has(key)) {
+                    const cached = frameCache.get(key);
+                    frameCache.delete(key);
+                    frameCache.set(key, cached); // refresh LRU position
                     return cached;
                 }
-                const promise = fetch(url)
-                    .then(r => {
-                        if (!r.ok) throw new Error(`${r.status} for ${url}`);
-                        return r.json();
-                    })
-                    // A missing hour clears the layer instead of breaking playback
-                    .catch(() => EMPTY_FC);
-                frameCache.set(url, promise);
+                const promise = Promise.resolve()
+                    .then(load)
+                    .then(frame => frame || fallback, () => {
+                        setTimeout(() => {
+                            if (frameCache.get(key) === promise) frameCache.delete(key);
+                        }, FAILED_FRAME_RETRY_MS);
+                        return fallback;
+                    });
+                frameCache.set(key, promise);
                 if (frameCache.size > FRAME_CACHE_MAX) {
                     frameCache.delete(frameCache.keys().next().value);
                 }
                 return promise;
+            }
+
+            function fetchJson(url) {
+                return fetch(url).then(r => {
+                    if (!r.ok) throw new Error(`${r.status} for ${url}`);
+                    return r.json();
+                });
+            }
+
+            function loadFrame(url) {
+                return cachedFrame(url, () => fetchJson(url));
+            }
+
+            // Swell arrows: partition 1 of the swell bundle as point features.
+            function loadArrows(hour) {
+                return cachedFrame(runUrl(`arrows#${hour}`), async () => {
+                    const bundle = await openBundle('swell');
+                    if (!bundle) return fetchJson(hourToArrowsFilename(hour)); // run from before the bundles
+                    const grid = await forecastBundles.grid(bundle, hour, ['h1', 'p1', 'd1']);
+                    return grid && forecastBundles.gridFeatures(grid, { h1: 'h', p1: 'p', d1: 'd' });
+                });
+            }
+
+            function loadContours(hour) {
+                return cachedFrame(runUrl(`contours#${hour}`), async () => {
+                    const bundle = await openBundle('contours');
+                    if (!bundle) return fetchJson(hourToFilename(hour));
+                    return forecastBundles.documentAt(bundle, hour);
+                });
             }
 
             function prefetchFrames(index, count = 4) {
@@ -1512,9 +1578,9 @@
                             if (layer.hours.has(hour)) loadNwpsFrame(nwpsFrameUrl(layer, hour));
                         }
                     } else {
-                        loadFrame(hourToFilename(hour));
+                        loadContours(hour);
                     }
-                    loadFrame(hourToArrowsFilename(hour));
+                    loadArrows(hour);
                 }
             }
 
@@ -1531,13 +1597,13 @@
                 const wantHeatmap = wantsHeatmap();
                 let [heatUrl, arrows] = await Promise.all([
                     wantHeatmap ? loadImageFrame(hourToHeatmapFilename(hours)) : null,
-                    loadFrame(hourToArrowsFilename(hours)),
+                    loadArrows(hours),
                 ]);
                 // Contours are the fallback when there is no heatmap (older
                 // pipeline runs, or a missing hour in the current one).
                 let contours = null;
                 if (!wantHeatmap || !heatUrl) {
-                    contours = await loadFrame(hourToFilename(hours));
+                    contours = await loadContours(hours);
                 }
                 if (token !== updateToken) return; // superseded by a newer frame
 

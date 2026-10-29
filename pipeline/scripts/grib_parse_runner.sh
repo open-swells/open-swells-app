@@ -55,7 +55,10 @@ fi
 mkdir -p "$FILES_DIR" "$LOG_DIR"
 
 echo "Cleaning files directory: $FILES_DIR"
-rm -f "$FILES_DIR"/*
+# Run-stamped bundles (<product>_<YYYYMMDD>_<HH>Z.bin) stay: each publish
+# keeps the previous run's for maps opened before it, and the pipeline
+# prunes older ones (bundle.prune_bundles).
+find "$FILES_DIR" -maxdepth 1 -type f ! -name '*_[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9]Z.bin' -delete
 
 PYTHON_BIN="${PYTHON_BIN:-$PROJECT_ROOT/.venv/bin/python}"
 

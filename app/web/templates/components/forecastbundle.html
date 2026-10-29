@@ -1,0 +1,169 @@
+{{/* Reader for the pipeline's forecast bundles (pipeline/bundle.py): one file
+     per map product per run, fetched an hour at a time with HTTP Range
+     requests. Layout: "OSB1", uint32 LE header length, JSON header, then
+     gzip chunks back to back, hour-major, in header.vars order. Files are
+     named per run and listed in metadata.json, so a URL always holds the
+     same bytes: a header can be kept as long as the page is open. */}}
+{{define "forecastbundle"}}
+<script>
+    window.createForecastBundles = window.createForecastBundles || ((fetchImpl = fetch) => {
+        // The header lists every chunk's length: ~14 KB for a full 209-hour
+        // swell bundle. A larger one is fetched in a second request.
+        const HEADER_PROBE_BYTES = 32768;
+
+        async function fetchRange(url, start, end) {
+            const response = await fetchImpl(url, { headers: { Range: `bytes=${start}-${end}` } });
+            if (response.status !== 206 && response.status !== 200) {
+                throw new Error(`${response.status} for ${url}`);
+            }
+            const buffer = await response.arrayBuffer();
+            // A server that ignores Range sends the whole file.
+            return response.status === 200 ? buffer.slice(start, end + 1) : buffer;
+        }
+
+        async function gunzip(bytes) {
+            const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+            return new Response(stream).arrayBuffer();
+        }
+
+        async function readHeader(url) {
+            let buffer = await fetchRange(url, 0, HEADER_PROBE_BYTES - 1);
+            const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, Math.min(4, buffer.byteLength)));
+            if (buffer.byteLength < 8 || magic !== 'OSB1') throw new Error(`${url} is not a forecast bundle`);
+            const length = new DataView(buffer).getUint32(4, true);
+            if (8 + length > buffer.byteLength) buffer = await fetchRange(url, 0, 8 + length - 1);
+            const header = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 8, length)));
+            const offsets = [];
+            let offset = 8 + length;
+            for (const n of header.chunks) {
+                offsets.push(offset);
+                offset += n;
+            }
+            return {
+                url,
+                header,
+                offsets,
+                hourAt: new Map(header.hours.map((hour, i) => [hour, i])),
+                varAt: new Map(header.vars.map((v, i) => [v.name, i])),
+            };
+        }
+
+        // Decompressed chunks for some vars of one hour, fetched as one range
+        // (the span from the first to the last named var). null if the
+        // bundle has no such hour.
+        async function chunks(bundle, hour, names) {
+            const h = bundle.hourAt.get(hour);
+            if (h === undefined) return null;
+            const indexes = names.map(name => {
+                const i = bundle.varAt.get(name);
+                if (i === undefined) throw new Error(`${bundle.url} has no var ${name}`);
+                return i;
+            });
+            const nvars = bundle.header.vars.length;
+            const first = h * nvars + Math.min(...indexes);
+            const last = h * nvars + Math.max(...indexes);
+            const start = bundle.offsets[first];
+            const buffer = await fetchRange(bundle.url, start, bundle.offsets[last] + bundle.header.chunks[last] - 1);
+            const out = {};
+            await Promise.all(names.map(async (name, k) => {
+                const chunk = h * nvars + indexes[k];
+                out[name] = await gunzip(new Uint8Array(buffer, bundle.offsets[chunk] - start, bundle.header.chunks[chunk]));
+            }));
+            return out;
+        }
+
+        // Grid vars of one hour as numbers: grid.value(name, cell) is null
+        // at NODATA, else raw * scale (as a short decimal, e.g. 0.57 rather
+        // than 57 * 0.01 = 0.5700000000000001).
+        async function grid(bundle, hour, names) {
+            const raw = await chunks(bundle, hour, names);
+            if (!raw) return null;
+            const { lat, lon, nodata } = bundle.header;
+            const arrays = {};
+            const divisors = {};
+            for (const name of names) {
+                arrays[name] = new Int16Array(raw[name]);
+                const scale = bundle.header.vars[bundle.varAt.get(name)].scale;
+                // Dividing by 100 lands on the nearest double to the decimal.
+                divisors[name] = scale < 1 ? Math.round(1 / scale) : 1 / scale;
+            }
+            return {
+                lat,
+                lon,
+                cells: lat.length * lon.length,
+                value(name, cell) {
+                    const v = arrays[name][cell];
+                    return v === nodata ? null : v / divisors[name];
+                },
+            };
+        }
+
+        // Point features for every cell where all the named vars have data;
+        // props maps a var name to its feature property name.
+        function gridFeatures(g, props) {
+            const features = [];
+            const entries = Object.entries(props);
+            const nlon = g.lon.length;
+            for (let cell = 0; cell < g.cells; cell++) {
+                const properties = {};
+                let ok = true;
+                for (const [name, prop] of entries) {
+                    const v = g.value(name, cell);
+                    if (v === null) { ok = false; break; }
+                    properties[prop] = v;
+                }
+                if (!ok) continue;
+                features.push({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [g.lon[cell % nlon], g.lat[Math.floor(cell / nlon)]] },
+                    properties,
+                });
+            }
+            return { type: 'FeatureCollection', features };
+        }
+
+        // Nearest cell within sqrt(maxDist2) degrees where hasData(cell), by
+        // the same wrapped squared-degree metric as the point scan; -1 if none.
+        function nearestCell(g, hasData, lngLat, maxDist2 = 4) {
+            let best = -1;
+            let bestDist = maxDist2;
+            const nlon = g.lon.length;
+            for (let i = 0; i < g.lat.length; i++) {
+                const dlat = g.lat[i] - lngLat.lat;
+                if (dlat * dlat >= bestDist) continue;
+                for (let j = 0; j < nlon; j++) {
+                    let dlng = Math.abs(g.lon[j] - lngLat.lng) % 360;
+                    if (dlng > 180) dlng = 360 - dlng;
+                    const dist = dlng * dlng + dlat * dlat;
+                    if (dist < bestDist && hasData(i * nlon + j)) {
+                        bestDist = dist;
+                        best = i * nlon + j;
+                    }
+                }
+            }
+            return best;
+        }
+
+        // GeoJSON documents (the contour bundle): one parsed doc per hour.
+        async function documentAt(bundle, hour) {
+            const raw = await chunks(bundle, hour, ['geojson']);
+            return raw && JSON.parse(new TextDecoder().decode(raw.geojson));
+        }
+
+        // One header read per file; a failed read isn't kept, so the next
+        // call tries again.
+        const opened = new Map(); // url -> Promise<bundle>
+        function open(url) {
+            if (!opened.has(url)) {
+                opened.set(url, readHeader(url).catch(error => {
+                    opened.delete(url);
+                    throw error;
+                }));
+            }
+            return opened.get(url);
+        }
+
+        return { open, grid, gridFeatures, nearestCell, documentAt };
+    });
+</script>
+{{end}}
