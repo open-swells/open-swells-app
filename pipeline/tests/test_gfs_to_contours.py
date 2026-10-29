@@ -1,4 +1,6 @@
 import datetime as dt
+import json
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -7,6 +9,24 @@ import numpy as np
 from PIL import Image
 
 import gfs_to_contours
+
+
+class MetadataTests(unittest.TestCase):
+    def test_optional_tide_availability_is_published_when_provided(self):
+        with tempfile.TemporaryDirectory() as files_dir:
+            path = gfs_to_contours.write_metadata(
+                files_dir, "20261028", "18", tide_stations=False
+            )
+            with open(path) as f:
+                metadata = json.load(f)
+        self.assertIs(metadata["tide_stations"], False)
+
+    def test_legacy_call_does_not_claim_tide_availability(self):
+        with tempfile.TemporaryDirectory() as files_dir:
+            path = gfs_to_contours.write_metadata(files_dir, "20261028", "18")
+            with open(path) as f:
+                metadata = json.load(f)
+        self.assertNotIn("tide_stations", metadata)
 
 
 class FakeMessage:

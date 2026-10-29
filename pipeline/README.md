@@ -145,7 +145,10 @@ results for a few spots without writing anything.
 - `tides.json` — NOAA CO-OPS hourly astronomical predictions and the latest
   48 hours of observed water levels, in meters relative to MLLW and UTC.
   Set `TIDE_STATIONS` to comma-separated CO-OPS station IDs to generate it,
-  for example `TIDE_STATIONS=9410230,9410840`.
+  for example `TIDE_STATIONS=9410230,9410840`. Metadata publishes
+  `tide_stations: false` when disabled or no stations succeed, so the map
+  skips the optional file request. Successful stations set it to `true`;
+  older metadata without the flag retains the legacy loading behavior.
 - `spot_tides.json.gz` — predicted highs and lows (meters MLLW, UTC) at the
   NOAA CO-OPS station nearest each spot within 50 km, plus hourly
   predictions for reference stations, for the tide panel on spot pages.
