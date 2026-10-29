@@ -51,6 +51,25 @@
         <script>
             if (window.self !== window.top) document.addEventListener('DOMContentLoaded', () => document.body.classList.add('embedded'));
             document.addEventListener('DOMContentLoaded', () => {
+                const infoButton = document.querySelector('.spot-info-button');
+                const header = document.querySelector('.spot-header');
+                const closeInfo = () => {
+                    header.classList.remove('show-information');
+                    infoButton.setAttribute('aria-expanded', 'false');
+                };
+                infoButton.addEventListener('click', () => {
+                    const open = header.classList.toggle('show-information');
+                    infoButton.setAttribute('aria-expanded', String(open));
+                });
+                document.addEventListener('click', event => {
+                    if (!infoButton.contains(event.target) && !document.getElementById('spot-information').contains(event.target)) closeInfo();
+                });
+                document.addEventListener('keydown', event => {
+                    if (event.key === 'Escape' && header.classList.contains('show-information')) {
+                        closeInfo();
+                        infoButton.focus();
+                    }
+                });
                 const formatter = window.FORECAST_CLOCK.formatter({
                     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
                 });
@@ -67,15 +86,18 @@
         <nav class="spot-breadcrumbs" aria-label="Breadcrumb">
             <a href="/map?spot={{.SwellReport.StationId}}">Map</a> <span aria-hidden="true">›</span> <span aria-current="page">{{.SpotName}}</span>
         </nav>
-        <div class="station-header flex items-start justify-between gap-4 mb-4">
+        <div class="station-header spot-header flex items-start justify-between gap-4 mb-4">
             <!-- Spot Name -->
-            <div class="w-full min-w-0">
+            <div class="spot-heading min-w-0">
                 <h1 class="station-title">{{.PageHeading}}</h1>
+                <div id="spot-information" class="spot-information">
                 <div class="station-meta" data-spot-timezone></div>
                 <div class="station-meta">{{if .Region}}{{.Region}} &middot; {{end}}{{.Coordinates}} &middot; GFS-WAVE MODEL FORECAST{{if .Facing}} &middot; FACES {{.Facing}}{{end}}</div>
+                </div>
             </div>
 
             <div class="station-header-actions">
+                <button type="button" class="page-header-action page-open-button spot-info-button" aria-label="Forecast information" aria-expanded="false" aria-controls="spot-information">i</button>
                 <a class="page-header-action page-open-button popup-only" href="/surf-spots/{{.SwellReport.StationId}}" target="_top" aria-label="Open full forecast" title="Open full forecast">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg><span>Full page</span>
                 </a>
