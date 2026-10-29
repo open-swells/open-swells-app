@@ -617,3 +617,31 @@ func TestStaticHandlerCachesByRun(t *testing.T) {
 		t.Errorf("new-run URL: Cache-Control = %q, want immutable", got)
 	}
 }
+
+// The map reads bundles an hour at a time with Range requests; they must
+// come back as byte ranges of the file itself, never re-encoded.
+func TestStaticHandlerServesBundleRanges(t *testing.T) {
+	dir := t.TempDir()
+	body := []byte("OSB1\x00\x00\x00\x00abcdefghij")
+	os.WriteFile(filepath.Join(dir, "swell_20260712_06Z.bin"), body, 0o644)
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/static/*filepath", staticHandler(dir))
+
+	req := httptest.NewRequest("GET", "/static/swell_20260712_06Z.bin?run=20260712_06Z", nil)
+	req.Header.Set("Range", "bytes=8-11")
+	req.Header.Set("Accept-Encoding", "gzip")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusPartialContent || w.Body.String() != "abcd" {
+		t.Fatalf("got %d %q", w.Code, w.Body.String())
+	}
+	if enc := w.Header().Get("Content-Encoding"); enc != "" {
+		t.Errorf("bundle range was encoded as %q", enc)
+	}
+	// Named per run, a bundle never changes: cacheable without ?run=.
+	if cc := staticCacheControl("/swell_20260712_06Z.bin", "", "20260712_12Z"); cc != "public, max-age=604800, immutable" {
+		t.Errorf("bundle cache-control %q", cc)
+	}
+}

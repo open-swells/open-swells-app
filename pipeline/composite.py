@@ -40,6 +40,41 @@ def _nearest(source: np.ndarray, target: np.ndarray) -> np.ndarray:
     return np.abs(target[:, None] - source[None, :]).argmin(axis=1)
 
 
+def _blank_like(value, key: str | None = None):
+    """An all-missing copy of a grid dict: NaN fields and fully set masks.
+
+    Stands in for a missing source grid so a single grid still lands on the
+    target lattice (lat/lon and scalars are kept as they are).
+    """
+    if isinstance(value, dict):
+        return {k: _blank_like(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_blank_like(v) for v in value]
+    if isinstance(value, np.ndarray) and key not in ("lat", "lon"):
+        if value.dtype == bool:
+            return np.ones_like(value)
+        if np.issubdtype(value.dtype, np.floating):
+            return np.full_like(value, np.nan)
+    return value
+
+
+def _fill_missing(data_hi: dict | None, data_lo: dict | None) -> tuple[dict, dict]:
+    """Both sources, standing in for a missing one.
+
+    Without the coarse grid the fine one keeps its band and the rest of
+    the lattice is empty; without the fine grid the coarse one fills
+    everything. Either way the result is on the usual target lattice, so
+    every hour of a run shares one grid.
+    """
+    if data_lo is None:
+        if data_hi is None:
+            raise ValueError("Both source grids are missing")
+        return data_hi, _blank_like(data_hi)
+    if data_hi is None:
+        return data_lo, data_lo
+    return data_hi, data_lo
+
+
 class _Compositor:
     """Regrids arrays from two sources onto the target lattice.
 
@@ -90,15 +125,10 @@ def composite_swell(data_hi: dict | None, data_lo: dict | None) -> dict:
     """Merge two extract_from_grib2_to_np() results into one global dict.
 
     Either argument may be None (a failed download); the other is then
-    returned unchanged so a run degrades to partial coverage instead of
+    regridded alone so a run degrades to partial coverage instead of
     losing the forecast hour.
     """
-    if data_lo is None:
-        if data_hi is None:
-            raise ValueError("Both source grids are missing")
-        return data_hi
-    if data_hi is None:
-        return data_lo
+    data_hi, data_lo = _fill_missing(data_hi, data_lo)
     if data_hi["valid_date"] != data_lo["valid_date"]:
         raise ValueError("Mismatched valid times between global wave grids")
 
@@ -141,12 +171,7 @@ def composite_swell(data_hi: dict | None, data_lo: dict | None) -> dict:
 
 def composite_wind(data_hi: dict | None, data_lo: dict | None) -> dict:
     """Merge two extract_wind() results into one global dict."""
-    if data_lo is None:
-        if data_hi is None:
-            raise ValueError("Both source grids are missing")
-        return data_hi
-    if data_hi is None:
-        return data_lo
+    data_hi, data_lo = _fill_missing(data_hi, data_lo)
     if data_hi["valid_date"] != data_lo["valid_date"]:
         raise ValueError("Mismatched valid times between global wind grids")
 

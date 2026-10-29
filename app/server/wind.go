@@ -1,9 +1,9 @@
 package main
 
-// Station wind forecast, extracted from the wind_XXX.geojson grids the
-// pipeline writes into the static dir. Each request finds the nearest grid
-// point to the station for every forecast hour; parsed grids are cached by
-// file mtime so the scan is cheap after the first hit per run.
+// Station wind forecast, extracted from the wind bundle the pipeline
+// writes into the static dir. Each request finds the nearest grid point to
+// the station for every forecast hour; decoded hours are cached until the
+// file changes, so lookups are cheap after the first hit per run.
 
 import (
 	"encoding/json"
@@ -105,15 +105,46 @@ func nearestWind(points []windPoint, lat, lon float64) (windPoint, bool) {
 	return best, bestDist <= 9
 }
 
+// windNearest is the wind grid's nearest valid cell within ~3 deg of
+// (lat, lon) at a forecast hour; the error means the run has no such hour.
+// Runs from before the bundles fall back to per-hour GeoJSON.
+func windNearest(staticDir string, hour int, lat, lon float64) (windPoint, bool, error) {
+	path := runBundlePath(staticDir, "wind")
+	if path == "" {
+		points, err := windGridPoints(filepath.Join(staticDir, fmt.Sprintf("wind_%03d.geojson", hour)))
+		if err != nil {
+			return windPoint{}, false, err
+		}
+		p, ok := nearestWind(points, lat, lon)
+		return p, ok, nil
+	}
+	b, err := loadGridBundle(path)
+	if err != nil {
+		return windPoint{}, false, err
+	}
+	f, err := b.frame(hour)
+	if err != nil {
+		return windPoint{}, false, err
+	}
+	vs, vd := b.varIndex("s"), b.varIndex("d")
+	for _, c := range b.nearbyCells(lat, lon, 9) {
+		s, okS := f.value(vs, c.Index)
+		d, okD := f.value(vd, c.Index)
+		if okS && okD {
+			return windPoint{Lon: c.Lon, Lat: c.Lat, S: s, D: d}, true, nil
+		}
+	}
+	return windPoint{}, false, nil
+}
+
 func windSeriesFor(staticDir string, lat, lon float64) []WindSample {
 	samples := []WindSample{}
 	for hour := 0; hour <= windMaxHour; hour += 3 {
-		path := filepath.Join(staticDir, fmt.Sprintf("wind_%03d.geojson", hour))
-		points, err := windGridPoints(path)
+		p, ok, err := windNearest(staticDir, hour, lat, lon)
 		if err != nil {
 			continue // hour not generated (partial run) — skip it
 		}
-		if p, ok := nearestWind(points, lat, lon); ok {
+		if ok {
 			samples = append(samples, WindSample{Hour: hour, Speed: p.S, Dir: p.D})
 		}
 	}

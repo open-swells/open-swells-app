@@ -1,4 +1,4 @@
-import gzip
+import gc
 import os
 import json
 import logging
@@ -26,11 +26,12 @@ from shapely.geometry import Polygon
 from shapely.ops import transform as shapely_transform
 from scipy.ndimage import gaussian_filter
 
+from bundle import bundle_name, pack_document, pack_grid, prune_bundles, write_bundle
 from composite import composite_swell, composite_wind
 from nwps import process_nwps_domains
 from spot_forecasts import load_spots, sample_spots, write_spot_forecasts
 from tides import DEFAULT_TIDE_CACHE_DIR, SPOT_TIDES_NAME, write_spot_tides, write_tides
-from wind import extract_wind, write_wind_arrows
+from wind import extract_wind, pack_wind
 
 logger = logging.getLogger("GFSWaveContours")
 logger.setLevel(logging.INFO)
@@ -41,6 +42,23 @@ _GRID_CACHE: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
 # grid only spans 15S-52.5N, the coarse one is pole-to-pole (see
 # composite.py for why the other regional products are not used).
 GLOBAL_GRIDS = ("global.0p16", "global.0p25")
+
+# One bundle per product per run (see bundle.py; published as
+# <product>_<run>.bin), replacing the per-hour files. Vars and scales are
+# part of the format the web app reads; the scales keep the precision the
+# GeoJSON points were rounded to.
+SWELL_VARS = [
+    {"name": f"{field}{index}", "scale": scale}
+    for index in (1, 2, 3)
+    for field, scale in (("h", 0.01), ("p", 0.1), ("d", 1))
+]
+WIND_VARS = [
+    {"name": "s", "scale": 0.1},
+    {"name": "d", "scale": 1},
+    {"name": "u", "scale": 0.1},
+    {"name": "v", "scale": 0.1},
+]
+CONTOURS_VARS = [{"name": "geojson"}]
 
 # Height bands shared with the frontend color scale and legend (meters).
 # Levels must be identical for every forecast hour: per-file derived levels
@@ -259,14 +277,6 @@ def render_heatmap_png(
     }
 
 
-def _write_geojson(payload: str, geojson_path: str) -> None:
-    with open(geojson_path, "w") as f:
-        f.write(payload)
-    # Precompressed sibling; the web app serves it when clients accept gzip.
-    with gzip.open(geojson_path + ".gz", "wt", encoding="utf-8", compresslevel=6) as f:
-        f.write(payload)
-
-
 WIND_SEA_FIELDS = {
     "height": "Significant height of wind waves",
     "period": "Mean period of wind waves",
@@ -366,7 +376,6 @@ def extract_from_grib2_to_np(filepath: str) -> dict:
 
 def calculate_contours4(
     data: dict,
-    geojson_path: str,
     *,
     levels: np.ndarray | None = None,
     smoothing_sigma: float = 1.5,
@@ -374,7 +383,8 @@ def calculate_contours4(
     min_area: float | None = None,
     stride: int = 1,
     extra_properties: dict | None = None,
-) -> np.ndarray:
+) -> str:
+    """Band the combined height field into GeoJSON polygons (the payload)."""
     lon_grid = data["lon"]
     lat_grid = data["lat"]
     height_values = data["height"].astype(np.float32, copy=False)
@@ -490,99 +500,42 @@ def calculate_contours4(
         )
 
     if not features:
-        logger.warning("No contour polygons generated for %s", geojson_path)
-    feature_collection = FeatureCollection(features)
-    _write_geojson(geojson.dumps(feature_collection), geojson_path)
-    logger.info(
-        "Contours saved to %s (%d polygons)", geojson_path, len(features)
-    )
-    return levels
+        logger.warning("No contour polygons generated for %s", base_properties)
+    return geojson.dumps(FeatureCollection(features))
 
 
-def extract_swell_arrows(
-    data: dict,
-    geojson_path: str,
-    *,
-    stride: int = 10,
-) -> int:
-    """Write a coarse grid of swell direction points for the given hour.
+def pack_swell_partitions(data: dict, *, stride: int = 10) -> dict[str, bytes]:
+    """Pack all three swell partitions on a coarse grid for the swell bundle.
 
-    The map renders these as rotated arrows over the height contours.
-    Property names are single letters to keep the payload small:
-    h = significant height (m), p = mean period (s), d = direction the
-    swell comes from (degrees true).
+    Vars h1/p1/d1 through h3/p3/d3: height (m), mean period (s) and the
+    direction the swell comes from (degrees true). A partition is stored
+    only where its height, period and direction are all valid, so one
+    NODATA in h<k> means the whole system is absent there. Partition 1 is
+    what the map draws as arrows.
     """
-    lon = data["lon"][::stride, ::stride]
-    lat = data["lat"][::stride, ::stride]
-    primary_partition = data["swell_partitions"][0]
-    height = primary_partition["height"][::stride, ::stride]
-    period = primary_partition["period"][::stride, ::stride]
-    direction = primary_partition["direction"][::stride, ::stride]
-    mask = primary_partition["mask"]
-
-    valid = np.isfinite(height) & np.isfinite(period) & np.isfinite(direction)
-    valid &= ~mask[::stride, ::stride]
-
-    features = []
-    for lo, la, h, p, d in zip(
-        lon[valid], lat[valid], height[valid], period[valid], direction[valid]
-    ):
-        features.append(
-            Feature(
-                geometry={
-                    "type": "Point",
-                    # Same lon convention as the contours (GFS 0..360).
-                    "coordinates": [round(float(lo), 2), round(float(la), 2)],
-                },
-                properties={
-                    "h": round(float(h), 2),
-                    "p": round(float(p), 1),
-                    "d": int(round(float(d))) % 360,
-                },
-            )
-        )
-
-    _write_geojson(geojson.dumps(FeatureCollection(features)), geojson_path)
-    logger.info("Arrows saved to %s (%d points)", geojson_path, len(features))
-    return len(features)
+    chunks: dict[str, bytes] = {}
+    for partition in data["swell_partitions"]:
+        index = partition["sequence"]
+        height = partition["height"][::stride, ::stride]
+        period = partition["period"][::stride, ::stride]
+        direction = partition["direction"][::stride, ::stride]
+        valid = np.isfinite(height) & np.isfinite(period) & np.isfinite(direction)
+        mask = partition.get("mask")
+        if mask is not None:
+            valid &= ~mask[::stride, ::stride]
+        chunks[f"h{index}"] = pack_grid(height, 0.01, valid)
+        chunks[f"p{index}"] = pack_grid(period, 0.1, valid)
+        chunks[f"d{index}"] = pack_grid(np.round(direction) % 360, 1, valid)
+    return chunks
 
 
-def extract_partition_arrows(data: dict, geojson_path: str, *, stride: int = 10) -> int:
-    """Write all three swell partitions at each valid coarse-grid point."""
-    lon = data["lon"][::stride, ::stride]
-    lat = data["lat"][::stride, ::stride]
-    sampled_partitions = [
-        {
-            "sequence": partition["sequence"],
-            "height": partition["height"][::stride, ::stride],
-            "period": partition["period"][::stride, ::stride],
-            "direction": partition["direction"][::stride, ::stride],
-        }
-        for partition in data["swell_partitions"]
-    ]
-    features = []
-    for row, column in np.ndindex(lon.shape):
-        properties = {}
-        for partition in sampled_partitions:
-            index = partition["sequence"]
-            h = partition["height"][row, column]
-            p = partition["period"][row, column]
-            d = partition["direction"][row, column]
-            if np.isfinite(h) and np.isfinite(p) and np.isfinite(d):
-                properties[f"h{index}"] = round(float(h), 2)
-                properties[f"p{index}"] = round(float(p), 1)
-                properties[f"d{index}"] = int(round(float(d))) % 360
-        if not properties:
-            continue
-        features.append(
-            Feature(
-                geometry={"type": "Point", "coordinates": [round(float(lon[row, column]), 2), round(float(lat[row, column]), 2)]},
-                properties=properties,
-            )
-        )
-    _write_geojson(geojson.dumps(FeatureCollection(features)), geojson_path)
-    logger.info("Swell partitions saved to %s (%d points)", geojson_path, len(features))
-    return len(features)
+def grid_axes(data: dict, stride: int) -> tuple[np.ndarray, np.ndarray]:
+    """1-D (lat, lon) axes of the strided composite lattice.
+
+    Copies, not views: the caller keeps these per hour, and a view would
+    keep the hour's full-resolution lat/lon grids alive with it.
+    """
+    return data["lat"][::stride, 0].copy(), data["lon"][0, ::stride].copy()
 
 
 def find_latest_gfs_time(session: requests.Session | None = None) -> tuple[str, str]:
@@ -635,6 +588,7 @@ def write_metadata(
     nwps: dict | None = None,
     spot_forecasts: dict | None = None,
     hours: list[int] | None = None,
+    bundles: dict | None = None,
 ) -> str:
     metadata_path = os.path.join(files_dir, "metadata.json")
     metadata: dict[str, object] = {
@@ -652,6 +606,10 @@ def write_metadata(
         # map's timeline is built from this list, so a failed hour is
         # skipped instead of showing a hole (or a previous run's frame).
         metadata["hours"] = hours
+    if bundles:
+        # This run's bundle files by product ({"swell": "swell_<run>.bin",
+        # ...}); the web app reads only what is listed here.
+        metadata["bundles"] = bundles
     if heatmap_bounds is not None:
         # The web app pins the heatmap PNGs to these corner coordinates.
         metadata["heatmap_bounds"] = heatmap_bounds
@@ -661,8 +619,8 @@ def write_metadata(
             # forecast hours have a nwps_<grid>_<HHH>.png frame.
             metadata["nwps_layers"] = nwps["layers"]
         if nwps.get("points"):
-            # Beach point grids: which 3-hourly hours have a
-            # nwps_points_<wfo>_<grid>_<HHH>.geojson file.
+            # Beach point grids: one bundle per domain ("file") and the
+            # 3-hourly hours it holds.
             metadata["nwps_points"] = nwps["points"]
     if spot_forecasts:
         # Per-spot hourly series sampled at full grid resolution.
@@ -684,20 +642,26 @@ def _process_single_hour(
     simplify_tolerance: float | None = 0.02,
     arrow_stride: int = 10,
     spots: tuple[np.ndarray, np.ndarray] | None = None,
-) -> tuple[str, bool, dict | None, dict | None]:
+) -> tuple[str, bool, dict | None, dict | None, dict | None]:
     """Download and render one forecast hour; runs in a worker process.
 
-    Returns (file_index, succeeded, heatmap_bounds, spot_samples), where
-    spot_samples is the sample_spots() result for the (lats, lons) in
-    spots, or None. Never raises: hours are independent, so one bad hour
-    must not take down the pool.
+    Returns (file_index, succeeded, heatmap_bounds, spot_samples, layers),
+    where spot_samples is the sample_spots() result for the (lats, lons) in
+    spots, or None, and layers holds this hour's packed bundle chunks
+    ({"swell": ..., "wind": ..., "contours": ..., "axes": (lat, lon)}) for
+    the parent to assemble. Never raises: hours are independent, so one bad
+    hour must not take down the pool.
     """
+    # Free the previous hour's grids before allocating this hour's. They sit
+    # in reference cycles (matplotlib's contour objects), and an hour makes
+    # too few Python objects to trigger the collector on its own, so without
+    # this a worker's memory climbs by ~85 MB an hour for several hours.
+    gc.collect()
     base_url = (
         "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
         f"gfs.{date_str}/{run_hour}/wave/gridded"
     )
     file_index = f"{int(forecast_hour):03}"
-    geojson_path = os.path.join(files_dir, f"contours_{file_index}.geojson")
 
     # One file per global grid. A missing grid degrades the hour to partial
     # coverage rather than losing it; only both missing is a failure.
@@ -716,7 +680,7 @@ def _process_single_hour(
                 logger.info("File %s (%s) exists", file_index, grid)
             grid_paths[grid] = file_path
     if not grid_paths:
-        return file_index, False, None, None
+        return file_index, False, None, None, None
     if len(grid_paths) < len(GLOBAL_GRIDS):
         logger.warning(
             "File %s: only %s available; coverage will be partial",
@@ -732,18 +696,13 @@ def _process_single_hour(
         data = composite_swell(
             extracted.get(GLOBAL_GRIDS[0]), extracted.get(GLOBAL_GRIDS[1])
         )
-        calculate_contours4(
+        contours = calculate_contours4(
             data,
-            geojson_path,
             stride=stride,
             smoothing_sigma=smoothing_sigma,
             simplify_tolerance=simplify_tolerance,
             extra_properties={"forecast_hour": int(forecast_hour)},
         )
-        arrows_path = os.path.join(files_dir, f"arrows_{file_index}.geojson")
-        extract_swell_arrows(data, arrows_path, stride=arrow_stride)
-        partition_path = os.path.join(files_dir, f"swell_partitions_{file_index}.geojson")
-        extract_partition_arrows(data, partition_path, stride=arrow_stride)
         wind_extracted = {
             grid: extract_wind(path) for grid, path in grid_paths.items()
         }
@@ -751,13 +710,17 @@ def _process_single_hour(
             wind_extracted.get(GLOBAL_GRIDS[0]),
             wind_extracted.get(GLOBAL_GRIDS[1]),
         )
-        wind_path = os.path.join(files_dir, f"wind_{file_index}.geojson")
-        write_wind_arrows(wind_data, wind_path, stride=arrow_stride)
+        layers = {
+            "contours": {"geojson": pack_document(contours)},
+            "swell": pack_swell_partitions(data, stride=arrow_stride),
+            "wind": pack_wind(wind_data, stride=arrow_stride),
+            "axes": grid_axes(data, arrow_stride),
+        }
         heatmap_path = os.path.join(files_dir, f"heatmap_{file_index}.png")
         bounds = render_heatmap_png(data, heatmap_path)
     except Exception as exc:
         logger.error("Error processing file %s: %s", file_index, exc, exc_info=True)
-        return file_index, False, None, None
+        return file_index, False, None, None, None
 
     # Spot sampling is an add-on: a failure here loses this hour's spot
     # values, not the map layers already written.
@@ -767,7 +730,7 @@ def _process_single_hour(
             spot_samples = sample_spots(data, wind_data, *spots)
         except Exception as exc:
             logger.error("Spot sampling failed for %s: %s", file_index, exc, exc_info=True)
-    return file_index, True, bounds, spot_samples
+    return file_index, True, bounds, spot_samples, layers
 
 
 def _worker_init() -> None:
@@ -818,6 +781,9 @@ def process_forecast_hours(
     With spots (lats, lons), each hour's spot samples are collected into
     run_info["spot_samples"], keyed by position in hour_sequence. The
     forecast hours that succeeded go to run_info["hours"], ascending.
+    Workers hand back packed map layers, which are written here as one
+    bundle per product (write_layer_bundles); their file names go to
+    run_info["bundles"].
     """
     hours = list(hour_sequence)
     if workers is None:
@@ -843,13 +809,16 @@ def process_forecast_hours(
     failures = 0
     bounds_by_position: dict[int, dict] = {}
     spot_samples: dict[int, dict] = {}
+    layers_by_hour: dict[int, dict] = {}
     succeeded_positions: list[int] = []
 
     def tally(
-        result: tuple[str, bool, dict | None, dict | None], done: int, position: int
+        result: tuple[str, bool, dict | None, dict | None, dict | None],
+        done: int,
+        position: int,
     ) -> None:
         nonlocal successes, failures
-        file_index, succeeded, bounds, samples = result
+        file_index, succeeded, bounds, samples, layers = result
         if succeeded:
             successes += 1
             succeeded_positions.append(position)
@@ -857,6 +826,8 @@ def process_forecast_hours(
                 bounds_by_position[position] = bounds
             if samples is not None:
                 spot_samples[position] = samples
+            if layers is not None:
+                layers_by_hour[int(hours[position])] = layers
         else:
             failures += 1
         _print_progress(done, len(hours), f"f{file_index}")
@@ -882,11 +853,63 @@ def process_forecast_hours(
         run_info["spot_samples"] = spot_samples
     if run_info is not None:
         run_info["hours"] = [int(hours[p]) for p in sorted(succeeded_positions)]
+    if layers_by_hour:
+        bundles = write_layer_bundles(files_dir, layers_by_hour, f"{date_str}_{run_hour}Z")
+        if run_info is not None:
+            run_info["bundles"] = bundles
 
     _print_progress(
         len(hours), len(hours), f"done ({failures} failed)" if failures else "done"
     )
     return successes, failures
+
+
+def write_layer_bundles(files_dir: str, layers_by_hour: dict[int, dict], run: str) -> dict[str, str]:
+    """Write the swell, wind and contours bundles from the hours' chunks.
+
+    Returns their file names by product, for metadata.json.
+
+    The grid bundles take their lattice from the first hour; an hour on a
+    different lattice (which composite_* should never produce) is left out
+    of them rather than mislabeled.
+    """
+    hours = sorted(layers_by_hour)
+    lat, lon = layers_by_hour[hours[0]]["axes"]
+    same_lattice = {
+        hour: layers
+        for hour, layers in layers_by_hour.items()
+        if np.array_equal(layers["axes"][0], lat) and np.array_equal(layers["axes"][1], lon)
+    }
+    if len(same_lattice) < len(layers_by_hour):
+        logger.error(
+            "Hours %s are on a different lattice; left out of the grid bundles",
+            sorted(set(layers_by_hour) - set(same_lattice)),
+        )
+    names = {product: bundle_name(product, run) for product in ("swell", "wind", "contours")}
+    for key, variables in (("swell", SWELL_VARS), ("wind", WIND_VARS)):
+        name = names[key]
+        count = write_bundle(
+            os.path.join(files_dir, name),
+            kind="grid",
+            hours=hours,
+            variables=variables,
+            chunks={hour: layers[key] for hour, layers in same_lattice.items()},
+            lat=lat,
+            lon=lon,
+            run=run,
+            axis_decimals=2,
+        )
+        logger.info("Saved %s (%d hours)", name, count)
+    count = write_bundle(
+        os.path.join(files_dir, names["contours"]),
+        kind="geojson",
+        hours=hours,
+        variables=CONTOURS_VARS,
+        chunks={hour: layers["contours"] for hour, layers in layers_by_hour.items()},
+        run=run,
+    )
+    logger.info("Saved %s (%d hours)", names["contours"], count)
+    return names
 
 
 def _download_file(
@@ -1025,6 +1048,12 @@ def main() -> None:
             except Exception as exc:
                 logger.error("Writing spot tides failed: %s", exc, exc_info=True)
 
+        # Keep only this run's bundles and the previous run's: maps opened
+        # before this run still read theirs.
+        pruned = prune_bundles(files_dir, f"{date_str}_{hour}Z")
+        if pruned:
+            logger.info("Pruned bundles of older runs: %s", ", ".join(pruned))
+
         # Metadata is written last (and copied to the server last) so the
         # frontend never sees a run announced before its contours exist.
         write_metadata(
@@ -1037,6 +1066,7 @@ def main() -> None:
             nwps=nwps,
             spot_forecasts=spot_forecasts,
             hours=run_info.get("hours"),
+            bundles=run_info.get("bundles"),
         )
 
         total = successes + failures

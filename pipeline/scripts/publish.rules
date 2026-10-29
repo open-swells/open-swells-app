@@ -5,9 +5,12 @@
 # behind under the same name. Everything else in the destination is
 # excluded and therefore untouched: metadata.json (copied separately, last)
 # and any .gz siblings the web app generates there.
+# *.geojson(.gz) are the per-hour files of the format before the .bin
+# bundles; they stay listed so --delete clears them from the server.
 # Tide predictions are astronomical, so a run whose tide fetch failed keeps
 # the previous spot_tides file rather than deleting it (P: never delete).
 P spot_tides.json.gz
++ *.bin
 + *.geojson
 + *.geojson.gz
 + *.png

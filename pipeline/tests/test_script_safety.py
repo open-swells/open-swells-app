@@ -68,6 +68,18 @@ class CleanupPathSafetyTests(unittest.TestCase):
             self.assertNotIn("FILES_DIR must be a child", result.stderr)
             self.assertFalse(marker.exists())
 
+    def test_cleanup_keeps_run_stamped_bundles(self):
+        # The pipeline prunes them itself; the previous run's must survive.
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as directory:
+            kept = Path(directory) / "swell_20261028_06Z.bin"
+            dropped = [Path(directory) / n for n in ("swell.bin", "swell_20261028_06Z.bin.part", "metadata.json")]
+            for path in [kept, *dropped]:
+                path.write_text("x")
+            self.run_with_files_dir(directory, python_bin="/bin/false")
+            self.assertTrue(kept.exists())
+            for path in dropped:
+                self.assertFalse(path.exists(), path.name)
+
 
 if __name__ == "__main__":
     unittest.main()
