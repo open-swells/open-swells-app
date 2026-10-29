@@ -445,13 +445,13 @@
         <!-- End Header -->
 
             <!-- Forecast dialog -->
-            <div id="forecastModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px] flex items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-labelledby="forecastModalTitle">
+            <div id="forecastModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px] flex items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-label="Forecast">
                 <div id="forecastDialog" class="surface relative w-full max-w-[1180px] h-[88vh] max-h-[900px] flex flex-col overflow-hidden">
-                    <div class="h-12 px-4 border-b border-[#2f3137] flex items-center justify-between shrink-0">
-                        <div class="min-w-0"><div id="forecastModalTitle" class="text-sm font-semibold text-white truncate">Station report & forecast</div><div id="forecastStation" class="mono text-[10px] text-[#a6aab2]"></div></div>
-                        <button class="icon-button" onclick="closeForecast()" aria-label="Close forecast"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
-                    </div>
-                    <div id="forecastLoading" class="absolute inset-12 flex items-center justify-center text-xs text-[#a6aab2]">Loading forecast...</div>
+                    <!-- The page inside carries its own title and actions; the
+                         close button floats into the gap it leaves for it
+                         (body.embedded .station-shell in theme.css). -->
+                    <button id="forecastClose" class="page-header-action page-open-button absolute top-[14px] right-3 z-10" onclick="closeForecast()" aria-label="Close forecast" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
+                    <div id="forecastLoading" class="absolute inset-0 flex items-center justify-center text-xs text-[#a6aab2]">Loading forecast...</div>
                     <iframe id="forecastFrame" class="relative flex-1 w-full bg-[#0e0f12] opacity-0" title="Station report and forecast"></iframe>
                 </div>
             </div>
@@ -520,15 +520,14 @@
                     document.getElementById('signInBtn').click();
                 }
 
-                // One modal serves both station and beach pages; only the
-                // iframe URL and header text differ.
+                // One modal serves station, beach and spot pages; only the
+                // iframe URL and accessible name differ.
                 let activeForecastFavorite = null;
 
-                function openModalFrame(url, title, subtitle, favorite = null) {
+                function openModalFrame(url, title, favorite = null) {
                     const modal = document.getElementById('forecastModal');
                     const frame = document.getElementById('forecastFrame');
-                    document.getElementById('forecastModalTitle').textContent = title;
-                    document.getElementById('forecastStation').textContent = subtitle;
+                    modal.setAttribute('aria-label', title);
                     document.getElementById('forecastLoading').classList.remove('hidden');
                     frame.classList.add('opacity-0');
                     frame.onload = () => {
@@ -550,20 +549,20 @@
                 function openForecast(stationId, stationName = '') {
                     if (!stationId) return;
                     openModalFrame(`/forecast/${stationId}`,
-                        stationName || 'Station report & forecast', `BUOY ${stationId}`,
+                        stationName || `Buoy ${stationId}`,
                         { type: 'buoy', id: stationId });
                 }
 
                 function openBeach(zoneId, zoneName = '') {
                     if (!zoneId) return;
                     openModalFrame(`/beach/${encodeURIComponent(zoneId)}`,
-                        zoneName || 'Beach forecast', `SURF ZONE ${zoneId}`);
+                        zoneName || 'Beach forecast');
                 }
 
-                function openSpot(spotId, spotName = '', region = '') {
+                function openSpot(spotId, spotName = '') {
                     if (!spotId) return;
                     openModalFrame(`/surf-spots/${encodeURIComponent(spotId)}`,
-                        spotName || 'Spot forecast', region ? region.toUpperCase() : 'SURF SPOT',
+                        spotName || 'Spot forecast',
                         { type: 'spot', id: spotId });
                 }
 
@@ -2271,8 +2270,8 @@
                     <div class="buoy-popup-name">${esc(p.name)}</div>
                     <div class="buoy-popup-meta"><span class="search-badge search-badge-beach">Beach</span><span class="buoy-popup-id">${esc(p.region || 'SURF SPOT')}</span></div>
                     <div class="buoy-popup-actions">
-                        <button class="toolbar-button" data-spot="${esc(p.id)}" data-name="${esc(p.name)}" data-region="${esc(p.region || '')}"
-                            onclick="openSpot(this.dataset.spot, this.dataset.name, this.dataset.region)">Report &amp; forecast</button>
+                        <button class="toolbar-button" data-spot="${esc(p.id)}" data-name="${esc(p.name)}"
+                            onclick="openSpot(this.dataset.spot, this.dataset.name)">Report &amp; forecast</button>
                         <button class="favorite-btn" data-spot-id="${esc(p.id)}"
                             onclick="toggleSpotFavorite(this.dataset.spotId)"></button>
                     </div>
