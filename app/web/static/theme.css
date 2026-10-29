@@ -190,8 +190,9 @@ a { color: inherit; text-decoration: none; }
 .station-action:hover { background: var(--hover); color: #fff; }
 
 .page-header-action {
-    width: 32px; height: 32px;
+    min-height: 36px; padding: 0 10px; gap: 7px;
     display: inline-flex; flex: none; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 500; white-space: nowrap;
     background: var(--raised);
     cursor: pointer;
 }
@@ -199,16 +200,32 @@ a { color: inherit; text-decoration: none; }
 .page-open-button:hover { background: var(--hover); color: #fff; }
 .page-open-button svg { width: 15px; height: 15px; }
 .page-favorite-button {
+    width: 36px; padding: 0;
     border: 1px solid #47725a; background: var(--raised); color: var(--positive);
-    font-size: 18px; line-height: 1; cursor: pointer;
+    cursor: pointer;
 }
 .page-favorite-button:hover { background: var(--hover); }
-.page-favorite-button.is-favorite { color: var(--negative); border-color: #5b343a; background: #281f22; }
+.page-favorite-button.is-favorite { color: var(--positive); border-color: #47725a; background: #192a22; }
+.page-favorite-button::before, .favorite-btn::before { content: '☆'; font-size: 17px; line-height: 1; }
+.page-favorite-button.is-favorite::before, .favorite-btn.is-favorite::before { content: '★'; }
+.page-header-action:focus-visible, .favorite-btn:focus-visible, .buoy-popup-actions .toolbar-button:focus-visible,
+.maplibregl-popup-close-button:focus-visible {
+    outline: 2px solid var(--accent-bright); outline-offset: 3px;
+}
+.station-header-actions { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap; }
 
 body.embedded .standalone-only { display: none !important; }
-/* Inside the map's forecast dialog: fill the frame and leave room on the
-   right for the dialog's floating close button (32px + 8px gap + 12px). */
-body.embedded .station-shell { max-width: none; padding-top: 14px; padding-right: 52px; }
+/* Keep popup content evenly padded; the close button lives in the header. */
+body.embedded .station-shell { max-width: none; padding-top: 14px; }
+.close-button, .close-button:hover {
+    width: 36px; min-height: 36px; padding: 0; border: 0;
+    background: transparent; color: var(--text-2); box-shadow: none;
+}
+.close-button:hover { color: #fff; }
+.close-button svg { width: 18px; height: 18px; }
+.close-button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
+.page-close-button { display: none; }
+body.embedded .page-close-button { display: inline-flex; }
 
 /* --- "Now" report ----------------------------------------------------- */
 /* The rating (or observed) headline and height over the swell trains, wind,
@@ -244,6 +261,10 @@ body.embedded .station-shell { max-width: none; padding-top: 14px; padding-right
 
 @media (max-width: 767px) {
     .station-shell { padding: 12px 12px 32px; }
+    .station-header { flex-wrap: wrap; padding-bottom: 12px; }
+    .station-header-actions { width: 100%; }
+    .page-header-action { padding-inline: 8px; font-size: 11px; }
+    .station-header-actions .page-close-button { margin-left: auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

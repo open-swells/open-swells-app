@@ -77,20 +77,22 @@
            Tailwind utility classes so the buttons hold their size and
            layout everywhere, including mobile. */
         .buoy-popup { width: min(230px, calc(100vw - 56px)); }
-        .buoy-popup-name { margin: 0 28px 4px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
+        .buoy-popup-name { margin: 0 32px 8px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
         .buoy-popup-id { margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #a6aab2; }
         .buoy-popup-meta { margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
         .buoy-popup-meta .buoy-popup-id { margin-bottom: 0; }
-        .buoy-popup-actions { display: flex; gap: 6px; }
-        .buoy-popup-actions .toolbar-button { height: 40px; flex: 1; justify-content: center; }
+        .buoy-popup-actions { display: flex; gap: 8px; }
+        .buoy-popup-actions .toolbar-button { min-height: 40px; flex: 1; justify-content: center; border-color: #47725a; background: #192a22; color: #b5f0cc; }
+        .buoy-popup-actions .toolbar-button::after { content: '→'; }
+        .buoy-popup-actions .toolbar-button:hover { background: #243d30; }
         .favorite-btn {
-            width: 40px; height: 40px; flex: none;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px; font-weight: 600; line-height: 1;
-            border: 1px solid #43454c; background: #1f2026; color: #6fcf97;
+            width: 40px; min-height: 40px; flex: none;
+            display: flex; gap: 7px; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 500; cursor: pointer;
+            border: 1px solid #43454c; background: #1f2026; color: #edeef1;
         }
-        .favorite-btn:hover { background: #2f3137; }
-        .favorite-btn.is-favorite { color: #e06c75; }
+        .favorite-btn:hover { background: #2f3137; border-color: #55575e; }
+        .favorite-btn.is-favorite { color: #6fcf97; border-color: #47725a; background: #192a22; }
         /* Search result kind badges: buoy green-blue, beach (surf spot) sand */
         .search-badge {
             font-size: 9px; font-weight: 600; text-transform: uppercase;
@@ -131,13 +133,14 @@
         .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #43454c !important; }
         .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #43454c !important; }
         .maplibregl-popup-close-button {
-            top: 2px; right: 2px;
-            width: 34px; height: 34px;
+            top: 6px; right: 6px;
+            width: 32px; min-height: 32px; padding: 0;
             display: flex; align-items: center; justify-content: center;
-            color: #a6aab2; font-size: 20px; line-height: 1;
+            color: #a6aab2; font-size: 24px; line-height: 1;
+            border: 0; background: transparent;
             border-radius: 0;
         }
-        .maplibregl-popup-close-button:hover { color: #fff; background: #292a30; }
+        .maplibregl-popup-close-button:hover { color: #fff; background: transparent; }
         input[type="range"] { accent-color: #2563eb; }
         /* iOS Safari auto-zooms the page when a focused input's font-size
            is under 16px; keep the search at 16px on touch devices so
@@ -407,7 +410,7 @@
                     <div class="signinmodal surface relative w-[300px]">
                         <div class="h-11 px-4 border-b border-[#2f3137] flex items-center justify-between">
                             <span class="text-sm font-semibold text-white">Sign in</span>
-                            <button id="closeModal" class="icon-button" aria-label="Close">
+                            <button id="closeModal" class="icon-button close-button" aria-label="Close">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -431,7 +434,7 @@
                             <p id="userName" class="text-[13px] font-medium text-white truncate"></p>
                             <p id="userEmail" class="text-[11px] text-[#a6aab2] truncate"></p>
                         </div>
-                        <button id="closeUserPopup" class="icon-button !w-6 !h-6 shrink-0" aria-label="Close">
+                        <button id="closeUserPopup" class="icon-button close-button !w-6 !h-6 shrink-0" aria-label="Close">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg>
                         </button>
                     </div>
@@ -447,10 +450,9 @@
             <!-- Forecast dialog -->
             <div id="forecastModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px] flex items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-label="Forecast">
                 <div id="forecastDialog" class="surface relative w-full max-w-[1180px] h-[88vh] max-h-[900px] flex flex-col overflow-hidden">
-                    <!-- The page inside carries its own title and actions; the
-                         close button floats into the gap it leaves for it
-                         (body.embedded .station-shell in theme.css). -->
-                    <button id="forecastClose" class="page-header-action page-open-button absolute top-[14px] right-3 z-10" onclick="closeForecast()" aria-label="Close forecast" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
+                    <!-- Fallback close button while the page is loading. Once
+                         loaded, its own header includes the close action. -->
+                    <button id="forecastClose" class="page-header-action page-open-button close-button absolute top-[14px] right-3 z-10" onclick="closeForecast()" aria-label="Close forecast" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
                     <div id="forecastLoading" class="absolute inset-0 flex items-center justify-center text-xs text-[#a6aab2]">Loading forecast...</div>
                     <iframe id="forecastFrame" class="relative flex-1 w-full bg-[#0e0f12] opacity-0" title="Station report and forecast"></iframe>
                 </div>
@@ -530,9 +532,12 @@
                     modal.setAttribute('aria-label', title);
                     document.getElementById('forecastLoading').classList.remove('hidden');
                     frame.classList.add('opacity-0');
+                    const closeButton = document.getElementById('forecastClose');
+                    closeButton.style.display = '';
                     frame.onload = () => {
                         document.getElementById('forecastLoading').classList.add('hidden');
                         frame.classList.remove('opacity-0');
+                        closeButton.style.display = frame.contentDocument?.querySelector('.page-close-button') ? 'none' : '';
                         bindForecastPageFavorite();
                         // once the page inside has focus, key presses go to
                         // the iframe's document, not this one -- listen there
@@ -581,7 +586,8 @@
                     const isFavorite = activeForecastFavorite.type === 'spot'
                         ? userSpots.includes(activeForecastFavorite.id)
                         : userBuoys.includes(activeForecastFavorite.id);
-                    button.textContent = isFavorite ? '−' : '+';
+                    button.textContent = '';
+                    button.setAttribute('aria-pressed', String(isFavorite));
                     button.classList.toggle('is-favorite', isFavorite);
                     button.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
                     button.setAttribute('aria-label', button.title);
@@ -1683,8 +1689,10 @@
                 const isFavorite = button.dataset.spotId
                     ? userSpots.includes(button.dataset.spotId)
                     : userBuoys.includes(button.dataset.stationId);
-                button.textContent = isFavorite ? '−' : '+';
+                button.textContent = '';
+                button.setAttribute('aria-pressed', String(isFavorite));
                 button.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+                button.setAttribute('aria-label', button.title);
                 button.classList.toggle('is-favorite', isFavorite);
             }
 
@@ -1712,14 +1720,13 @@
                         <button
                             onclick="openForecast('${buoy.stationId}')"
                             class="toolbar-button">
-                            Report & forecast
+                            View forecast
                         </button>
                         <button
                             id="fav-${buoy.stationId}"
                             onclick="toggleFavorite('${buoy.stationId}')"
                             data-station-id="${buoy.stationId}"
-                            class="favorite-btn">
-                        </button>
+                            class="favorite-btn" aria-label="Add to favorites" aria-pressed="false" title="Add to favorites"></button>
                     </div>
                 </div>`;
             }
@@ -2271,9 +2278,9 @@
                     <div class="buoy-popup-meta"><span class="search-badge search-badge-beach">Beach</span><span class="buoy-popup-id">${esc(p.region || 'SURF SPOT')}</span></div>
                     <div class="buoy-popup-actions">
                         <button class="toolbar-button" data-spot="${esc(p.id)}" data-name="${esc(p.name)}"
-                            onclick="openSpot(this.dataset.spot, this.dataset.name)">Report &amp; forecast</button>
+                            onclick="openSpot(this.dataset.spot, this.dataset.name)">View forecast</button>
                         <button class="favorite-btn" data-spot-id="${esc(p.id)}"
-                            onclick="toggleSpotFavorite(this.dataset.spotId)"></button>
+                            onclick="toggleSpotFavorite(this.dataset.spotId)" aria-label="Add to favorites" aria-pressed="false" title="Add to favorites"></button>
                     </div>
                 </div>`;
             }
