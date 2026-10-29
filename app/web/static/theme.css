@@ -206,7 +206,9 @@ a { color: inherit; text-decoration: none; }
 .page-favorite-button.is-favorite { color: var(--negative); border-color: #5b343a; background: #281f22; }
 
 body.embedded .standalone-only { display: none !important; }
-body.embedded .station-shell { padding-top: 14px; }
+/* Inside the map's forecast dialog: fill the frame and leave room on the
+   right for the dialog's floating close button (32px + 8px gap + 12px). */
+body.embedded .station-shell { max-width: none; padding-top: 14px; padding-right: 52px; }
 
 /* --- "Now" report ----------------------------------------------------- */
 /* The rating (or observed) headline and height over the swell trains, wind,
