@@ -267,6 +267,25 @@ body.embedded .page-close-button { display: inline-flex; }
     .station-header-actions .page-close-button { margin-left: auto; }
 }
 
+/* Spot actions stay beside the heading, including in map popups. */
+.spot-header { position: relative; padding-bottom: 12px; }
+.spot-heading { flex: 1; }
+.spot-info-button { display: none; }
+@media (max-width: 767px) {
+    .spot-header { flex-wrap: nowrap; gap: 12px; }
+    .spot-header .station-header-actions { width: auto; flex-wrap: nowrap; gap: 6px; }
+    .spot-header .page-close-button { margin-left: 0; }
+    .spot-header .popup-only span { display: none; }
+    .spot-info-button { display: inline-flex; width: 36px; padding: 0; font-family: Georgia, serif; font-size: 18px; font-weight: 600; }
+    .spot-information { display: none; }
+    .spot-header.show-information .spot-information {
+        display: block; position: absolute; top: calc(100% + 6px); right: 0; left: 0;
+        z-index: 40; padding: 12px 14px; background: var(--panel);
+        border: 1px solid var(--line-strong); box-shadow: 0 8px 24px #0006;
+    }
+    .spot-information .station-meta { line-height: 1.7; overflow-wrap: anywhere; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: .001ms !important;
