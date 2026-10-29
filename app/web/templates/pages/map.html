@@ -1366,6 +1366,9 @@
                 updateMap(currentIndex);
             });
 
+            // Missing flag preserves compatibility with older pipeline metadata.
+            let tideStationsAvailable = true;
+
             // Fetch metadata and initialize time display
             async function fetchMetadata() {
                 try {
@@ -1374,6 +1377,7 @@
                         throw new Error('Failed to fetch metadata');
                     }
                     const metadata = await response.json();
+                    tideStationsAvailable = metadata.tide_stations !== false;
                     const timestamp = new Date(metadata.timestamp);
                     
                     const [datePart, timePart] = metadata.forecast_start.split('_');
@@ -2052,6 +2056,10 @@
             async function loadTideStations() {
                 try {
                     await metadataReady;
+                    // New runs explicitly advertise whether the optional
+                    // station file exists. Missing metadata keeps legacy
+                    // runs compatible; false avoids an expected 404.
+                    if (!tideStationsAvailable) return;
                     const response = await fetch(runUrl('/static/tides.json'));
                     if (!response.ok) return; // older pipeline run: no tides
                     const payload = await response.json();

@@ -635,6 +635,7 @@ def write_metadata(
     nwps: dict | None = None,
     spot_forecasts: dict | None = None,
     hours: list[int] | None = None,
+    tide_stations: bool | None = None,
 ) -> str:
     metadata_path = os.path.join(files_dir, "metadata.json")
     metadata: dict[str, object] = {
@@ -667,6 +668,10 @@ def write_metadata(
     if spot_forecasts:
         # Per-spot hourly series sampled at full grid resolution.
         metadata["spot_forecasts"] = spot_forecasts
+    if tide_stations is not None:
+        # Explicitly advertise the optional map tide layer. Older metadata
+        # lacks this field, so the frontend retains its legacy behavior.
+        metadata["tide_stations"] = tide_stations
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
     logger.info("Saved metadata to %s", metadata_path)
@@ -999,8 +1004,10 @@ def main() -> None:
             if station.strip()
         ]
         tide_path = os.path.join(files_dir, "tides.json")
+        has_tide_stations = False
         if tide_stations:
-            write_tides(session, tide_stations, tide_path)
+            station_count, _ = write_tides(session, tide_stations, tide_path)
+            has_tide_stations = station_count > 0
         else:
             logger.info("TIDE_STATIONS is empty; skipping NOAA CO-OPS tide data")
             # Do not republish a file from an older configuration/run.
@@ -1037,6 +1044,7 @@ def main() -> None:
             nwps=nwps,
             spot_forecasts=spot_forecasts,
             hours=run_info.get("hours"),
+            tide_stations=has_tide_stations,
         )
 
         total = successes + failures
