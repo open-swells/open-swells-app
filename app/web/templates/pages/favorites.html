@@ -9,7 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{themecss}}">
     <style>
-        .button { height: 34px; padding: 0 12px; }
+        .button { height: 36px; padding: 0 10px; }
         .view-switch { width: 162px; height: 36px; padding: 4px; }
         .view-switch a { width: 76px; height: 28px; flex: none; transition: background 120ms ease, color 120ms ease; }
         .view-switch-active { background: var(--accent); color: #fff; }
@@ -18,9 +18,6 @@
         #favoritesGrid { display: block; }
         .search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; min-height: 64px; border-bottom: 1px solid #2f3137; }
         .search-row:last-child { border-bottom: 0; }
-        .add-button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #565961; background: #1f2026; color: #fff; font-size: 19px; line-height: 1; }
-        .add-button:hover { background: #2f3137; }
-        .add-button.is-added { color: #6fcf97; border-color: #406b53; cursor: default; }
         .location-badge { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid currentColor; font-size: 9px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
         .location-badge-buoy { color: #60a5fa; }
         .location-badge-beach { color: #f4a967; }
@@ -37,9 +34,9 @@
         #filterBeaches[aria-pressed="true"] { z-index: 2; color: #ffc38f; border-color: #f4a967; background: #34271d; }
         .mobile-favorites-filter { display: none; position: relative; }
         .mobile-filter-trigger {
-            width: 34px; height: 34px; position: relative;
+            width: 36px; height: 36px; position: relative;
             display: inline-flex; align-items: center; justify-content: center;
-            border: 1px solid #43454c; background: #1f2026; color: #b7bac1;
+            border: 1px solid var(--line-strong); background: var(--raised); color: var(--text-1);
         }
         .mobile-filter-trigger:hover, .mobile-filter-trigger[aria-expanded="true"], .mobile-filter-trigger.has-filters {
             color: #fff; border-color: #565961; background: #292a30;
@@ -206,7 +203,7 @@
         <div class="surface w-full max-w-2xl max-h-[76vh] flex flex-col shadow-2xl">
             <div class="h-12 px-4 border-b border-[#2f3137] flex items-center justify-between shrink-0">
                 <div><h2 id="searchTitle" class="text-sm font-semibold text-white">Add location</h2><p class="text-[10px] text-[#a6aab2]">Buoys and surf spots</p></div>
-                <button class="icon-button" onclick="closeLocationSearch()" aria-label="Close search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
+                <button class="icon-button close-button" onclick="closeLocationSearch()" aria-label="Close search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
             </div>
             <label class="h-12 flex items-center border-b border-[#2f3137] focus-within:bg-[#1f2026] shrink-0">
                 <svg class="ml-4 shrink-0 text-[#a6aab2]" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -225,7 +222,7 @@
         <div class="surface w-full max-w-[320px]">
             <div class="h-11 px-4 border-b border-[#2f3137] flex items-center justify-between">
                 <h2 id="signInTitle" class="text-sm font-semibold text-white">Sign in</h2>
-                <button class="icon-button" onclick="closeSignIn()" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
+                <button class="icon-button close-button" onclick="closeSignIn()" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
             </div>
             <div class="p-4">
                 <button onclick="googleSignIn()" class="button w-full">Sign in with Google</button>
@@ -309,7 +306,7 @@
                         <div class="flex items-center gap-2"><span class="location-badge ${item.type === 'buoy' ? 'location-badge-buoy' : 'location-badge-beach'}">${kind}</span><span class="mono text-[10px] text-[#8b9099] truncate">${escapeHTML(item.meta)}</span></div>
                         <div class="mt-1 text-[13px] font-medium text-[#edeef1] group-hover:text-white truncate">${escapeHTML(item.name)}</div>
                     </a>
-                    <button class="add-button ${added ? 'is-added' : ''}" ${added ? 'disabled' : ''} data-add-type="${item.type}" data-add-id="${escapeHTML(item.id)}" aria-label="${added ? 'Already in favorites' : `Add ${escapeHTML(item.name)} to favorites`}">${added ? '✓' : '+'}</button>
+                    <button class="page-header-action page-favorite-button ${added ? 'is-favorite' : ''}" ${added ? 'disabled' : ''} data-add-type="${item.type}" data-add-id="${escapeHTML(item.id)}" title="${added ? 'Already in favorites' : 'Add to favorites'}" aria-label="${added ? 'Already in favorites' : `Add ${escapeHTML(item.name)} to favorites`}"></button>
                 </div>`;
             }).join('');
         }

@@ -2,9 +2,10 @@ package main
 
 // Surf spots: ~6k named breaks loaded from data/spots.json. Unlike buoys they
 // have no station bulletin, so a spot's forecast is sampled from the
-// swell_partitions_XXX.geojson grids the pipeline writes into the static
-// dir — nearest wet grid point per forecast hour, interpolated to hourly
-// rows so the buoy forecast template renders them unchanged.
+// pipeline's per-spot series, falling back to the coarse swell bundle the
+// pipeline writes into the static dir — nearest wet grid point per forecast
+// hour, interpolated to hourly rows so the buoy forecast template renders
+// them unchanged.
 //
 // The spot list is static per deploy, so /api/spots serves bytes marshaled
 // (and gzipped) once at startup.
@@ -15,6 +16,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -26,16 +28,19 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zsefvlol/timezonemapper"
 )
 
 var spotStore *SpotStore
 
 type Spot struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Lat    float64 `json:"lat"`
-	Lon    float64 `json:"lon"`
-	Region string  `json:"region,omitempty"`
+	// Optional IANA override for small islands the coordinate lookup misses.
+	TimeZone string  `json:"timezone,omitempty"`
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Lat      float64 `json:"lat"`
+	Lon      float64 `json:"lon"`
+	Region   string  `json:"region,omitempty"`
 	// Optional hand-tuned point to sample the wave grid at, for spots
 	// where the nearest grid cell to the beach itself picks badly
 	// (deep bays, island shadows).
@@ -358,8 +363,54 @@ func nearestSwell(points []swellPoint, lat, lon float64) (swellPoint, bool) {
 	return best, bestDist <= 9
 }
 
+// swellNearest is the coarse swell grid's nearest wet cell within ~3 deg of
+// (lat, lon) at a forecast hour; the error means the run has no such hour.
+// Runs from before the bundles fall back to per-hour GeoJSON.
+func swellNearest(staticDir string, hour int, lat, lon float64) (swellPoint, bool, error) {
+	path := runBundlePath(staticDir, "swell")
+	if path == "" {
+		points, err := swellGridPoints(filepath.Join(staticDir, fmt.Sprintf("swell_partitions_%03d.geojson", hour)))
+		if err != nil {
+			return swellPoint{}, false, err
+		}
+		p, ok := nearestSwell(points, lat, lon)
+		return p, ok, nil
+	}
+	b, err := loadGridBundle(path)
+	if err != nil {
+		return swellPoint{}, false, err
+	}
+	f, err := b.frame(hour)
+	if err != nil {
+		return swellPoint{}, false, err
+	}
+	var vars [3][3]int
+	for i := range vars {
+		n := strconv.Itoa(i + 1)
+		vars[i] = [3]int{b.varIndex("h" + n), b.varIndex("p" + n), b.varIndex("d" + n)}
+	}
+	for _, c := range b.nearbyCells(lat, lon, 9) {
+		pt := swellPoint{Lat: c.Lat, Lon: c.Lon}
+		found := false
+		for i, v := range vars {
+			h, okH := f.value(v[0], c.Index)
+			p, okP := f.value(v[1], c.Index)
+			d, okD := f.value(v[2], c.Index)
+			if okH && okP && okD {
+				pt.H[i], pt.P[i], pt.D[i] = h, p, d
+				pt.Has[i] = true
+				found = true
+			}
+		}
+		if found {
+			return pt, true, nil
+		}
+	}
+	return swellPoint{}, false, nil
+}
+
 // --- NWPS nearshore point sampling ----------------------------------------
-// NWPS CG1 point grids (nwps_points_<wfo>_<grid>_<HHH>.geojson) carry the
+// NWPS CG1 point grids (nwps_points_<wfo>_<grid>_<run>.bin) carry the
 // combined sea state (h/p/d) at ~2-4 km spacing out to 144 h. Where a spot
 // falls inside a domain, that combined value becomes the forecast's
 // headline number and the global partitions stay as the breakdown.
@@ -450,10 +501,44 @@ func nearestNwps(points []nwpsPoint, lat, lon float64) (nwpsPoint, float64, bool
 	return best, bestDist, bestDist <= 0.01
 }
 
+// nwpsNearest is a domain's nearest wet cell within ~0.1 deg at an hour,
+// with its squared-degree distance. Fields missing at that cell read 0, as
+// they did in the GeoJSON points.
+func nwpsNearest(staticDir string, d nwpsDomain, hour int, lat, lon float64) (nwpsPoint, float64, bool) {
+	if d.File == "" { // a run from before the bundles
+		points, err := nwpsGridPoints(filepath.Join(staticDir, fmt.Sprintf("nwps_points_%s_%s_%03d.geojson", d.WFO, d.Grid, hour)))
+		if err != nil {
+			return nwpsPoint{}, 0, false
+		}
+		return nearestNwps(points, lat, lon)
+	}
+	b, err := loadGridBundle(filepath.Join(staticDir, d.File))
+	if err != nil {
+		return nwpsPoint{}, 0, false
+	}
+	f, err := b.frame(hour)
+	if err != nil {
+		return nwpsPoint{}, 0, false
+	}
+	vh, vs, vp, vd := b.varIndex("h"), b.varIndex("s"), b.varIndex("p"), b.varIndex("d")
+	for _, c := range b.nearbyCells(lat, lon, 0.01) {
+		h, ok := f.value(vh, c.Index)
+		if !ok {
+			continue
+		}
+		s, _ := f.value(vs, c.Index)
+		p, _ := f.value(vp, c.Index)
+		dir, _ := f.value(vd, c.Index)
+		return nwpsPoint{Lon: c.Lon, Lat: c.Lat, H: h, S: s, P: p, D: dir}, c.Dist, true
+	}
+	return nwpsPoint{}, 0, false
+}
+
 type nwpsDomain struct {
 	WFO   string `json:"wfo"`
 	Grid  string `json:"grid"`
 	Hours []int  `json:"hours"`
+	File  string `json:"file"` // the domain's bundle; "" before the bundles
 }
 
 // nwpsPointDomains reads the nwps_points index from the run's metadata.
@@ -487,12 +572,7 @@ func nwpsSample(staticDir string, domains []nwpsDomain, hour int, lat, lon float
 		if !covered {
 			continue
 		}
-		path := filepath.Join(staticDir, fmt.Sprintf("nwps_points_%s_%s_%03d.geojson", d.WFO, d.Grid, hour))
-		points, err := nwpsGridPoints(path)
-		if err != nil {
-			continue
-		}
-		if p, dist, ok := nearestNwps(points, lat, lon); ok && dist < bestDist {
+		if p, dist, ok := nwpsNearest(staticDir, d, hour, lat, lon); ok && dist < bestDist {
 			pCopy := p
 			best, bestDist = &pCopy, dist
 		}
@@ -719,7 +799,7 @@ func buildSpotForecast(start time.Time, samples []spotSample) (ForecastData, []h
 }
 
 // gridSpotForecast is the coarse fallback: the nearest point of every
-// 3-hourly ~1.67 deg swell_partitions grid.
+// 3-hourly ~1.67 deg swell grid.
 // Only the leading gap-free run of hours is used: rows after a missing
 // file would land on the wrong timeline slot.
 func gridSpotForecast(staticDir string, lat, lon float64) (ForecastData, []hourSwells) {
@@ -731,12 +811,10 @@ func gridSpotForecast(staticDir string, lat, lon float64) (ForecastData, []hourS
 	nwpsDomains := nwpsPointDomains(staticDir)
 	var samples []spotSample
 	for hour := 0; hour <= windMaxHour; hour += 3 {
-		path := filepath.Join(staticDir, fmt.Sprintf("swell_partitions_%03d.geojson", hour))
-		points, err := swellGridPoints(path)
+		p, ok, err := swellNearest(staticDir, hour, lat, lon)
 		if err != nil {
 			break // hour not generated — end of this run's horizon
 		}
-		p, ok := nearestSwell(points, lat, lon)
 		if !ok {
 			if len(samples) == 0 {
 				return ForecastData{}, nil // no wave grid near this spot at all
@@ -788,12 +866,8 @@ func spotFacing(staticDir string, spot Spot) (float64, bool) {
 			return deg, true
 		}
 	}
-	points, err := swellGridPoints(filepath.Join(staticDir, "swell_partitions_000.geojson"))
-	if err != nil {
-		return 0, false
-	}
-	p, ok := nearestSwell(points, spot.Lat, spot.Lon)
-	if !ok {
+	p, ok, err := swellNearest(staticDir, 0, spot.Lat, spot.Lon)
+	if err != nil || !ok {
 		return 0, false
 	}
 	return bearingToCell(spot, p.Lat, p.Lon)
@@ -1012,7 +1086,27 @@ func conditionNear(conds []HourlyCondition, unixMs int64) (HourlyCondition, bool
 	return HourlyCondition{}, false
 }
 
+// spotLocation uses the beach coordinates, rather than the offshore model point.
+func spotLocation(spot Spot) *time.Location {
+	name := spot.TimeZone
+	if name != "" {
+		if loc, err := time.LoadLocation(name); err == nil {
+			return loc
+		}
+		log.Printf("spot %q has invalid timezone override %q; using coordinate lookup", spot.ID, name)
+	}
+	name = timezonemapper.LatLngToTimezoneString(spot.Lat, spot.Lon)
+	if name != "" {
+		if loc, err := time.LoadLocation(name); err == nil {
+			return loc
+		}
+	}
+	log.Printf("spot %q timezone lookup failed at %.6f, %.6f (zone %q); using UTC", spot.ID, spot.Lat, spot.Lon, name)
+	return time.UTC
+}
+
 type SpotPageData struct {
+	TimeZone        string
 	SEO             SEOPage
 	ForecastData    ForecastData
 	SwellReport     SwellReport // StationId feeds the template's wind fetch
@@ -1078,14 +1172,14 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 	if c, ok := conditionNear(conditions, report.ValidUnixMs); ok && hasReport {
 		report.Surf = c.Surf
 	}
-	// The page doesn't know the viewer's zone; the browser re-rates the
-	// current day by local time (see spotreport and forecast).
+	// Summaries and browser charts share the beach's local calendar days.
+	loc := spotLocation(spot)
 	var runStartMs int64
 	if start, ok := forecastRunStart(forecastData); ok {
 		runStartMs = start.UnixMilli()
 	}
-	summary := generateForecastSummary(forecastData, time.UTC)
-	applyConditionSummary(summary, conditionsFromRun(conditions, forecastData), time.UTC)
+	summary := generateForecastSummary(forecastData, loc)
+	applyConditionSummary(summary, conditionsFromRun(conditions, forecastData), loc)
 	b := spotBeach(staticDir, spot)
 	facing := ""
 	if b.HasFacing {
@@ -1104,6 +1198,7 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 	}
 	seo := spotSEOPage(siteURL, spotStore, spot)
 	return SpotPageData{
+		TimeZone:        loc.String(),
 		SEO:             seo,
 		ForecastData:    forecastData,
 		SwellReport:     SwellReport{StationId: spot.ID},

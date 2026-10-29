@@ -12,7 +12,8 @@
         let saved = false;
 
         function render() {
-            button.textContent = saved ? '−' : '+';
+            button.textContent = '';
+            button.setAttribute('aria-pressed', String(saved));
             button.classList.toggle('is-favorite', saved);
             button.title = saved ? 'Remove from favorites' : 'Add to favorites';
             button.setAttribute('aria-label', button.title);

@@ -12,15 +12,13 @@
     .favorite-name { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: #fff; }
     .offline-flag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--warn); white-space: nowrap; }
     .location-meta { margin-top: 4px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
-    .favorite-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-    .link-button { height: 30px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--text-1); background: var(--raised); border: 1px solid var(--line-strong); cursor: pointer; }
-    .link-button:hover { color: #fff; background: var(--line); border-color: var(--line); }
-    .open-button { color: #fff; background: var(--accent); border-color: var(--accent-hover); box-shadow: 0 3px 10px rgba(29, 78, 216, .28); }
-    .open-button:hover { background: var(--accent-hover); border-color: var(--swell); }
-    .full-forecast-link { width: 30px; padding: 0; }
+    .favorite-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .link-button { min-height: 36px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; font-weight: 500; color: var(--text-1); background: var(--raised); border: 1px solid var(--line-strong); cursor: pointer; }
+    .link-button:hover { color: #fff; background: var(--hover); }
+    .link-button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
+    .full-forecast-link { width: 36px; padding: 0; }
     .action-icon { width: 13px; height: 13px; flex: none; }
-    .remove-button { width: 30px; height: 30px; display: grid; place-items: center; color: var(--negative); background: #281f22; border: 1px solid #553137; font-size: 18px; line-height: 1; cursor: pointer; }
-    .remove-button:hover { color: #ff9299; background: #382429; border-color: #8f4952; }
+    .remove-button { width: 36px; min-height: 36px; }
     .stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
     .hour-block { margin-top: 16px; }
     .hour-strip { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 38px; align-items: end; border-bottom: 1px solid var(--line); }
@@ -135,7 +133,7 @@
                         <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
                     </a>
                     {{end}}
-                    <button onclick="toggleFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">−</button>
+                    <button onclick="toggleFavorite('{{.ID}}')" class="page-header-action page-favorite-button is-favorite remove-button" aria-pressed="true" title="Remove from favorites" aria-label="Remove {{.Name}} from favorites"></button>
                 </div>
             </div>
             <section class="favorite-report" aria-label="Current conditions">{{template "buoynow" (buoyreport .SwellReport .WindReport)}}</section>
@@ -180,7 +178,7 @@
                         <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
                     </a>
                     {{end}}
-                    <button onclick="toggleSpotFavorite('{{.ID}}')" class="remove-button" title="Remove favorite" aria-label="Remove {{.Name}} from favorites">−</button>
+                    <button onclick="toggleSpotFavorite('{{.ID}}')" class="page-header-action page-favorite-button is-favorite remove-button" aria-pressed="true" title="Remove from favorites" aria-label="Remove {{.Name}} from favorites"></button>
                 </div>
             </div>
             {{/* the spot page's "now" report: rating and surf height, then

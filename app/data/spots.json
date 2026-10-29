@@ -6398,6 +6398,7 @@
     "lon": 73.3793592453,
     "region": "Australia, TAS, Hobart, Heard Island and McDonald Islands",
     "id": "satans-shank",
+    "timezone": "Indian/Kerguelen",
     "facing": 282,
     "open_water": [[322, 350]]
   },
@@ -10489,6 +10490,7 @@
     "lon": -32.400580644608,
     "region": "Brazil, Fernando do Noronha",
     "id": "abras",
+    "timezone": "America/Noronha",
     "facing": 119,
     "open_water": [[44, 170]]
   },
@@ -10498,6 +10500,7 @@
     "lon": -32.403348684311,
     "region": "Brazil, Fernando do Noronha",
     "id": "biboca",
+    "timezone": "America/Noronha",
     "facing": 105,
     "open_water": [[34, 164]]
   },
@@ -10507,6 +10510,7 @@
     "lon": -32.43169426918,
     "region": "Brazil, Fernando do Noronha",
     "id": "boldro",
+    "timezone": "America/Noronha",
     "facing": 336,
     "open_water": [[260, 46]]
   },
@@ -10516,6 +10520,7 @@
     "lon": -32.411127090454,
     "region": "Brazil, Fernando do Noronha",
     "id": "cachorro",
+    "timezone": "America/Noronha",
     "facing": 349,
     "open_water": [[266, 32]]
   },
@@ -10525,6 +10530,7 @@
     "lon": -32.43953704834,
     "region": "Brazil, Fernando do Noronha",
     "id": "cacimba-do-padre",
+    "timezone": "America/Noronha",
     "facing": 339,
     "open_water": [[274, 50]]
   },
@@ -10534,6 +10540,7 @@
     "lon": -32.418497800827,
     "region": "Brazil, Fernando do Noronha",
     "id": "conceicao",
+    "timezone": "America/Noronha",
     "facing": 342,
     "open_water": [[254, 2]]
   },
@@ -10543,6 +10550,7 @@
     "lon": -32.41328895092,
     "region": "Brazil, Fernando do Noronha",
     "id": "meio",
+    "timezone": "America/Noronha",
     "facing": 345,
     "open_water": [[262, 34]]
   },
@@ -16752,6 +16760,7 @@
     "lon": -109.44970607758,
     "region": "Easter",
     "id": "mataveri",
+    "timezone": "Pacific/Easter",
     "facing": 300,
     "open_water": [[196, 20]]
   },
@@ -16761,6 +16770,7 @@
     "lon": -109.432336092,
     "region": "Easter",
     "id": "papa-hanga-roa",
+    "timezone": "Pacific/Easter",
     "facing": 316,
     "open_water": [[250, 14]]
   },
@@ -16770,6 +16780,7 @@
     "lon": -109.38722222222,
     "region": "Easter",
     "id": "papa-tangaroa",
+    "timezone": "Pacific/Easter",
     "facing": 173,
     "open_water": [[88, 230]]
   },
@@ -16779,6 +16790,7 @@
     "lon": -109.42874193192,
     "region": "Easter",
     "id": "vai-uri",
+    "timezone": "Pacific/Easter",
     "facing": 283,
     "open_water": [[230, 358]]
   },
@@ -17211,6 +17223,7 @@
     "lon": -89.614384174347,
     "region": "Ecuador, Galapagos Islands",
     "id": "carola",
+    "timezone": "Pacific/Galapagos",
     "facing": 284,
     "open_water": [[304, 16], [224, 278]]
   },
@@ -17229,6 +17242,7 @@
     "lon": -90.982160568245,
     "region": "Ecuador, Galapagos Islands",
     "id": "el-faro-ecuador-galapagos-islands",
+    "timezone": "Pacific/Galapagos",
     "facing": 166,
     "open_water": [[134, 230]]
   },
@@ -17238,6 +17252,7 @@
     "lon": -89.612452983856,
     "region": "Ecuador, Galapagos Islands",
     "id": "la-loberia",
+    "timezone": "Pacific/Galapagos",
     "facing": 226,
     "open_water": [[196, 280], [124, 182]]
   },
@@ -17247,6 +17262,7 @@
     "lon": -89.627773761749,
     "region": "Ecuador, Galapagos Islands",
     "id": "tongo-reef",
+    "timezone": "Pacific/Galapagos",
     "facing": 274,
     "open_water": [[194, 280], [308, 28], [172, 178]]
   },
@@ -17256,6 +17272,7 @@
     "lon": -90.332851409908,
     "region": "Ecuador, Galapagos Islands",
     "id": "tortuga-bay",
+    "timezone": "Pacific/Galapagos",
     "facing": 177,
     "open_water": [[106, 182], [200, 244]]
   },
@@ -31711,6 +31728,7 @@
     "lon": -176.4914560318,
     "region": "New Zealand, New Zealand SI, NE Coast",
     "id": "tuapeka-point",
+    "timezone": "Pacific/Chatham",
     "facing": 87,
     "open_water": [[14, 92]]
   },
@@ -41906,6 +41924,7 @@
     "lon": -172.46234893799,
     "region": "Tokelau",
     "id": "utua-mamao",
+    "timezone": "Pacific/Fakaofo",
     "facing": 70,
     "open_water": [[320, 194]]
   },

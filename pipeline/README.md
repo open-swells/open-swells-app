@@ -52,23 +52,19 @@ to ±85° (see `composite.py`; the other regional products add nothing beyond
 these two). Both files are downloaded per forecast hour; if one is missing
 the hour degrades to partial coverage instead of failing.
 
-**Outputs per forecast hour**:
+**Outputs**: images stay one file per forecast hour (the map loads them
+directly); everything else is one bundle per product per run, named
+`<product>_<run>.bin` (e.g. `swell_20261028_12Z.bin`) and listed under
+`bundles` (and per domain under `nwps_points`) in `metadata.json`. A
+publish keeps the previous run's bundles alongside, so a map opened before
+it keeps reading the files it started with: the runner leaves bundles in
+`files/` and the pipeline prunes all but the current and previous run's.
+
 - `heatmap_XXX.png` — continuous-color combined wind-wave-and-swell height
   field in Web Mercator with transparent land; the app's primary wave layer.
   Corner coordinates are published as `heatmap_bounds` in `metadata.json`.
   Colors come from `HEATMAP_COLORS` in `gfs_to_contours.py`, matched by
   `SWELL_BANDS` in the web app's `pages/today.html` — change them together.
-- `contours_XXX.geojson` (+`.gz`) — combined wave-height polygons on fixed
-  bands (`FIXED_LEVELS`); kept as the app's fallback layer when heatmaps are
-  missing.
-- `arrows_XXX.geojson` (+`.gz`) — coarse grid of swell direction points
-  (properties `h`=height m, `p`=period s, `d`=direction from, deg true);
-- `swell_partitions_XXX.geojson` (+`.gz`) — all three swell systems. Compact
-  properties `h1`/`p1`/`d1` through `h3`/`p3`/`d3` are height in meters,
-  period in seconds, and direction from in degrees true.
-- `wind_XXX.geojson` (+`.gz`) — surface wind points from the GFS-Wave file.
-  Properties are `s` speed in m/s, `d` direction from in degrees true, and
-  `u`/`v` components in m/s.
 - `nwps_<grid>_XXX.png` (e.g. `nwps_cg1_012.png`) — nearshore combined
   wave height from NOAA NWPS (SWAN), all configured office domains
   mosaicked onto one lattice at the finest source resolution (finer
@@ -78,13 +74,37 @@ the hour degrades to partial coverage instead of failing.
   directly. `metadata.json` lists bounds and covered hours per grid tier
   under `nwps_layers` (max 144 h; hours before the office's cycle or past
   its horizon have no frame and the global layer shows through).
-- `nwps_points_<wfo>_<grid>_XXX.geojson` (+`.gz`) — every wet NWPS cell
-  as a point, 3-hourly out to 144 h, for high-resolution beach forecasts.
-  Compact properties `h` (combined wind-wave-and-swell height m — total
-  sea state, not a swell partition), `s` (total swell height m, wind sea
-  excluded — use this for "swell"), `p` (primary mean period s), `d`
-  (primary direction from, deg true). Listed per domain under
-  `nwps_points` in `metadata.json`.
+- `swell_<run>.bin` — all three swell systems on a coarse grid (every
+  `ARROW_STRIDE`th cell of the 1/6° composite, ~1.67°), every forecast
+  hour. Vars `h1`/`p1`/`d1` through `h3`/`p3`/`d3` are height in meters,
+  period in seconds, and direction from in degrees true; the map draws
+  partition 1 as the swell arrows.
+- `wind_<run>.bin` — surface wind from the GFS-Wave file on the same grid. Vars
+  `s` speed in m/s, `d` direction from in degrees true, and `u`/`v`
+  components in m/s.
+- `contours_<run>.bin` — combined wave-height polygons on fixed bands
+  (`FIXED_LEVELS`), one GeoJSON document per hour; the map's contour mode
+  and its fallback when a heatmap frame is missing.
+- `nwps_points_<wfo>_<grid>_<run>.bin` — every wet NWPS cell, 3-hourly out to
+  144 h, for high-resolution beach forecasts. Vars `h` (combined
+  wind-wave-and-swell height m — total sea state, not a swell partition),
+  `s` (total swell height m, wind sea excluded — use this for "swell"),
+  `p` (primary mean period s), `d` (primary direction from, deg true).
+  Listed per domain, with its hours, under `nwps_points` in
+  `metadata.json`.
+
+**Bundle format** (`bundle.py`; read by the app's `server/bundle.go` and
+`web/templates/components/forecastbundle.html`): `OSB1`, a little-endian
+uint32 header length, a JSON header, then gzip chunks back to back. The
+header has the `hours`, the `vars` (with `scale`), and `chunks`, the byte
+length of every (hour, var) chunk in hour-major order. Grid bundles also
+carry the lattice axes `lat`/`lon`; each chunk is a row-major int16 array,
+value = raw × scale, with `nodata` (-32768) on land or where a field is
+missing. An hour's vars are contiguous, so the browser fetches one hour
+with a single HTTP Range request. Each chunk names itself in its gzip
+header (FNAME `<run>/<hour>/<var>`), which the server's reader checks.
+Inspect a bundle with `bundle.read_bundle(path)`.
+
 - `spot_forecasts.json.gz` — one file per run (not per hour): every
   surf spot in the web app's `spots.json` sampled at its nearest wet cell
   of the full-resolution 1/6° composite (great-circle distance, within

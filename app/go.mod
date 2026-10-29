@@ -7,6 +7,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-resty/resty/v2 v2.11.0
 	github.com/mattn/go-sqlite3 v1.14.17
+	github.com/zsefvlol/timezonemapper v1.0.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/time v0.7.0
 	google.golang.org/api v0.202.0

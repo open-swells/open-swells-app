@@ -11,6 +11,7 @@
         <meta property="og:url" content="{{.SEO.Canonical}}">
         <meta property="og:type" content="website">
         {{template "analytics"}}
+        {{template "forecastbundle"}}
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
             tailwind.config = {
@@ -76,20 +77,22 @@
            Tailwind utility classes so the buttons hold their size and
            layout everywhere, including mobile. */
         .buoy-popup { width: min(230px, calc(100vw - 56px)); }
-        .buoy-popup-name { margin: 0 28px 4px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
+        .buoy-popup-name { margin: 0 32px 8px 0; font-size: 13px; font-weight: 500; line-height: 1.375; color: #fff; overflow-wrap: break-word; }
         .buoy-popup-id { margin-bottom: 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #a6aab2; }
         .buoy-popup-meta { margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
         .buoy-popup-meta .buoy-popup-id { margin-bottom: 0; }
-        .buoy-popup-actions { display: flex; gap: 6px; }
-        .buoy-popup-actions .toolbar-button { height: 40px; flex: 1; justify-content: center; }
+        .buoy-popup-actions { display: flex; gap: 8px; }
+        .buoy-popup-actions .toolbar-button { min-height: 40px; flex: 1; justify-content: center; border-color: #47725a; background: #192a22; color: #b5f0cc; }
+        .buoy-popup-actions .toolbar-button::after { content: '→'; }
+        .buoy-popup-actions .toolbar-button:hover { background: #243d30; }
         .favorite-btn {
-            width: 40px; height: 40px; flex: none;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 18px; font-weight: 600; line-height: 1;
-            border: 1px solid #43454c; background: #1f2026; color: #6fcf97;
+            width: 40px; min-height: 40px; flex: none;
+            display: flex; gap: 7px; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 500; cursor: pointer;
+            border: 1px solid #43454c; background: #1f2026; color: #edeef1;
         }
-        .favorite-btn:hover { background: #2f3137; }
-        .favorite-btn.is-favorite { color: #e06c75; }
+        .favorite-btn:hover { background: #2f3137; border-color: #55575e; }
+        .favorite-btn.is-favorite { color: #6fcf97; border-color: #47725a; background: #192a22; }
         /* Search result kind badges: buoy green-blue, beach (surf spot) sand */
         .search-badge {
             font-size: 9px; font-weight: 600; text-transform: uppercase;
@@ -130,13 +133,14 @@
         .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #43454c !important; }
         .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #43454c !important; }
         .maplibregl-popup-close-button {
-            top: 2px; right: 2px;
-            width: 34px; height: 34px;
+            top: 6px; right: 6px;
+            width: 32px; min-height: 32px; padding: 0;
             display: flex; align-items: center; justify-content: center;
-            color: #a6aab2; font-size: 20px; line-height: 1;
+            color: #a6aab2; font-size: 24px; line-height: 1;
+            border: 0; background: transparent;
             border-radius: 0;
         }
-        .maplibregl-popup-close-button:hover { color: #fff; background: #292a30; }
+        .maplibregl-popup-close-button:hover { color: #fff; background: transparent; }
         input[type="range"] { accent-color: #2563eb; }
         /* iOS Safari auto-zooms the page when a focused input's font-size
            is under 16px; keep the search at 16px on touch devices so
@@ -406,7 +410,7 @@
                     <div class="signinmodal surface relative w-[300px]">
                         <div class="h-11 px-4 border-b border-[#2f3137] flex items-center justify-between">
                             <span class="text-sm font-semibold text-white">Sign in</span>
-                            <button id="closeModal" class="icon-button" aria-label="Close">
+                            <button id="closeModal" class="icon-button close-button" aria-label="Close">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -430,7 +434,7 @@
                             <p id="userName" class="text-[13px] font-medium text-white truncate"></p>
                             <p id="userEmail" class="text-[11px] text-[#a6aab2] truncate"></p>
                         </div>
-                        <button id="closeUserPopup" class="icon-button !w-6 !h-6 shrink-0" aria-label="Close">
+                        <button id="closeUserPopup" class="icon-button close-button !w-6 !h-6 shrink-0" aria-label="Close">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg>
                         </button>
                     </div>
@@ -444,13 +448,12 @@
         <!-- End Header -->
 
             <!-- Forecast dialog -->
-            <div id="forecastModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px] flex items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-labelledby="forecastModalTitle">
+            <div id="forecastModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px] flex items-center justify-center md:p-6" role="dialog" aria-modal="true" aria-label="Forecast">
                 <div id="forecastDialog" class="surface relative w-full max-w-[1180px] h-[88vh] max-h-[900px] flex flex-col overflow-hidden">
-                    <div class="h-12 px-4 border-b border-[#2f3137] flex items-center justify-between shrink-0">
-                        <div class="min-w-0"><div id="forecastModalTitle" class="text-sm font-semibold text-white truncate">Station report & forecast</div><div id="forecastStation" class="mono text-[10px] text-[#a6aab2]"></div></div>
-                        <button class="icon-button" onclick="closeForecast()" aria-label="Close forecast"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
-                    </div>
-                    <div id="forecastLoading" class="absolute inset-12 flex items-center justify-center text-xs text-[#a6aab2]">Loading forecast...</div>
+                    <!-- Fallback close button while the page is loading. Once
+                         loaded, its own header includes the close action. -->
+                    <button id="forecastClose" class="page-header-action page-open-button close-button absolute top-[14px] right-3 z-10" onclick="closeForecast()" aria-label="Close forecast" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg></button>
+                    <div id="forecastLoading" class="absolute inset-0 flex items-center justify-center text-xs text-[#a6aab2]">Loading forecast...</div>
                     <iframe id="forecastFrame" class="relative flex-1 w-full bg-[#0e0f12] opacity-0" title="Station report and forecast"></iframe>
                 </div>
             </div>
@@ -519,20 +522,22 @@
                     document.getElementById('signInBtn').click();
                 }
 
-                // One modal serves both station and beach pages; only the
-                // iframe URL and header text differ.
+                // One modal serves station, beach and spot pages; only the
+                // iframe URL and accessible name differ.
                 let activeForecastFavorite = null;
 
-                function openModalFrame(url, title, subtitle, favorite = null) {
+                function openModalFrame(url, title, favorite = null) {
                     const modal = document.getElementById('forecastModal');
                     const frame = document.getElementById('forecastFrame');
-                    document.getElementById('forecastModalTitle').textContent = title;
-                    document.getElementById('forecastStation').textContent = subtitle;
+                    modal.setAttribute('aria-label', title);
                     document.getElementById('forecastLoading').classList.remove('hidden');
                     frame.classList.add('opacity-0');
+                    const closeButton = document.getElementById('forecastClose');
+                    closeButton.style.display = '';
                     frame.onload = () => {
                         document.getElementById('forecastLoading').classList.add('hidden');
                         frame.classList.remove('opacity-0');
+                        closeButton.style.display = frame.contentDocument?.querySelector('.page-close-button') ? 'none' : '';
                         bindForecastPageFavorite();
                         // once the page inside has focus, key presses go to
                         // the iframe's document, not this one -- listen there
@@ -549,20 +554,20 @@
                 function openForecast(stationId, stationName = '') {
                     if (!stationId) return;
                     openModalFrame(`/forecast/${stationId}`,
-                        stationName || 'Station report & forecast', `BUOY ${stationId}`,
+                        stationName || `Buoy ${stationId}`,
                         { type: 'buoy', id: stationId });
                 }
 
                 function openBeach(zoneId, zoneName = '') {
                     if (!zoneId) return;
                     openModalFrame(`/beach/${encodeURIComponent(zoneId)}`,
-                        zoneName || 'Beach forecast', `SURF ZONE ${zoneId}`);
+                        zoneName || 'Beach forecast');
                 }
 
-                function openSpot(spotId, spotName = '', region = '') {
+                function openSpot(spotId, spotName = '') {
                     if (!spotId) return;
                     openModalFrame(`/surf-spots/${encodeURIComponent(spotId)}`,
-                        spotName || 'Spot forecast', region ? region.toUpperCase() : 'SURF SPOT',
+                        spotName || 'Spot forecast',
                         { type: 'spot', id: spotId });
                 }
 
@@ -581,7 +586,8 @@
                     const isFavorite = activeForecastFavorite.type === 'spot'
                         ? userSpots.includes(activeForecastFavorite.id)
                         : userBuoys.includes(activeForecastFavorite.id);
-                    button.textContent = isFavorite ? '−' : '+';
+                    button.textContent = '';
+                    button.setAttribute('aria-pressed', String(isFavorite));
                     button.classList.toggle('is-favorite', isFavorite);
                     button.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
                     button.setAttribute('aria-label', button.title);
@@ -790,6 +796,18 @@
             function runUrl(path) {
                 return runQuery ? `${path}?${runQuery}` : path;
             }
+
+            // Each product is one bundle per run (see forecastbundle), named
+            // in metadata.json's "bundles" (set by fetchMetadata). The
+            // per-hour filenames below are the format before the bundles,
+            // still read when a run lists none.
+            const forecastBundles = window.createForecastBundles();
+            let bundleFiles = {};
+            function openBundle(product) {
+                const file = bundleFiles[product];
+                return file ? forecastBundles.open(`/static/${file}`) : null;
+            }
+            const SWELL_SYSTEM_VARS = ['h1', 'p1', 'd1', 'h2', 'p2', 'd2', 'h3', 'p3', 'd3'];
 
             function hourToFilename(hour) {
                 return runUrl(`/static/contours_${String(hour).padStart(3, '0')}.geojson`);
@@ -1304,6 +1322,29 @@
                 if (legendReadout && !wantsHeatmap()) legendReadout.textContent = '';
             });
 
+            // The swell systems at the grid point nearest the cursor, as
+            // [{h, p, d}], or null when there is none.
+            async function swellSystemsAt(hour, lngLat) {
+                const bundle = await openBundle('swell');
+                if (!bundle) {
+                    const fc = await loadFrame(hourToPartitionsFilename(hour));
+                    const f = fc.features && nearestPointFeature(fc.features, lngLat);
+                    if (!f) return null;
+                    return [1, 2, 3]
+                        .filter(k => f.properties[`h${k}`] !== undefined)
+                        .map(k => ({ h: f.properties[`h${k}`], p: f.properties[`p${k}`], d: f.properties[`d${k}`] }));
+                }
+                const grid = await cachedFrame(`${bundle.url}#${hour}`,
+                    () => forecastBundles.grid(bundle, hour, SWELL_SYSTEM_VARS), null);
+                if (!grid) return null;
+                const cell = forecastBundles.nearestCell(grid,
+                    c => [1, 2, 3].some(k => grid.value(`h${k}`, c) !== null), lngLat);
+                if (cell < 0) return null;
+                return [1, 2, 3]
+                    .filter(k => grid.value(`h${k}`, cell) !== null)
+                    .map(k => ({ h: grid.value(`h${k}`, cell), p: grid.value(`p${k}`, cell), d: grid.value(`d${k}`, cell) }));
+            }
+
             function nearestPointFeature(features, lngLat, maxDist2 = 4) {
                 let best = null;
                 let bestDist = maxDist2; // squared degrees
@@ -1320,8 +1361,7 @@
             }
 
             // Hovering an arrow shows the full swell reading; the individual
-            // swell systems from swell_partitions_XXX.geojson stream in once
-            // that frame is cached.
+            // swell systems stream in once that hour of the swell bundle is cached.
             const arrowPopup = new maplibregl.Popup({
                 closeButton: false,
                 closeOnClick: false,
@@ -1333,16 +1373,10 @@
                 const base = `<div class="text-xs">${p.h} m @ ${p.p} s from ${p.d}&deg;</div>`;
                 arrowPopup.setLngLat(lngLat).setHTML(base).addTo(map);
 
-                loadFrame(hourToPartitionsFilename(forecastHours[currentIndex])).then(fc => {
-                    if (!arrowPopup.isOpen() || !fc.features || !fc.features.length) return;
-                    const f = nearestPointFeature(fc.features, lngLat);
-                    if (!f) return;
-                    const rows = [];
-                    for (let k = 1; k <= 3; k++) {
-                        const h = f.properties[`h${k}`];
-                        if (h === undefined) continue;
-                        rows.push(`<div class="text-xs" style="color: #d5d7dc;">${h} m @ ${f.properties[`p${k}`]} s from ${f.properties[`d${k}`]}&deg;</div>`);
-                    }
+                swellSystemsAt(forecastHours[currentIndex], lngLat).catch(() => null).then(systems => {
+                    if (!arrowPopup.isOpen() || !systems) return;
+                    const rows = systems.map(s =>
+                        `<div class="text-xs" style="color: #d5d7dc;">${s.h} m @ ${s.p} s from ${s.d}&deg;</div>`);
                     if (rows.length > 1) {
                         arrowPopup.setHTML(base +
                             `<div class="mono" style="margin: 6px 0 2px; font-size: 9px; color: #a6aab2; text-transform: uppercase;">Swell systems</div>` +
@@ -1388,6 +1422,7 @@
                     
                     forecastStartTime = new Date(Date.UTC(year, month - 1, day, hour));
                     runQuery = `run=${encodeURIComponent(metadata.forecast_start)}`;
+                    bundleFiles = metadata.bundles || {};
 
                     // The hours this run actually published: a failed hour
                     // has no frame, so the timeline skips it rather than
@@ -1484,27 +1519,63 @@
 
             // Parsed frames are cached (LRU) and the next few hours prefetched,
             // so scrubbing and playback don't wait on the network per frame.
-            const frameCache = new Map(); // url -> Promise<geojson>
+            const frameCache = new Map(); // key -> Promise<frame>
 
-            function loadFrame(url) {
-                if (frameCache.has(url)) {
-                    const cached = frameCache.get(url);
-                    frameCache.delete(url);
-                    frameCache.set(url, cached); // refresh LRU position
+            // An absent frame (null) or a failure resolves to fallback, so a
+            // missing hour clears the layer instead of breaking playback. A
+            // failure's fallback is kept only for FAILED_FRAME_RETRY_MS, then
+            // the frame is tried again, without playback and prefetch retrying
+            // it on every tick.
+            const FAILED_FRAME_RETRY_MS = 15000;
+            function cachedFrame(key, load, fallback = EMPTY_FC) {
+                if (frameCache.has(key)) {
+                    const cached = frameCache.get(key);
+                    frameCache.delete(key);
+                    frameCache.set(key, cached); // refresh LRU position
                     return cached;
                 }
-                const promise = fetch(url)
-                    .then(r => {
-                        if (!r.ok) throw new Error(`${r.status} for ${url}`);
-                        return r.json();
-                    })
-                    // A missing hour clears the layer instead of breaking playback
-                    .catch(() => EMPTY_FC);
-                frameCache.set(url, promise);
+                const promise = Promise.resolve()
+                    .then(load)
+                    .then(frame => frame || fallback, () => {
+                        setTimeout(() => {
+                            if (frameCache.get(key) === promise) frameCache.delete(key);
+                        }, FAILED_FRAME_RETRY_MS);
+                        return fallback;
+                    });
+                frameCache.set(key, promise);
                 if (frameCache.size > FRAME_CACHE_MAX) {
                     frameCache.delete(frameCache.keys().next().value);
                 }
                 return promise;
+            }
+
+            function fetchJson(url) {
+                return fetch(url).then(r => {
+                    if (!r.ok) throw new Error(`${r.status} for ${url}`);
+                    return r.json();
+                });
+            }
+
+            function loadFrame(url) {
+                return cachedFrame(url, () => fetchJson(url));
+            }
+
+            // Swell arrows: partition 1 of the swell bundle as point features.
+            function loadArrows(hour) {
+                return cachedFrame(runUrl(`arrows#${hour}`), async () => {
+                    const bundle = await openBundle('swell');
+                    if (!bundle) return fetchJson(hourToArrowsFilename(hour)); // run from before the bundles
+                    const grid = await forecastBundles.grid(bundle, hour, ['h1', 'p1', 'd1']);
+                    return grid && forecastBundles.gridFeatures(grid, { h1: 'h', p1: 'p', d1: 'd' });
+                });
+            }
+
+            function loadContours(hour) {
+                return cachedFrame(runUrl(`contours#${hour}`), async () => {
+                    const bundle = await openBundle('contours');
+                    if (!bundle) return fetchJson(hourToFilename(hour));
+                    return forecastBundles.documentAt(bundle, hour);
+                });
             }
 
             function prefetchFrames(index, count = 4) {
@@ -1516,9 +1587,9 @@
                             if (layer.hours.has(hour)) loadNwpsFrame(nwpsFrameUrl(layer, hour));
                         }
                     } else {
-                        loadFrame(hourToFilename(hour));
+                        loadContours(hour);
                     }
-                    loadFrame(hourToArrowsFilename(hour));
+                    loadArrows(hour);
                 }
             }
 
@@ -1535,13 +1606,13 @@
                 const wantHeatmap = wantsHeatmap();
                 let [heatUrl, arrows] = await Promise.all([
                     wantHeatmap ? loadImageFrame(hourToHeatmapFilename(hours)) : null,
-                    loadFrame(hourToArrowsFilename(hours)),
+                    loadArrows(hours),
                 ]);
                 // Contours are the fallback when there is no heatmap (older
                 // pipeline runs, or a missing hour in the current one).
                 let contours = null;
                 if (!wantHeatmap || !heatUrl) {
-                    contours = await loadFrame(hourToFilename(hours));
+                    contours = await loadContours(hours);
                 }
                 if (token !== updateToken) return; // superseded by a newer frame
 
@@ -1622,8 +1693,10 @@
                 const isFavorite = button.dataset.spotId
                     ? userSpots.includes(button.dataset.spotId)
                     : userBuoys.includes(button.dataset.stationId);
-                button.textContent = isFavorite ? '−' : '+';
+                button.textContent = '';
+                button.setAttribute('aria-pressed', String(isFavorite));
                 button.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+                button.setAttribute('aria-label', button.title);
                 button.classList.toggle('is-favorite', isFavorite);
             }
 
@@ -1651,14 +1724,13 @@
                         <button
                             onclick="openForecast('${buoy.stationId}')"
                             class="toolbar-button">
-                            Report & forecast
+                            View forecast
                         </button>
                         <button
                             id="fav-${buoy.stationId}"
                             onclick="toggleFavorite('${buoy.stationId}')"
                             data-station-id="${buoy.stationId}"
-                            class="favorite-btn">
-                        </button>
+                            class="favorite-btn" aria-label="Add to favorites" aria-pressed="false" title="Add to favorites"></button>
                     </div>
                 </div>`;
             }
@@ -2213,10 +2285,10 @@
                     <div class="buoy-popup-name">${esc(p.name)}</div>
                     <div class="buoy-popup-meta"><span class="search-badge search-badge-beach">Beach</span><span class="buoy-popup-id">${esc(p.region || 'SURF SPOT')}</span></div>
                     <div class="buoy-popup-actions">
-                        <button class="toolbar-button" data-spot="${esc(p.id)}" data-name="${esc(p.name)}" data-region="${esc(p.region || '')}"
-                            onclick="openSpot(this.dataset.spot, this.dataset.name, this.dataset.region)">Report &amp; forecast</button>
+                        <button class="toolbar-button" data-spot="${esc(p.id)}" data-name="${esc(p.name)}"
+                            onclick="openSpot(this.dataset.spot, this.dataset.name)">View forecast</button>
                         <button class="favorite-btn" data-spot-id="${esc(p.id)}"
-                            onclick="toggleSpotFavorite(this.dataset.spotId)"></button>
+                            onclick="toggleSpotFavorite(this.dataset.spotId)" aria-label="Add to favorites" aria-pressed="false" title="Add to favorites"></button>
                     </div>
                 </div>`;
             }

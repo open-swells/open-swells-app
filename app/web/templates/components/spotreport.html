@@ -254,9 +254,10 @@
         const RATING = { epic: css('--cond-epic'), good: css('--cond-good'), fair: css('--cond-fair'), poor: css('--cond-poor') };
         const CARDINALS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
         const cardinal = d => CARDINALS[Math.round((((d % 360) + 360) % 360) / 22.5) % 16];
-        const hourFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric' });
-        const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-        const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+        const clock = window.FORECAST_CLOCK;
+        const hourFmt = clock.formatter({ hour: 'numeric' });
+        const timeFmt = clock.formatter({ hour: 'numeric', minute: '2-digit' });
+        const dayFmt = clock.formatter({ weekday: 'short', month: 'short', day: 'numeric' });
         const shortHour = d => hourFmt.format(d).toLowerCase().replace(' ', '');
         const shortTime = d => timeFmt.format(d).toLowerCase().replace(' ', '');
         const now = new Date();
@@ -290,12 +291,12 @@
         // --- Today: the viewer's local day as four lanes --------
         const el = document.querySelector('[data-today-chart]');
         const conds = (window.SPOT_CONDITIONS || []).map(c => ({ ...c, t: new Date(c.t) }));
-        const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const todayKey = clock.dateKey(now);
+        const { start: dayStart, end: dayEnd } = clock.dayBounds(todayKey);
         const hours = conds.filter(c => c.t >= dayStart && c.t < dayEnd);
 
-        // The server rates the current card by the UTC day; re-rate it by
-        // the viewer's local day, which rates as its best hour from the run on.
+        // Rate today's card using the same local day as the chart, taking
+        // its best hour from the model run onward.
         const runStart = window.SPOT_RUN_START || 0;
         const dayBest = hours.filter(c => +c.t >= runStart)
             .reduce((b, c) => (!b || c.score > b.score ? c : b), null);
@@ -361,7 +362,7 @@
 
             // three-hourly grid; "now" sits on the axis, so hour
             // labels it would cover drop out
-            const ticks = d3.range(0, 25, 3).map(h => new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), h));
+            const ticks = d3.range(0, 25, 3).map(h => clock.atHour(todayKey, h));
             const narrow = width < 380;
             const nx = x(now);
             svg.append('g').selectAll('line').data(ticks).join('line').attr('class', 'grid')
@@ -418,7 +419,7 @@
                         .attr('x', h => x(h.t) + 1).attr('width', Math.max(1, hourW - 2))
                         .attr('y', h => ys(h.wmph)).attr('height', h => lane.h - ys(h.wmph));
                     // where the wind blows to, every three hours (not under the peak label)
-                    g.append('g').selectAll('path').data(windHours.filter(h => h.t.getHours() % 3 === 0 && h !== peakWind)).join('path')
+                    g.append('g').selectAll('path').data(windHours.filter(h => clock.parts(h.t).hour % 3 === 0 && h !== peakWind)).join('path')
                         .attr('class', 'wind-arrow').attr('d', 'M0 -3.5 L2.8 3 L0 1.5 L-2.8 3 Z')
                         .attr('transform', h => `translate(${at(h)},${ys(h.wmph) - 6}) rotate(${(h.wdir + 180) % 360})`);
                     peakLabel(g, at(peakWind), Math.max(8, ys(peakWind.wmph) - 4), `${Math.round(peakWind.wmph)}`);

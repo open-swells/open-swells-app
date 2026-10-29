@@ -16,9 +16,9 @@ type forecastCacheWarmResult struct {
 	elapsed                  time.Duration
 }
 
-// runForecastCacheWarmer moves the expensive GeoJSON decoding out of the
-// first spot request. Rechecking every minute also warms newly rsynced model
-// files; unchanged files are only statted because the loaders cache by mtime.
+// runForecastCacheWarmer moves grid decoding out of the first spot request.
+// Rechecking every minute also warms newly rsynced model files; unchanged
+// files are only statted because the loaders cache by mtime.
 func runForecastCacheWarmer(ctx context.Context, forecastDir string) {
 	result := warmForecastCachesOnce(forecastDir)
 	log.Printf(
@@ -59,47 +59,82 @@ func warmForecastCachesOnce(forecastDir string) forecastCacheWarmResult {
 
 	go func() {
 		defer wg.Done()
-		for hour := 0; hour <= windMaxHour; hour += 3 {
-			path := filepath.Join(forecastDir, "swell_partitions_"+forecastHour(hour)+".geojson")
-			if _, err := swellGridPoints(path); err == nil {
-				result.swell++
-			}
-		}
+		result.swell = warmGrid(runBundlePath(forecastDir, "swell"), mapHours(), func(hour int) error {
+			_, err := swellGridPoints(filepath.Join(forecastDir, "swell_partitions_"+forecastHour(hour)+".geojson"))
+			return err
+		})
 	}()
 
 	go func() {
 		defer wg.Done()
-		for hour := 0; hour <= windMaxHour; hour += 3 {
-			path := filepath.Join(forecastDir, "wind_"+forecastHour(hour)+".geojson")
-			if _, err := windGridPoints(path); err == nil {
-				result.wind++
-			}
-		}
+		result.wind = warmGrid(runBundlePath(forecastDir, "wind"), mapHours(), func(hour int) error {
+			_, err := windGridPoints(filepath.Join(forecastDir, "wind_"+forecastHour(hour)+".geojson"))
+			return err
+		})
 	}()
 
 	go func() {
 		defer wg.Done()
-		seen := make(map[string]struct{})
 		for _, domain := range nwpsPointDomains(forecastDir) {
-			for _, hour := range domain.Hours {
-				path := filepath.Join(
+			bundle := ""
+			if domain.File != "" {
+				bundle = filepath.Join(forecastDir, domain.File)
+			}
+			result.nwps += warmGrid(bundle, domain.Hours, func(hour int) error {
+				_, err := nwpsGridPoints(filepath.Join(
 					forecastDir,
 					"nwps_points_"+domain.WFO+"_"+domain.Grid+"_"+forecastHour(hour)+".geojson",
-				)
-				if _, ok := seen[path]; ok {
-					continue
-				}
-				seen[path] = struct{}{}
-				if _, err := nwpsGridPoints(path); err == nil {
-					result.nwps++
-				}
-			}
+				))
+				return err
+			})
 		}
 	}()
 
 	wg.Wait()
 	result.elapsed = time.Since(started)
 	return result
+}
+
+// mapHours are the 3-hourly forecast hours the server samples the coarse
+// swell and wind grids at.
+func mapHours() []int {
+	var hours []int
+	for hour := 0; hour <= windMaxHour; hour += 3 {
+		hours = append(hours, hour)
+	}
+	return hours
+}
+
+// warmGrid decodes the given hours of a grid bundle, or for runs from
+// before the bundles (path "") loads the per-hour GeoJSON through legacy.
+// Returns how many hours are ready.
+func warmGrid(path string, hours []int, legacy func(hour int) error) int {
+	if path == "" {
+		warmed := 0
+		for _, hour := range hours {
+			if legacy(hour) == nil {
+				warmed++
+			}
+		}
+		return warmed
+	}
+	b, err := loadGridBundle(path)
+	if err != nil {
+		log.Printf("forecast cache: %v", err)
+		return 0
+	}
+	warmed := 0
+	for _, hour := range hours {
+		if !b.hasHour(hour) {
+			continue
+		}
+		if _, err := b.frame(hour); err != nil {
+			log.Printf("forecast cache: %v", err)
+			continue
+		}
+		warmed++
+	}
+	return warmed
 }
 
 func forecastHour(hour int) string {

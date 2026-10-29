@@ -955,10 +955,16 @@ func ensureGzipSibling(full string) (string, error) {
 // be cached for good. A run that is no longer current is not cached at
 // all: the file on disk now belongs to a newer run, and caching it under
 // the old run's URL would pin the mismatch.
+// runBundleName matches forecast bundles, which are named per run
+// (swell_20261028_12Z.bin) and so never change once published.
+var runBundleName = regexp.MustCompile(`_\d{8}_\d{2}Z\.bin$`)
+
 func staticCacheControl(path, requestedRun, currentRun string) string {
 	switch {
 	case strings.HasSuffix(path, "metadata.json"):
 		return "public, max-age=60"
+	case runBundleName.MatchString(path):
+		return "public, max-age=604800, immutable"
 	case requestedRun == "":
 		return "public, max-age=300"
 	case requestedRun == currentRun:

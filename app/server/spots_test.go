@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestSpotForecastKeepsLeadingRunWhenLaterGridMisses(t *testing.T) {
@@ -76,5 +78,78 @@ func TestSpotCoastlineFields(t *testing.T) {
 	}
 	if b := spotBeach(dir, tuned); b.OpenWater != nil || len(b.Window) != 2 {
 		t.Errorf("tuned beach = %+v", b)
+	}
+}
+
+func TestSpotLocation(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		lat, lon float64
+		zone     string
+	}{
+		{"California", 33.86, -118.63, "America/Los_Angeles"},
+		{"Hawaii", 21.66, -158.05, "Pacific/Honolulu"},
+		{"Sydney", -33.89, 151.28, "Australia/Sydney"},
+		{"Bali", -8.81, 115.09, "Asia/Makassar"},
+		{"Portugal", 38.69, -9.34, "Europe/Lisbon"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spot := Spot{Lat: tc.lat, Lon: tc.lon}
+			if got := spotLocation(spot).String(); got != tc.zone {
+				t.Fatalf("zone = %s, want %s", got, tc.zone)
+			}
+		})
+	}
+}
+
+func TestSpotTimezoneOverride(t *testing.T) {
+	spot := Spot{ID: "island", Lat: -3.83, Lon: -32.4, TimeZone: "America/Noronha"}
+	if got := spotLocation(spot).String(); got != spot.TimeZone {
+		t.Fatalf("override = %s, want %s", got, spot.TimeZone)
+	}
+	spot.TimeZone = "invalid/zone"
+	spot.Lat, spot.Lon = 33.86, -118.63
+	if got := spotLocation(spot).String(); got != "America/Los_Angeles" {
+		t.Fatalf("invalid override fallback = %s", got)
+	}
+}
+
+func TestIslandTimezoneData(t *testing.T) {
+	store, err := NewSpotStore("../data/spots.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, spot := range store.All() {
+		if spot.TimeZone != "" {
+			if _, err := time.LoadLocation(spot.TimeZone); err != nil {
+				t.Errorf("spot %s: %v", spot.ID, err)
+			}
+		}
+	}
+	for id, zone := range map[string]string{
+		"abras": "America/Noronha", "biboca": "America/Noronha", "boldro": "America/Noronha",
+		"cachorro": "America/Noronha", "cacimba-do-padre": "America/Noronha", "conceicao": "America/Noronha", "meio": "America/Noronha",
+		"mataveri": "Pacific/Easter", "papa-hanga-roa": "Pacific/Easter", "papa-tangaroa": "Pacific/Easter", "vai-uri": "Pacific/Easter",
+		"carola": "Pacific/Galapagos", "el-faro-ecuador-galapagos-islands": "Pacific/Galapagos", "la-loberia": "Pacific/Galapagos", "tongo-reef": "Pacific/Galapagos", "tortuga-bay": "Pacific/Galapagos",
+		"tuapeka-point": "Pacific/Chatham", "utua-mamao": "Pacific/Fakaofo", "satans-shank": "Indian/Kerguelen",
+	} {
+		spot, ok := store.Get(id)
+		if !ok {
+			t.Fatalf("missing spot %s", id)
+		}
+		if got := spotLocation(spot).String(); got != zone {
+			t.Errorf("spot %s: zone = %s, want %s", id, got, zone)
+		}
+	}
+	appData, err := os.ReadFile("../data/spots.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pipelineData, err := os.ReadFile("../../pipeline/spots.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(appData, pipelineData) {
+		t.Error("app and pipeline spot data must stay synchronized")
 	}
 }
