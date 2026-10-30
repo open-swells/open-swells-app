@@ -1,0 +1,9 @@
+# Downloaded and derived datasets live outside git (see docs/data.md).
+data/
+artifacts/
+.venv/
+envs/*/.venv/
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/

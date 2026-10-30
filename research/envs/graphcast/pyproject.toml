@@ -1,0 +1,18 @@
+[project]
+name = "openswells-graphcast"
+version = "0.1.0"
+description = "GraphCast (DeepMind weathernext) sandbox: inference and mesh/GNN building blocks"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # GraphCast moved into weathernext.weathernext1_graph; pinned for reproducibility.
+    "weathernext @ git+https://github.com/google-deepmind/graphcast@f2f2c5117d2f864e2d5e7c2f9f220db5e1049dd3",
+    "gcsfs",
+    "ipykernel",
+]
+
+[project.optional-dependencies]
+# On a CUDA machine: uv sync --extra cuda
+cuda = ["jax[cuda12]"]
+
+[tool.uv]
+package = false

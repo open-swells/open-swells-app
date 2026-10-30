@@ -1,0 +1,22 @@
+[project]
+name = "openswells-earth2"
+version = "0.1.0"
+description = "NVIDIA Earth2Studio sandbox: FourCastNet (FCN, SFNO, FCN3) and GraphCast inference"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "earth2studio[data,fcn,sfno,fcn3,graphcast]==0.19.0",
+    "ipykernel",
+    # Listed directly so the [tool.uv.sources] git pins below apply.
+    "makani",
+    "weathernext",
+]
+
+[tool.uv]
+package = false
+# The model stacks only ship Linux x86_64 wheels; GPU boxes are all this.
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+
+# Not on PyPI; the same pins earth2studio 0.19.0 uses in its own pyproject.
+[tool.uv.sources]
+makani = { git = "https://github.com/NVIDIA/makani.git", rev = "b38fcb2799d7dbc146fa60459f3f9823394a8bf1" }
+weathernext = { git = "https://github.com/google-deepmind/weathernext.git", rev = "9c034db1ff412d5db6cbe6bb0c5c9afc5a267719" }
