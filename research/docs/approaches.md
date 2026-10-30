@@ -25,9 +25,19 @@ A GNN can simply leave land cells out. SFNO's spherical harmonics see a
 field with sharp coastline edges, which tends to cause ringing near
 coasts, and coasts are exactly where surf spots are.
 
-Whatever we build has to output the `spot_forecasts.json.gz` fields
-(`hs`, `h1..3`/`p1..3`/`d1..3`, `ws`/`wd`, `hw`/`pw`/`dw`) so the app can
-use it unchanged.
+Whatever we build has to output what the pipeline publishes, so the app
+can use it unchanged:
+
+- `spot_forecasts.json.gz`: per-spot series of `hs`, `h1..3`/`p1..3`/`d1..3`,
+  `ws`/`wd` and `hw`/`pw`/`dw`.
+- The map's run-scoped bundles: `swell_<run>.bin` (`h1..d3`) and
+  `wind_<run>.bin` (`s`/`d`/`u`/`v`), int16 grids listed under `bundles` in
+  `metadata.json`. `products.write_run` writes these through
+  `pipeline/bundle.py`, and `products.read_run` reads a published run back
+  for comparison. Every cell becomes a map arrow, so write at about the
+  pipeline's 1.67° spacing (`products.MAP_SPACING_DEG`). A partition is
+  shown wherever it isn't NODATA, so mask weak ERA5-style partitions to NaN
+  first.
 
 ## 0. Evaluation harness (do first)
 

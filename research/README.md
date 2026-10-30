@@ -12,7 +12,7 @@ The pipeline never imports from here.
 
 | Path | What |
 | --- | --- |
-| `src/openswells_research/` | Core package: data sources, variable catalog, spots, CLI |
+| `src/openswells_research/` | Core package: data sources, variable catalog, spots, CLI, and `products` (read/write the pipeline's `swell`/`wind` bundles) |
 | `envs/earth2/` | Separate uv project: NVIDIA Earth2Studio (FourCastNet FCN/SFNO/FCN3, GraphCast inference). GPU, Linux x86_64. |
 | `envs/graphcast/` | Separate uv project: DeepMind GraphCast (`weathernext`) for inference and its mesh/GNN code |
 | `data/` | Downloaded datasets, git-ignored (`$OPENSWELLS_DATA` overrides) |
