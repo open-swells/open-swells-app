@@ -7,6 +7,8 @@
     <title>{{.SEO.Title}}</title>
     <meta name="description" content="{{.SEO.Description}}">
     <link rel="canonical" href="{{.SEO.Canonical}}">
+    <meta name="theme-color" content="#0e0f12">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230e0f12'/%3E%3Cpath d='M4 20c4 0 4-4 8-4s4 4 8 4 4-4 8-4' fill='none' stroke='%233b82f6' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
     <meta property="og:title" content="{{.SEO.OpenGraphTitle}}">
     <meta property="og:description" content="{{.SEO.Description}}">
     <meta property="og:url" content="{{.SEO.Canonical}}">
@@ -25,9 +27,11 @@
     <style>
         /* The four facts, compact, in a strip under the search. */
         .feature-card {
-            background: color-mix(in srgb, var(--panel) 88%, transparent);
+            background: color-mix(in srgb, var(--panel) 72%, transparent);
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
             border: 1px solid var(--line);
-            padding: 10px 12px;
+            padding: 12px 14px;
             text-align: left;
         }
         .feature-card h2 { margin: 3px 0 2px; font-size: 13px; font-weight: 600; color: #fff; }
@@ -42,25 +46,17 @@
            on top of it, and a radial shade keeps the text readable. The field
            is about a screen tall and fades out behind the live report, so the
            report's height doesn't stretch it. */
-        .hero { position: relative; overflow: hidden; border-bottom: 1px solid var(--line); }
+        .hero { position: relative; overflow: hidden; }
         .chart-field {
             position: absolute; top: 0; left: 0; right: 0; height: min(100vh, 900px); overflow: hidden;
-            -webkit-mask-image: linear-gradient(to bottom, #000 65%, transparent);
-            mask-image: linear-gradient(to bottom, #000 65%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 160px, #000 65%, transparent);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 160px, #000 65%, transparent);
         }
         .chart-field canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
         .chart-field svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
         .hero-shade {
             position: absolute; inset: 0;
             background: radial-gradient(ellipse 60% 70% at 50% 45%, rgba(14, 15, 18, 0.9) 0%, rgba(14, 15, 18, 0.5) 55%, transparent 78%);
-            pointer-events: none;
-        }
-        .chart-note {
-            position: absolute;
-            font-family: var(--font-mono);
-            font-size: 10px;
-            letter-spacing: 0.08em;
-            color: #6c6f77;
             pointer-events: none;
         }
         /* --- Spot search ---------------------------------------------------
@@ -105,14 +101,23 @@
         .live-head h2 { margin: 6px 0 0; font-size: 20px; font-weight: 600; color: #fff; }
         .live-head h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
         .live-actions { flex: none; display: flex; gap: 8px; }
+
+        /* --- Header and footer ----------------------------------------------
+           No rules: the header is page black and the chart field fades in
+           beneath it, so the top of the page reads as one surface. */
+        .brand-mark { width: 18px; height: 18px; flex: none; }
+        .nav-link { height: 32px; display: inline-flex; align-items: center; padding: 0 10px; font-size: 13px; color: var(--text-2); transition: color 120ms ease; }
+        .nav-link:hover { color: #fff; }
+        .site-footer a { color: var(--text-2); transition: color 120ms ease; }
+        .site-footer a:hover { color: #fff; }
         @media (max-width: 640px) {
             .spot-search kbd { display: none; }
             .hero-actions { flex-direction: column; align-items: stretch; }
+            .hero-actions > * { width: 100%; }
             .live-head { flex-direction: column; align-items: flex-start; }
             .live-card { padding: 14px 12px 16px; }
             /* titles only, so the report starts on the first screen */
             .feature-card p { display: none; }
-            .chart-note { display: none; }
         }
     </style>
     <script>
@@ -129,18 +134,16 @@
 </head>
 <body class="min-h-screen flex flex-col">
     <!-- Header -->
-    <header class="w-full border-b border-[#2f3137] relative z-20 bg-[#0e0f12]">
-        <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+    <header class="w-full relative z-20 bg-[#0e0f12]">
+        <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
             <a href="/" class="flex items-center gap-2 text-sm font-semibold text-white">
-                <span class="text-[#3b82f6]">◒</span> OpenSwells
+                <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 20c4 0 4-4 8-4s4 4 8 4 4-4 8-4" fill="none" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round"/></svg> OpenSwells
             </a>
             <nav class="flex items-center gap-1">
-                <a href="/about" class="icon-button" title="About">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" width="18" height="18">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </a>
-                <a href="https://github.com/open-swells/open-swells-app" class="icon-button" title="GitHub">
+                <a href="/map" class="nav-link">Map</a>
+                <a href="/favorites" class="nav-link hidden sm:inline-flex">Favorites</a>
+                <a href="/about" class="nav-link">About</a>
+                <a href="https://github.com/open-swells/open-swells-app" class="icon-button ml-1" title="OpenSwells on GitHub" aria-label="OpenSwells on GitHub">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="17" height="17">
                         <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
                     </svg>
@@ -157,16 +160,14 @@
                 <g id="graticule"></g>
             </svg>
             <div class="hero-shade"></div>
-            <div class="chart-note hidden sm:block" style="left: 18px; top: 14px;">GFS-WAVE &middot; 0.25&deg; &middot; SIG. HEIGHT (M)</div>
-            <div class="chart-note hidden sm:block" style="right: 18px; top: 14px;">33.8&deg;N &nbsp;121.5&deg;W</div>
         </div>
 
-        <div class="relative z-10 max-w-6xl mx-auto px-6 pt-10 pb-12 text-center">
-            <h1 class="text-4xl md:text-5xl font-semibold tracking-tight text-white">
-                OpenSwells<span class="text-[#3b82f6]">;</span>
+        <div class="relative z-10 max-w-6xl mx-auto px-6 pt-12 md:pt-16 pb-16 text-center">
+            <h1 class="text-4xl md:text-6xl font-semibold tracking-[-0.03em] text-white">
+                OpenSwells
             </h1>
-            <p class="mt-3 text-[15px] text-[#b7bac1]">
-                Free surf reports and 16-day swell forecasts for {{formatcount .SpotCount}} spots. Open source, no subscription.
+            <p class="mt-4 max-w-lg mx-auto text-[15px] md:text-base leading-relaxed text-[#b7bac1] [text-wrap:balance]">
+                Free surf reports and 16-day swell forecasts for {{formatcount .SpotCount}} spots, built on NOAA wave models. Open source, no subscription.
             </p>
             <div class="hero-actions mt-6 max-w-xl mx-auto flex items-center gap-2">
                 <div class="spot-search" data-spot-search>
@@ -184,7 +185,7 @@
                 </a>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-10">
                 <div class="feature-card">
                     <div class="mono text-[10px] font-medium uppercase text-[#a6aab2]">Coverage</div>
                     <h2>{{formatcount .SpotCount}} surf spots</h2>
@@ -233,10 +234,14 @@
     </section>
 
     <!-- Footer -->
-    <footer class="w-full border-t border-[#2f3137] relative z-20 bg-[#0e0f12]">
-        <div class="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between text-[11px] text-[#8b9099]">
-            <span>OpenSwells &middot; open source</span>
-            <span class="mono">DATA: NOAA / NDBC / EMC</span>
+    <footer class="site-footer w-full border-t border-[#2f3137]/60 relative z-20 bg-[#0e0f12]">
+        <div class="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-[12px] text-[#8b9099]">
+            <div class="flex items-center gap-4">
+                <span class="flex items-center gap-1.5 text-[#d5d7dc] font-medium"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 20c4 0 4-4 8-4s4 4 8 4 4-4 8-4" fill="none" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round"/></svg> OpenSwells</span>
+                <a href="/about">About</a>
+                <a href="https://github.com/open-swells/open-swells-app">Source on GitHub</a>
+            </div>
+            <span>Data from <a href="https://www.ndbc.noaa.gov/" class="underline underline-offset-2 decoration-[#43454c]">NOAA NDBC</a> and <a href="https://polar.ncep.noaa.gov/waves/" class="underline underline-offset-2 decoration-[#43454c]">NCEP/EMC wave models</a></span>
         </div>
     </footer>
 
@@ -249,7 +254,7 @@
         // Same ramp as the map legend (low to high swell)
         const RAMP = ['#64a8e8', '#3178d2', '#15a3a3', '#2fb54e', '#a3c520', '#f2ce08'];
 
-        // Graticule: faint 2° grid with coordinate ticks
+        // Graticule: a faint grid, unlabelled
         const grat = document.getElementById('graticule');
         for (let x = 160; x < W; x += 160) {
             const line = document.createElementNS(SVG_NS, 'line');
@@ -264,24 +269,6 @@
             line.setAttribute('x2', W); line.setAttribute('y2', y);
             line.setAttribute('stroke', 'rgba(255,255,255,0.035)');
             grat.appendChild(line);
-        }
-        const lonLabels = [[160, '130°W'], [480, '126°W'], [800, '122°W'], [1120, '118°W'], [1440, '114°W']];
-        const latLabels = [[150, '38°N'], [450, '34°N'], [750, '30°N']];
-        for (const [x, txt] of lonLabels) {
-            const t = document.createElementNS(SVG_NS, 'text');
-            t.setAttribute('x', x + 5); t.setAttribute('y', H - 10);
-            t.setAttribute('fill', '#5f6269'); t.setAttribute('font-size', '10');
-            t.setAttribute('font-family', "'JetBrains Mono', monospace");
-            t.textContent = txt;
-            grat.appendChild(t);
-        }
-        for (const [y, txt] of latLabels) {
-            const t = document.createElementNS(SVG_NS, 'text');
-            t.setAttribute('x', 8); t.setAttribute('y', y - 6);
-            t.setAttribute('fill', '#5f6269'); t.setAttribute('font-size', '10');
-            t.setAttribute('font-family', "'JetBrains Mono', monospace");
-            t.textContent = txt;
-            grat.appendChild(t);
         }
 
         // --- Heatmap raster ------------------------------------------------
