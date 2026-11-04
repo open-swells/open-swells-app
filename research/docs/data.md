@@ -98,6 +98,34 @@ time, never by random step:
 - The test years overlap the GFS-Wave archive (2021-03 on), so the same
   period can be scored against GFS-Wave and buoys.
 
+## Building the training set
+
+**Status (2026-11-03): not downloaded yet.** `data/` holds only the
+samples used to check the tools: ERA5 2024-01 plus `static.zarr`, GFS-Wave
+2026-01-01 00Z f000/f024, and NDBC 46025/46086 for 2025 (~340 MB).
+
+The full prototype set, from `research/`. Each ERA5 command writes one
+zarr per month and skips months already written, so run a few at once and
+rerun any that stop:
+
+```sh
+# ERA5 2010–2025, 1°, 6-hourly: ~60 GB, ~22 h serial, ~6 h as four jobs
+uv run openswells-research fetch-era5 --start 2010-01 --end 2013-12 &
+uv run openswells-research fetch-era5 --start 2014-01 --end 2017-12 &
+uv run openswells-research fetch-era5 --start 2018-01 --end 2021-12 &
+uv run openswells-research fetch-era5 --start 2022-01 --end 2025-12 &
+wait
+
+# NDBC buoys within 100 km of spots, 2021–2025: ~0.5 GB, minutes
+uv run openswells-research fetch-ndbc --years 2021-2025
+```
+
+The four-job estimate assumes throughput scales with job count; it
+hasn't been measured. GFS-Wave isn't part of the training set: the
+evaluation harness (approaches.md, step 0) will pull forecasts at buoy
+points rather than store global grids. Update the status line above when
+a pull finishes.
+
 ## Open questions
 
 - [ ] Is GFS-Wave's `SWPER` a partition peak period or a mean period?
