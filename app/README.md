@@ -2,7 +2,7 @@
   <img src="https://github.com/evancoons22/go-mb-surf/blob/main/surf4.png?raw=true" width="300"/>
 </p>
 -->
-## OpenSwells;
+## OpenSwells
 
 ### Overview
 
