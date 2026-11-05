@@ -63,10 +63,9 @@
     --warn: #e2b86b;
 
     /* Night on the forecast charts: a veil over the hours the sun is
-       down, edged by a faint line at sunrise and sunset. The veil sits
-       over the series, so it dims them as well as the plot. */
+       down. The veil sits over the series, so it dims them as well
+       as the plot. */
     --night-veil: rgba(3, 4, 8, .5);
-    --sun-line: rgba(253, 226, 160, .35);
     --sun-text: #c9b98f;
 
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -108,7 +107,6 @@ button, input, select, textarea { font: inherit; letter-spacing: 0; }
 
 /* Sunrise/sunset marks shared by every forecast chart (see sunscript) */
 .sun-veil { fill: var(--night-veil); pointer-events: none; }
-.sun-line { stroke: var(--sun-line); stroke-width: 1; pointer-events: none; shape-rendering: crispEdges; }
 .sun-label { fill: var(--sun-text) !important; pointer-events: none; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
 
 a { color: inherit; text-decoration: none; }
