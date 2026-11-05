@@ -500,8 +500,9 @@
 {{if .HasTide}}
 <script>
     // Predicted highs and lows (t = epoch ms UTC, v = meters
-    // MLLW) at the NOAA CO-OPS station nearest the spot. The
-    // forecast component draws the curve between them.
+    // above .datum) at the NOAA CO-OPS station nearest the spot,
+    // or from FES2022 where none is near (.source). The forecast
+    // component draws the curve between them.
     window.SPOT_TIDES = {{json .Tide}};
 </script>
 {{end}}

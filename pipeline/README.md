@@ -156,6 +156,63 @@ results for a few spots without writing anything.
   CO-OPS rate-limits bursts, so stations fetched earlier the same UTC day
   are reused from `TIDE_CACHE_DIR` (default `~/.cache/openswells-tides`);
   a failed fetch keeps the server's previous file (`P` in publish.rules).
+  Spots with no CO-OPS station within 50 km fall back to the FES2022 global
+  tide atlas when `FES_CONFIG` names a PyFES config (see below); NOAA stays
+  the source wherever a station is in range. Each station in the file names
+  its `source` (`NOAA CO-OPS` or `FES2022`) and `datum` (`MLLW` or
+  `FES MLLW`), and the spot page's tide panel labels the datum.
+
+### FES2022 tide fallback
+
+`fes_tides.py` evaluates FES2022 with [PyFES](https://github.com/CNES/aviso-fes)
+on the pipeline host, so spot pages never call an outside service.
+
+1. **Data.** FES2022b is distributed by AVISO+, not with this repository:
+   register at aviso.altimetry.fr, accept the AVISO License, and download the
+   `ocean_tide_extrapolated/*.nc.xz` archives (unxz needs ~18 GB of memory).
+   The extrapolated grids fill the coastal pixels the native grid masks.
+   Licence terms that apply to this site (AVISO License, Issue 20):
+   - Never commit, serve or otherwise republish the `.nc` files (section 3.2).
+     The predictions derived from them are fine to publish.
+   - Keep the attribution: the credit under the tide chart on FES spots (in
+     `components/forecast.html`) and the FES2022 entry on the About page give
+     the product, producers, DOI, licence link and how the data was modified
+     (section 3.1).
+   - Don't imply that AVISO or CNES endorses the site (section 2.6).
+2. **PyFES.** `uv sync --extra fes` (`scripts/deploy.sh` does this on the
+   host). PyFES is source-only on PyPI and builds against Boost 1.79 or newer
+   and Eigen. On Debian 12 that means `apt install libboost1.81-dev
+   libeigen3-dev`: plain `libboost-dev` there is 1.74, too old.
+3. **Config.** Copy PyFES's `data/fes2022b/ocean_tide_extrapolated.yaml` and
+   make its paths absolute. The default location is
+   `~/.cache/openswells-fes2022/` (grids in `ocean_tide_extrapolated/`, config
+   `ocean_tide_extrapolated.yaml`), used whenever that config exists and
+   `FES_CONFIG` is unset; set `FES_CONFIG` to use another path, or to an
+   empty value to turn the fallback off. `scripts/fes_download.sh` fetches
+   the grids there (resumable; AVISO throttles each connection, so it
+   downloads six at a time).
+
+How it works: spots are grouped onto a 0.05° lattice so neighbors share a
+prediction; a site the atlas masks as land moves to the nearest wet point
+within ~30 km. The atlas is loaded 10° tile at a time. Predictions are
+made every 10 minutes over the same window as NOAA's; highs and lows are
+the refined turns of that curve and hourly values ride along. FES heights
+are relative to mean sea level, so they are shifted to a modeled MLLW
+(the mean lower low of each tidal day over 2026's predictions); each site's
+`msl` is mean sea level above that datum. NOAA's MLLW averages a 19-year
+epoch, so expect a few cm of difference where the two overlap.
+
+Caching: today's predictions come from `TIDE_CACHE_DIR` like NOAA's, so the
+atlas is read at most once a UTC day, and each site's wet point and datum
+are computed once and kept in `TIDE_CACHE_DIR/fes_sites.json` (reset when
+`FES_CONFIG` changes). If PyFES or the atlas fails, sites keep the previous
+file's predictions while those still reach four days ahead.
+
+Accuracy: FES2022 is an open-ocean model at 1/30°; inside estuaries,
+lagoons and reef passes its amplitude and timing can be off by tens of
+centimeters and tens of minutes. Before trusting a region, compare a few
+sites against local gauges (for example `fes_tides.fes_spot_tides` on spots
+next to UHSLC or national tide stations).
   also drives the app's hover readout.
 
 See `webgl-swell-rendering.md` (kept outside this repository) for the

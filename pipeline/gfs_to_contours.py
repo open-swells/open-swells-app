@@ -30,6 +30,7 @@ from bundle import bundle_name, pack_document, pack_grid, prune_bundles, write_b
 from composite import composite_swell, composite_wind
 from nwps import process_nwps_domains
 from spot_forecasts import load_spots, sample_spots, write_spot_forecasts
+from fes_tides import resolve_config as resolve_fes_config
 from tides import DEFAULT_TIDE_CACHE_DIR, SPOT_TIDES_NAME, write_spot_tides, write_tides
 from wind import extract_wind, pack_wind
 
@@ -1040,8 +1041,11 @@ def main() -> None:
                 pass
 
         # High/low tides at the station nearest each spot, for the spot
-        # pages' tide chart. Predictions are astronomical, so when this
-        # fails publish.rules keeps the previous run's file on the server.
+        # pages' tide chart, and FES2022 predictions for spots no station
+        # is near when FES_CONFIG names a PyFES config (default
+        # ~/.cache/openswells-fes2022/, if there). Predictions are
+        # astronomical, so when this fails publish.rules keeps the
+        # previous run's file on the server.
         if spot_ids:
             try:
                 write_spot_tides(
@@ -1051,6 +1055,7 @@ def main() -> None:
                     cache_path=os.path.join(
                         os.environ.get("TIDE_CACHE_DIR") or DEFAULT_TIDE_CACHE_DIR, SPOT_TIDES_NAME
                     ),
+                    fes_config=resolve_fes_config(os.environ.get("FES_CONFIG")),
                 )
             except Exception as exc:
                 logger.error("Writing spot tides failed: %s", exc, exc_info=True)

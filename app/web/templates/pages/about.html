@@ -169,6 +169,15 @@
                     <li><a href="https://maplibre.org/">MapLibre GL</a> (maps)</li>
                     <li><a href="https://d3js.org/">D3.js</a> (charts)</li>
                     <li><a href="https://polar.ncep.noaa.gov/waves/index.php">EMC Operational Wave Models</a></li>
+                    <li><a href="https://tidesandcurrents.noaa.gov/">NOAA CO-OPS</a> tide predictions, at spots within 50 km of a station</li>
+                    <li id="fes2022">Elsewhere, tides come from the FES2022b ocean tide model: FES2022 tide elevations,
+                        extrapolated grids (version b), by LEGOS, NOVELTIS and CLS, with CNES as licensor, distributed by
+                        AVISO+ (<a href="https://doi.org/10.24400/527896/A01-2024.004">doi:10.24400/527896/A01-2024.004</a>)
+                        under the <a href="https://www.aviso.altimetry.fr/fileadmin/documents/data/License_Aviso.pdf">AVISO License</a>.
+                        Modified: Open Swells evaluates the model's constituents with
+                        <a href="https://github.com/CNES/aviso-fes">PyFES</a> to predict hourly heights and highs and lows
+                        at each spot (taken from the nearest ocean grid point where a spot falls on land), and shifts them
+                        from mean sea level to a modeled MLLW computed from one year of predictions.</li>
                 </ul>
             </div>
         </main>

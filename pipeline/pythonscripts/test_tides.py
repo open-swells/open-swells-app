@@ -22,6 +22,17 @@ STATIONS = [
 ]
 
 
+def harmonic(m2=0.8, k1=0.0):
+    """A stand-in FES predictor: M2 + K1 everywhere."""
+    import numpy as np
+
+    def predict(lons, lats, times):
+        t = times.astype("datetime64[s]").astype(np.int64).astype(float)
+        return m2 * np.cos(2 * np.pi * t / (12.4206 * 3600)) + k1 * np.cos(2 * np.pi * t / (23.9345 * 3600))
+
+    return predict
+
+
 class FakeResponse:
     def __init__(self, payload):
         self.payload = payload
@@ -217,6 +228,59 @@ class SpotTideTests(unittest.TestCase):
         self.assertEqual(result, (0, 2))
         self.assertEqual(hilo.call_count, 1)
         self.assertIn("rate limiting", payload["errors"][1]["error"])
+
+    def test_write_spot_tides_falls_back_to_fes_only_without_a_station(self):
+        spots = [
+            {"id": "a", "lat": 33.01, "lon": -117.29},  # 1 km from "near"
+            {"id": "bali", "lat": -8.815, "lon": 115.088},
+        ]
+        factory = Mock(side_effect=lambda bbox: harmonic(m2=0.8, k1=0.2))
+        with tempfile.TemporaryDirectory() as directory:
+            cache = os.path.join(directory, "cache", "spot_tides.json.gz")
+            with patch("tides.fetch_hilo", return_value=[[1, 0.5, "L"]]), patch(
+                "tides.fetch_hourly", return_value=None
+            ), patch("fes_tides.pyfes_predictors", return_value=factory):
+                result, payload = self._write(
+                    directory, spots, now=datetime(2026, 7, 11, tzinfo=UTC), cache_path=cache, fes_config="fes.yml"
+                )
+            self.assertTrue(os.path.exists(os.path.join(directory, "cache", "fes_sites.json")))
+
+        self.assertEqual(result, (2, 0))
+        self.assertEqual(payload["spots"]["a"]["station"], "near")
+        near = payload["stations"]["near"]
+        self.assertEqual((near["source"], near["datum"]), ("NOAA CO-OPS", "MLLW"))
+        fes_id = payload["spots"]["bali"]["station"]
+        self.assertTrue(fes_id.startswith("fes:"))
+        fes = payload["stations"][fes_id]
+        self.assertEqual((fes["source"], fes["datum"], fes["type"]), ("FES2022", "FES MLLW", "M"))
+        self.assertIn("msl", fes)
+        self.assertTrue(fes["hilo"] and fes["hourly"]["v"])
+        # only the spot without a station asked the model
+        self.assertEqual(factory.call_count, 1)
+
+    def test_write_spot_tides_without_fes_config_skips_the_model(self):
+        spots = [{"id": "bali", "lat": -8.815, "lon": 115.088}]
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("fes_tides.pyfes_predictors") as predictors:
+                _, payload = self._write(directory, spots, now=datetime(2026, 7, 11, tzinfo=UTC))
+        predictors.assert_not_called()
+        self.assertEqual(payload["spots"], {})
+
+    def test_write_spot_tides_keeps_previous_fes_when_pyfes_is_missing(self):
+        spots = [{"id": "bali", "lat": -8.815, "lon": 115.088}]
+        with tempfile.TemporaryDirectory() as directory:
+            cache = os.path.join(directory, "cache", "spot_tides.json.gz")
+            with patch("fes_tides.pyfes_predictors", return_value=lambda bbox: harmonic()):
+                _, first = self._write(
+                    directory, spots, now=datetime(2026, 7, 11, tzinfo=UTC), cache_path=cache, fes_config="fes.yml"
+                )
+            with patch("fes_tides.pyfes_predictors", side_effect=ImportError("No module named 'pyfes'")):
+                _, second = self._write(
+                    directory, spots, now=datetime(2026, 7, 12, tzinfo=UTC), cache_path=cache, fes_config="fes.yml"
+                )
+        self.assertEqual(second["spots"], first["spots"])
+        self.assertEqual(second["stations"], first["stations"])
+        self.assertIn("kept the previous prediction", second["errors"][0]["error"])
 
 
 if __name__ == "__main__":

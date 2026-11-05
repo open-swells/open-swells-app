@@ -1,4 +1,5 @@
-"""NOAA CO-OPS tide predictions and recent observed water levels.
+"""NOAA CO-OPS tide predictions and recent observed water levels, with
+FES2022 model predictions for spots no CO-OPS station is near.
 
 Two products:
 
@@ -10,7 +11,9 @@ Two products:
   (an hourly request fails), and the web app draws the curve between their
   events. Reference stations also get hourly predictions: around neap tides
   one high/low pair can flatten into a stand that has no event, which a
-  curve drawn between events misses.
+  curve drawn between events misses. Spots with no station within
+  SPOT_TIDE_MAX_KM fall back to FES2022 (see fes_tides.py) when an atlas
+  is configured.
 """
 
 import gzip
@@ -24,6 +27,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
 import requests
+
+import fes_tides
 
 logger = logging.getLogger("GFSWaveContours")
 DATA_URL = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter"
@@ -257,19 +262,25 @@ def fetch_hourly(
     return {"start": start, "v": [round(float(p["v"]), 3) for p in predictions]}
 
 
-def _cached_stations(cache_path: str | None, now: datetime) -> dict:
-    """Stations from the cached file when it was written on now's UTC day."""
+def _read_cache(cache_path: str | None) -> tuple[datetime | None, dict]:
+    """The cached file's generation time and stations."""
     if not cache_path:
-        return {}
+        return None, {}
     try:
         with gzip.open(cache_path, "rt") as f:
             cached = json.load(f)
         generated = datetime.fromisoformat(cached["generated_at"]).astimezone(UTC)
     except (OSError, ValueError, KeyError, TypeError):
+        return None, {}
+    return generated, cached.get("stations", {})
+
+
+def _cached_stations(cache_path: str | None, now: datetime) -> dict:
+    """Stations from the cached file when it was written on now's UTC day."""
+    generated, stations = _read_cache(cache_path)
+    if generated is None or generated.date() != now.date():
         return {}
-    if generated.date() != now.date():
-        return {}
-    return cached.get("stations", {})
+    return stations
 
 
 def write_spot_tides(
@@ -281,6 +292,7 @@ def write_spot_tides(
     max_km: float = SPOT_TIDE_MAX_KM,
     workers: int = 4,
     cache_path: str | None = None,
+    fes_config: str | None = None,
 ) -> tuple[int, int]:
     """Write high/low tides for the station nearest each spot.
 
@@ -289,18 +301,26 @@ def write_spot_tides(
         {
           "generated_at": "...", "source": "NOAA CO-OPS",
           "datum": "MLLW", "units": "meters",
-          "stations": {"<id>": {"name", "lat", "lon", "type", "hilo": [[t, v, "H"], ...],
+          "stations": {"<id>": {"name", "lat", "lon", "type", "source", "datum",
+                                "hilo": [[t, v, "H"], ...],
                                 "hourly": {"start": t, "v": [...]}}},
           "spots": {"<spot id>": {"station": "<id>", "km": 3.2}},
           "errors": [{"station": "<id>", "error": "..."}]
         }
 
-    "type" is "R" (reference) or "S" (subordinate); only reference stations
-    have "hourly", and it is left out when that request fails. Spots whose
-    station failed are left out. Returns (stations written, stations failed).
+    "type" is "R" (reference) or "S" (subordinate) for CO-OPS stations;
+    only reference stations have "hourly", and it is left out when that
+    request fails. The top-level "source" and "datum" are CO-OPS's; each
+    station names its own, since with fes_config (a PyFES YAML config for
+    the FES2022 atlas) spots with no station within max_km get an FES2022
+    site instead: id "fes:<lat>,<lon>", type "M", datum "FES MLLW", and
+    "msl", mean sea level above that datum. Spots whose station failed are
+    left out. Returns (stations written, stations failed).
 
     With cache_path, stations already in that file from the same UTC day are
-    reused, and the result is copied there for the next run.
+    reused, and the result is copied there for the next run. FES sites that
+    fail keep their predictions from that file while they reach far enough
+    ahead, and each site's model point and datum are kept beside it.
     """
     now = (now or datetime.now(UTC)).astimezone(UTC)
     with open(spots_path) as f:
@@ -354,10 +374,22 @@ def write_spot_tides(
                 "lat": station["lat"],
                 "lon": station["lon"],
                 "type": station["type"],
+                "source": "NOAA CO-OPS",
+                "datum": "MLLW",
                 "hilo": events,
             }
             if hourly:
                 out_stations[station_id]["hourly"] = hourly
+    spot_matches = {k: v for k, v in matches.items() if v["station"] in out_stations}
+
+    if fes_config:
+        # NOAA stays first: only spots with no station in range use the model.
+        fes_stations, fes_matches, fes_errors = _fes_tides(
+            [spot for spot in spots if spot.get("id") not in matches], fes_config, now, cached, cache_path
+        )
+        out_stations.update(fes_stations)
+        spot_matches.update(fes_matches)
+        errors.extend(fes_errors)
 
     payload = {
         "generated_at": now.isoformat(),
@@ -365,7 +397,7 @@ def write_spot_tides(
         "datum": "MLLW",
         "units": "meters",
         "stations": out_stations,
-        "spots": {k: v for k, v in matches.items() if v["station"] in out_stations},
+        "spots": spot_matches,
         "errors": errors,
     }
     # write-then-rename so a reader never sees a half-written file
@@ -387,3 +419,29 @@ def write_spot_tides(
         output_path, len(out_stations), len(errors), len(payload["spots"]),
     )
     return len(out_stations), len(errors)
+
+
+def _fes_tides(spots: list[dict], fes_config: str, now: datetime, cached: dict, cache_path: str | None):
+    sites_path = os.path.join(os.path.dirname(cache_path), fes_tides.FES_SITES_NAME) if cache_path else None
+    # the atlas is named by its config; another config starts the site cache over
+    model = os.path.abspath(fes_config)
+    sites = fes_tides.load_site_cache(sites_path, model)
+    try:
+        predictor_for = fes_tides.pyfes_predictors(fes_config)
+    except ImportError as exc:
+        logger.error("FES tides need PyFES (uv sync --extra fes): %s", exc)
+
+        def predictor_for(bbox, exc=exc):
+            raise exc
+
+    _, previous = _read_cache(cache_path)
+    result = fes_tides.fes_spot_tides(
+        spots,
+        predictor_for,
+        now=now,
+        cached=cached,
+        previous=fes_tides.still_current(previous, now),
+        sites=sites,
+    )
+    fes_tides.save_site_cache(sites_path, model, sites)
+    return result

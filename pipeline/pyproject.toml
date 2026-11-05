@@ -13,3 +13,10 @@ dependencies = [
     "scipy>=1.16.2",
     "shapely>=2.1.2",
 ]
+
+[project.optional-dependencies]
+# FES2022 tide fallback (fes_tides.py). PyFES ships as source only and
+# builds against Boost, Eigen and netCDF; conda-forge has binaries.
+fes = [
+    "pyfes>=2026.10.0",
+]

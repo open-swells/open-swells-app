@@ -127,7 +127,8 @@
 
             // --- Tide ------------------------------------------------------
             // Predicted highs and lows at the nearest NOAA CO-OPS station,
-            // injected by the spot page (buoy pages have none). Most coastal
+            // or from the FES2022 model where no station is near, injected
+            // by the spot page (buoy pages have none). Most coastal
             // stations are subordinate stations that NOAA only predicts as
             // highs and lows; between those the curve is a half cosine, the
             // same shape NOAA draws for them. Reference stations also send
@@ -931,7 +932,9 @@
                         .range([tdBase - 18, tdTop + 20]);
                     const ftLabel = v => `${v.toFixed(1)} ft`;
                     const station = TIDE.name && TIDE.name.length > 30 ? `${TIDE.name.slice(0, 29)}…` : (TIDE.name || TIDE.station);
-                    panelTitle(tdTop, 'TIDE (FT, MLLW)', `${station} · ${TIDE.km.toFixed(0)} km`, CHART.axis);
+                    // model tides (FES2022) are above a modeled MLLW, not NOAA's
+                    const datum = (TIDE.datum || 'MLLW').toUpperCase();
+                    panelTitle(tdTop, `TIDE (FT, ${datum})`, `${station} · ${TIDE.km.toFixed(0)} km`, CHART.axis);
                     for (const t of yt.ticks(4)) {
                         lane.append("line")
                             .attr("x1", 0).attr("x2", width)
@@ -1286,6 +1289,20 @@
         <div id="chart-container">
             <div id="chart"></div>
         </div>
+        <!-- AVISO License (Issue 20) section 3.1: credit the source,
+             link the license and say how the data was modified, wherever
+             FES2022 tides are shown. Kept free of anything implying
+             endorsement (section 2.6). -->
+        <p id="tideCredit" class="mt-2 px-1 text-[10px] leading-snug text-[#8b9099]" hidden>
+            Tide at this spot is modeled, not measured at a station: computed by Open Swells from the
+            <a href="https://doi.org/10.24400/527896/A01-2024.004" class="underline underline-offset-2">FES2022b ocean tide model</a>
+            (LEGOS, NOVELTIS, CLS; CNES), distributed by AVISO+ under the
+            <a href="https://www.aviso.altimetry.fr/fileadmin/documents/data/License_Aviso.pdf" class="underline underline-offset-2">AVISO License</a>.
+            Heights are relative to a modeled MLLW datum, not NOAA's.
+        </p>
+        <script>
+            if ((window.SPOT_TIDES || {}).source === 'FES2022') document.getElementById('tideCredit').hidden = false;
+        </script>
     </div>
     <div id="tooltip" class="absolute invisible pointer-events-none"></div>
     <div class="h-8"></div>
