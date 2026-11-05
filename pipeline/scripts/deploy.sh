@@ -76,14 +76,24 @@ if [[ -z "$UV_BIN" || ! -x "$UV_BIN" ]]; then
   exit 1
 fi
 
+# --extra fes installs PyFES for the FES2022 tide fallback; a plain
+# `uv sync` would uninstall it. It builds from source (needs Boost >= 1.79,
+# e.g. libboost1.81-dev on Debian 12, and libeigen3-dev); uv caches the
+# build, so later deploys don't recompile.
 echo "Syncing virtualenv with $UV_BIN..."
-"$UV_BIN" sync --frozen
+"$UV_BIN" sync --frozen --extra fes
 
 echo "Checking scripts and imports..."
 for script in run.sh scripts/*.sh; do
   bash -n "$script"
 done
 .venv/bin/python -c 'import gfs_to_contours'
+if ! .venv/bin/python -c 'import pyfes' 2>/dev/null; then
+  echo "Warning: PyFES is not importable; spots far from NOAA stations get no tides." >&2
+fi
+if [[ ! -f "$HOME/.cache/openswells-fes2022/ocean_tide_extrapolated.yaml" ]]; then
+  echo "Warning: FES2022 data not found in ~/.cache/openswells-fes2022 (see scripts/fes_download.sh)." >&2
+fi
 
 if [[ ! -f .env ]]; then
   echo "Warning: $PIPELINE_DIR/.env is missing; runs cannot publish until it exists." >&2

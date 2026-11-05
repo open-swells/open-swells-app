@@ -80,3 +80,33 @@ func TestSpotTideMissingFile(t *testing.T) {
 		t.Error("expected no tide without a file")
 	}
 }
+
+func TestSpotTideNamesSourceAndDatum(t *testing.T) {
+	dir := t.TempDir()
+	writeSpotTidesFixture(t, dir, `{
+		"stations": {
+			"9410230": {"name": "La Jolla", "type": "R", "hilo": [
+				[1783728000, 0.1, "L"], [1783749600, 1.5, "H"], [1783771200, 0.4, "L"]
+			]},
+			"fes:-8.80,115.10": {"name": "FES2022 model", "type": "M",
+				"source": "FES2022", "datum": "FES MLLW", "msl": 1.1, "hilo": [
+				[1783728000, 0.1, "L"], [1783749600, 2.0, "H"], [1783771200, 0.3, "L"]
+			], "hourly": {"start": 1783728000, "v": [0.1, 0.4]}}
+		},
+		"spots": {
+			"blacks-beach": {"station": "9410230", "km": 2.5},
+			"uluwatu": {"station": "fes:-8.80,115.10", "km": 1.6}
+		}
+	}`)
+	base := time.Unix(1783728000, 0).UTC()
+
+	// older files have no source or datum: they are NOAA's
+	noaa, ok := spotTide(dir, "blacks-beach", base.Add(time.Hour), base.Add(2*time.Hour))
+	if !ok || noaa.Source != "NOAA CO-OPS" || noaa.Datum != "MLLW" {
+		t.Errorf("noaa = %+v", noaa)
+	}
+	fes, ok := spotTide(dir, "uluwatu", base.Add(time.Hour), base.Add(2*time.Hour))
+	if !ok || fes.Source != "FES2022" || fes.Datum != "FES MLLW" || fes.Subordinate || fes.Hourly == nil {
+		t.Errorf("fes = %+v", fes)
+	}
+}

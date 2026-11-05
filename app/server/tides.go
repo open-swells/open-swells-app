@@ -5,7 +5,11 @@ package main
 // events (see grib-parse-collect/tides.py). Most coastal stations are
 // subordinate stations, which CO-OPS only predicts as highs and lows, so the
 // spot page draws the curve between events itself. Reference stations also
-// carry hourly predictions, which the curve follows instead.
+// carry hourly predictions, which the curve follows instead. Spots with no
+// station nearby may instead have an FES2022 model site (type "M", always
+// hourly), whose heights are above a modeled MLLW rather than NOAA's; each
+// station names its source and datum, and older files without them are
+// NOAA CO-OPS and MLLW.
 //
 // Predictions are astronomical and don't belong to a model run, so unlike
 // spot_forecasts.json.gz the file isn't checked against metadata.json; the
@@ -24,12 +28,16 @@ import (
 const spotTidesFile = "spot_tides.json.gz"
 
 type tideStation struct {
-	Name string      `json:"name"`
-	Lat  float64     `json:"lat"`
-	Lon  float64     `json:"lon"`
-	Type string      `json:"type"` // "R" reference (harmonic) or "S" subordinate
-	HiLo []TideEvent `json:"hilo"`
-	// Reference stations only: meters MLLW hourly from Start (unix seconds).
+	Name string  `json:"name"`
+	Lat  float64 `json:"lat"`
+	Lon  float64 `json:"lon"`
+	Type string  `json:"type"` // "R" reference (harmonic), "S" subordinate, or "M" model
+	// e.g. "NOAA CO-OPS" / "MLLW" or "FES2022" / "FES MLLW"
+	Source string      `json:"source"`
+	Datum  string      `json:"datum"`
+	HiLo   []TideEvent `json:"hilo"`
+	// Reference and model stations only: meters above the station's datum
+	// hourly from Start (unix seconds).
 	Hourly *struct {
 		Start int64     `json:"start"`
 		V     []float64 `json:"v"`
@@ -44,7 +52,8 @@ type spotTideSet struct {
 	} `json:"spots"`
 }
 
-// TideEvent is one predicted high or low: T epoch ms, V meters MLLW.
+// TideEvent is one predicted high or low: T epoch ms, V meters above the
+// station's datum (MLLW for NOAA stations).
 type TideEvent struct {
 	T    int64   `json:"t"`
 	V    float64 `json:"v"`
@@ -82,12 +91,14 @@ type SpotTide struct {
 	StationName string      `json:"name"`
 	Km          float64     `json:"km"`
 	Subordinate bool        `json:"subordinate"`
+	Source      string      `json:"source"`
+	Datum       string      `json:"datum"`
 	Events      []TideEvent `json:"events"`
 	// Hourly predictions over the events' span, when the station has them.
 	Hourly *TideHourly `json:"hourly,omitempty"`
 }
 
-// TideHourly is meters MLLW one hour apart from Start (epoch ms).
+// TideHourly is meters above the datum one hour apart from Start (epoch ms).
 type TideHourly struct {
 	Start int64     `json:"start"`
 	V     []float64 `json:"v"`
@@ -176,11 +187,20 @@ func spotTide(staticDir, spotID string, from, to time.Time) (SpotTide, bool) {
 		return SpotTide{}, false // the file's events don't reach this window
 	}
 	events := st.HiLo[first : last+1]
+	source, datum := st.Source, st.Datum
+	if source == "" {
+		source = "NOAA CO-OPS"
+	}
+	if datum == "" {
+		datum = "MLLW"
+	}
 	return SpotTide{
 		StationID:   match.Station,
 		StationName: st.Name,
 		Km:          match.Km,
 		Subordinate: st.Type == "S",
+		Source:      source,
+		Datum:       datum,
 		Events:      events,
 		Hourly:      hourlySpan(st, events[0].T, events[len(events)-1].T),
 	}, true
