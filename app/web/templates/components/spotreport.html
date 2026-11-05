@@ -445,8 +445,16 @@
                 }
             }
 
-            // sunrise and sunset: a faint line through the lanes, the
-            // time beside it on the night side, atop the surf lane
+            // Shade the gaps between lanes to match the lane overlays.
+            for (const n of sun.nights) {
+                for (let i = 0; i < lanes.length - 1; i++) {
+                    svg.append('rect').attr('class', 'sun-veil')
+                        .attr('x', x(new Date(n.start))).attr('width', x(new Date(n.end)) - x(new Date(n.start)))
+                        .attr('y', lanes[i].y + lanes[i].h).attr('height', gap);
+                }
+            }
+
+            // Sunrise and sunset times sit on the night side of the surf lane.
             const sunMarks = [...sun.rises.map(t => ({ t, rise: true })), ...sun.sets.map(t => ({ t, rise: false }))];
             // labels already on the top row (lane name, peak, y ticks)
             const taken = svg.selectAll('text').nodes().map(n => n.getBBox()).filter(b => b.y < 14);
@@ -454,7 +462,6 @@
                 && taken.every(o => b.x > o.x + o.width + 3 || b.x + b.width < o.x - 3 || b.y > o.y + o.height || b.y + b.height < o.y);
             for (const m of sunMarks) {
                 const sx = x(new Date(m.t));
-                svg.append('line').attr('class', 'sun-line').attr('x1', sx).attr('x2', sx).attr('y1', 0).attr('y2', height - axisH);
                 if (narrow) continue;
                 const text = svg.append('text').attr('class', 'sun-label').attr('y', 9)
                     .text(`${m.rise ? 'sunrise' : 'sunset'} ${SUN.shortTime(m.t)}`);

@@ -1025,8 +1025,8 @@
                 }
 
                 // Night: a veil over each panel's dark hours, over the
-                // series but beneath the labels, and a faint line at
-                // sunrise and sunset with its time atop the swell panel
+                // series but beneath the labels, with sunrise and sunset
+                // times atop the swell panel
                 if (currentDate) {
                     const { start: sunDayStart, end: sunDayEnd } = localDayBounds(currentDate);
                     const sun = SUN.between(window.SUN_SITE, +sunDayStart, +sunDayEnd);
@@ -1053,10 +1053,6 @@
                     const sunMarks = [...sun.rises.map(t => ({ t, rise: true })), ...sun.sets.map(t => ({ t, rise: false }))];
                     for (const m of sunMarks) {
                         const sx = x(sunHour(m.t));
-                        for (const [top, bottom] of panels) {
-                            marks.append("line").attr("class", "sun-line")
-                                .attr("x1", sx).attr("x2", sx).attr("y1", top).attr("y2", bottom);
-                        }
                         // night side, unless it would run off the plot
                         const before = m.rise ? sx > 100 : sx > width - 95;
                         marks.append("text").attr("class", "sun-label")
