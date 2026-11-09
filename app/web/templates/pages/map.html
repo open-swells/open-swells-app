@@ -228,13 +228,16 @@
         /* Forecast timeline scrubber: a 16-day track with day ticks and a
            sliding playhead. The real <input type="range"> sits invisibly on
            top so dragging/keyboard behavior stays native. */
-        .timeline-track { position: relative; height: 44px; flex: 1; min-width: 0; }
+        .timeline-track {
+            position: relative; height: 44px; flex: 1; min-width: 0;
+            cursor: ew-resize; touch-action: none; user-select: none;
+        }
         .timeline-track::before {
             content: '';
             position: absolute; left: 0; right: 0; bottom: 15px;
             height: 1px; background: #2f3137;
         }
-        .timeline-track:focus-within { outline: 1px solid #3b82f6; outline-offset: 3px; }
+        .timeline-track:has(.timeline-input:focus-visible) { outline: 1px solid #3b82f6; outline-offset: 3px; }
         .timeline-tick {
             position: absolute; bottom: 15px;
             width: 1px; height: 7px;
@@ -268,11 +271,14 @@
             width: 7px; height: 7px;
             background: #60a5fa;
         }
+        /* Keyboard and screen readers only: pointer drags are handled on
+           the track (see timeline scrubbing), because the native thumb is
+           inset by half its width and steps by index, not by hour. */
         .timeline-input {
             position: absolute; inset: 0;
             width: 100%; height: 100%;
             opacity: 0; margin: 0;
-            cursor: ew-resize;
+            pointer-events: none;
         }
         @media (max-width: 640px) {
             .timeline-tick-label { display: none; }
@@ -498,7 +504,7 @@
                         <span id="timeDay" class="text-[13px] font-semibold leading-tight text-white">--</span>
                         <span id="timeClock" class="mono text-[11px] leading-tight text-[#60a5fa] mt-0.5">--:--</span>
                     </div>
-                    <div class="timeline-track">
+                    <div id="timelineTrack" class="timeline-track">
                         <div id="timelineTicks" class="absolute inset-0 pointer-events-none"></div>
                         <div id="timelineProgress" class="timeline-progress" style="width: 0%"></div>
                         <div id="timelinePlayhead" class="timeline-playhead" style="left: 0%"></div>
@@ -817,8 +823,11 @@
                 return runUrl(`/static/arrows_${String(hour).padStart(3, '0')}.geojson`);
             }
 
+            // metadata.json's heatmap_format ("webp"); runs from before it
+            // was published wrote PNGs.
+            let heatmapFormat = 'png';
             function hourToHeatmapFilename(hour) {
-                return runUrl(`/static/heatmap_${String(hour).padStart(3, '0')}.png`);
+                return runUrl(`/static/heatmap_${String(hour).padStart(3, '0')}.${heatmapFormat}`);
             }
 
             function hourToPartitionsFilename(hour) {
@@ -961,7 +970,8 @@
 
             // --- Heatmap rendering -------------------------------------------
             // The pipeline pre-renders each hour's height field as a Mercator
-            // PNG (heatmap_XXX.png); metadata.json carries the corner bounds.
+            // image (heatmap_XXX.webp, .png in older runs); metadata.json
+            // carries the corner bounds.
             // Two image sources ping-pong with an opacity transition so frame
             // changes crossfade instead of popping. The contour polygons stay
             // as a fallback when a run has no heatmaps.
@@ -1091,7 +1101,7 @@
                     .then(objectUrl => decodeImageUrl(objectUrl))
                     .catch(() => null); // hour not covered: global shows through
                 nwpsImageCache.set(url, promise);
-                if (nwpsImageCache.size > FRAME_CACHE_MAX) {
+                if (nwpsImageCache.size > FRAME_CACHE_MAX * Math.max(1, nwpsLayers.length)) {
                     const oldest = nwpsImageCache.keys().next().value;
                     nwpsImageCache.get(oldest).then(u => u && URL.revokeObjectURL(u));
                     nwpsImageCache.delete(oldest);
@@ -1192,6 +1202,9 @@
                 updateMap(currentIndex);
             }
 
+            // Holds the prefetch window (PREFETCH_AHEAD + PREFETCH_BEHIND)
+            // plus some recently viewed hours, so stepping back and forth
+            // doesn't refetch.
             const FRAME_CACHE_MAX = 48;
 
             // Heatmap frames are fetched as blobs into an LRU of object URLs.
@@ -1436,6 +1449,7 @@
                     }
 
                     if (metadata.heatmap_bounds) {
+                        heatmapFormat = metadata.heatmap_format === 'webp' ? 'webp' : 'png';
                         heatmapBounds = metadata.heatmap_bounds;
                         maybeAddHeatmapLayers();
                     }
@@ -1491,6 +1505,8 @@
                 );
                 timeDayLabel.textContent = dayFormatter.format(currentTime);
                 timeClockLabel.textContent = clockFormatter.format(currentTime);
+                timeSlider.setAttribute('aria-valuetext',
+                    `${timeDayLabel.textContent} ${timeClockLabel.textContent}`);
             }
 
             // One tick per forecast day; a label on every other tick keeps
@@ -1527,24 +1543,27 @@
             // the frame is tried again, without playback and prefetch retrying
             // it on every tick.
             const FAILED_FRAME_RETRY_MS = 15000;
-            function cachedFrame(key, load, fallback = EMPTY_FC) {
-                if (frameCache.has(key)) {
-                    const cached = frameCache.get(key);
-                    frameCache.delete(key);
-                    frameCache.set(key, cached); // refresh LRU position
+            // Arrow grids get their own cache, so the hover readout's and
+            // contours' entries can't evict the prefetch window.
+            const arrowGridCache = new Map();
+            function cachedFrame(key, load, fallback = EMPTY_FC, cache = frameCache, max = FRAME_CACHE_MAX) {
+                if (cache.has(key)) {
+                    const cached = cache.get(key);
+                    cache.delete(key);
+                    cache.set(key, cached); // refresh LRU position
                     return cached;
                 }
                 const promise = Promise.resolve()
                     .then(load)
                     .then(frame => frame || fallback, () => {
                         setTimeout(() => {
-                            if (frameCache.get(key) === promise) frameCache.delete(key);
+                            if (cache.get(key) === promise) cache.delete(key);
                         }, FAILED_FRAME_RETRY_MS);
                         return fallback;
                     });
-                frameCache.set(key, promise);
-                if (frameCache.size > FRAME_CACHE_MAX) {
-                    frameCache.delete(frameCache.keys().next().value);
+                cache.set(key, promise);
+                if (cache.size > max) {
+                    cache.delete(cache.keys().next().value);
                 }
                 return promise;
             }
@@ -1560,14 +1579,24 @@
                 return cachedFrame(url, () => fetchJson(url));
             }
 
-            // Swell arrows: partition 1 of the swell bundle as point features.
+            // Swell arrows: partition 1 of the swell bundle. The compact
+            // int16 grid is what's prefetched and cached; point features are
+            // built from it on demand (a few ms) and only the last few kept.
+            const arrowFeatureCache = new Map();
+            function loadArrowGrid(hour) {
+                return cachedFrame(runUrl(`arrowgrid#${hour}`), async () => {
+                    const bundle = await openBundle('swell');
+                    if (!bundle) return { features: await fetchJson(hourToArrowsFilename(hour)) }; // run from before the bundles
+                    return forecastBundles.grid(bundle, hour, ['h1', 'p1', 'd1']);
+                }, null, arrowGridCache, FRAME_CACHE_MAX);
+            }
+
             function loadArrows(hour) {
                 return cachedFrame(runUrl(`arrows#${hour}`), async () => {
-                    const bundle = await openBundle('swell');
-                    if (!bundle) return fetchJson(hourToArrowsFilename(hour)); // run from before the bundles
-                    const grid = await forecastBundles.grid(bundle, hour, ['h1', 'p1', 'd1']);
-                    return grid && forecastBundles.gridFeatures(grid, { h1: 'h', p1: 'p', d1: 'd' });
-                });
+                    const grid = await loadArrowGrid(hour);
+                    if (!grid) return null;
+                    return grid.features || forecastBundles.gridFeatures(grid, { h1: 'h', p1: 'p', d1: 'd' });
+                }, EMPTY_FC, arrowFeatureCache, 8);
             }
 
             function loadContours(hour) {
@@ -1578,18 +1607,56 @@
                 });
             }
 
-            function prefetchFrames(index, count = 4) {
-                for (let i = 1; i <= count; i++) {
-                    const hour = forecastHours[(index + i) % forecastHours.length];
-                    if (wantsHeatmap()) {
-                        loadImageFrame(hourToHeatmapFilename(hour));
-                        for (const layer of nwpsLayers) {
-                            if (layer.hours.has(hour)) loadNwpsFrame(nwpsFrameUrl(layer, hour));
-                        }
-                    } else {
-                        loadContours(hour);
+            // Prefetch a window around the playhead, nearest frames first:
+            // PREFETCH_AHEAD hours ahead (wrapping, like playback) and
+            // PREFETCH_BEHIND behind. A heatmap frame is ~200 KB, so the
+            // window costs ~6 MB; the whole run would be ~45 MB. Each
+            // updateMap re-centers what's still queued; cached frames
+            // resolve immediately.
+            const PREFETCH_AHEAD = 24;
+            const PREFETCH_BEHIND = 6;
+            // Parsed contour GeoJSON is large: contour mode keeps it short.
+            const PREFETCH_AHEAD_CONTOURS = 6;
+            const PREFETCH_CONCURRENCY = 4;
+            let prefetchQueue = [];
+            let prefetchActive = 0;
+
+            function prefetchHour(hour, withHeatmap) {
+                const loads = [loadArrowGrid(hour)];
+                if (withHeatmap) {
+                    loads.push(loadImageFrame(hourToHeatmapFilename(hour)));
+                    for (const layer of nwpsLayers) {
+                        if (layer.hours.has(hour)) loads.push(loadNwpsFrame(nwpsFrameUrl(layer, hour)));
                     }
-                    loadArrows(hour);
+                } else {
+                    loads.push(loadContours(hour));
+                }
+                return Promise.all(loads);
+            }
+
+            function prefetchFrames(index) {
+                const n = forecastHours.length;
+                const withHeatmap = wantsHeatmap();
+                const ahead = Math.min(withHeatmap ? PREFETCH_AHEAD : PREFETCH_AHEAD_CONTOURS, n - 1);
+                const behind = withHeatmap ? Math.min(PREFETCH_BEHIND, index) : 0;
+                const queue = [];
+                // Mostly ahead: one hour behind for every four ahead.
+                for (let d = 1; d <= ahead || Math.ceil(d / 4) <= behind; d++) {
+                    if (d <= ahead) queue.push((index + d) % n);
+                    if (d % 4 === 0 && d / 4 <= behind) queue.push(index - d / 4);
+                }
+                prefetchQueue = [...new Set(queue)].map(i => ({ hour: forecastHours[i], withHeatmap }));
+                pumpPrefetch();
+            }
+
+            function pumpPrefetch() {
+                while (prefetchActive < PREFETCH_CONCURRENCY && prefetchQueue.length) {
+                    const { hour, withHeatmap } = prefetchQueue.shift();
+                    prefetchActive++;
+                    prefetchHour(hour, withHeatmap).catch(() => null).then(() => {
+                        prefetchActive--;
+                        pumpPrefetch();
+                    });
                 }
             }
 
@@ -1649,6 +1716,14 @@
                 updateMap(nextIndex);
             }
 
+            function stopPlayback() {
+                if (!isPlaying) return;
+                clearInterval(animationInterval);
+                isPlaying = false;
+                playButton.innerHTML = PLAY_ICON;
+                playButton.title = 'Play forecast';
+            }
+
             const PLAY_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
             const PAUSE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>';
 
@@ -1666,16 +1741,78 @@
                 }
             });
 
+            // Keyboard (arrow keys step one published hour).
             timeSlider.addEventListener('input', (event) => {
                 const index = parseInt(event.target.value, 10);
                 updateMap(index);
-                if (isPlaying) {
-                    clearInterval(animationInterval);
-                    isPlaying = false;
-                    playButton.innerHTML = PLAY_ICON;
-                    playButton.title = 'Play forecast';
+                stopPlayback();
+            });
+
+            // Timeline scrubbing. The playhead is placed by forecast hour,
+            // and hours are hourly to 120 then 3-hourly, so the cursor's x is
+            // mapped to an hour and then to the nearest published one — the
+            // playhead stays under the pointer across the whole track.
+            const timelineTrack = document.getElementById('timelineTrack');
+            let scrubPointerId = null;
+            let scrubClientX = 0;
+            let scrubFrame = 0;
+
+            function indexAtClientX(clientX) {
+                const rect = timelineTrack.getBoundingClientRect();
+                const fraction = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+                const target = fraction * lastForecastHour;
+                // forecastHours is sorted: binary search the first >= target.
+                let lo = 0;
+                let hi = forecastHours.length - 1;
+                while (lo < hi) {
+                    const mid = (lo + hi) >> 1;
+                    if (forecastHours[mid] < target) lo = mid + 1;
+                    else hi = mid;
+                }
+                if (lo > 0 && target - forecastHours[lo - 1] < forecastHours[lo] - target) lo--;
+                return lo;
+            }
+
+            function scrubTo(clientX) {
+                const index = indexAtClientX(clientX);
+                if (index === currentIndex && Number(timeSlider.value) === index) return;
+                timeSlider.value = index;
+                currentIndex = index;
+                updateTimeDisplay(forecastHours[index]); // move the playhead now
+                updateMap(index);
+            }
+
+            timelineTrack.addEventListener('pointerdown', (event) => {
+                if (event.button !== 0) return;
+                event.preventDefault(); // no text selection or native drag
+                stopPlayback();
+                scrubPointerId = event.pointerId;
+                timelineTrack.setPointerCapture(event.pointerId);
+                timeSlider.focus({ preventScroll: true });
+                scrubTo(event.clientX);
+            });
+            timelineTrack.addEventListener('pointermove', (event) => {
+                if (event.pointerId !== scrubPointerId) return;
+                // One update per animation frame, at the latest position.
+                scrubClientX = event.clientX;
+                if (!scrubFrame) {
+                    scrubFrame = requestAnimationFrame(() => {
+                        scrubFrame = 0;
+                        if (scrubPointerId !== null) scrubTo(scrubClientX);
+                    });
                 }
             });
+            const endScrub = (event) => {
+                if (event.pointerId !== scrubPointerId) return;
+                scrubPointerId = null;
+                if (scrubFrame) {
+                    cancelAnimationFrame(scrubFrame);
+                    scrubFrame = 0;
+                }
+                if (event.type === 'pointerup') scrubTo(event.clientX);
+            };
+            timelineTrack.addEventListener('pointerup', endScrub);
+            timelineTrack.addEventListener('pointercancel', endScrub);
 
             if (map.isStyleLoaded()) {
                 initializeSwellMap();

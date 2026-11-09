@@ -60,9 +60,12 @@ publish keeps the previous run's bundles alongside, so a map opened before
 it keeps reading the files it started with: the runner leaves bundles in
 `files/` and the pipeline prunes all but the current and previous run's.
 
-- `heatmap_XXX.png` — continuous-color combined wind-wave-and-swell height
+- `heatmap_XXX.webp` — continuous-color combined wind-wave-and-swell height
   field in Web Mercator with transparent land; the app's primary wave layer.
-  Corner coordinates are published as `heatmap_bounds` in `metadata.json`.
+  Lossless WebP with a 128-step ramp (`HEATMAP_STEPS`), ~200 KB a frame.
+  Corner coordinates are published as `heatmap_bounds` in `metadata.json`,
+  and the extension as `heatmap_format` (runs from before it wrote `.png`
+  and have no `heatmap_format`).
   Colors come from `HEATMAP_COLORS` in `gfs_to_contours.py`, matched by
   `SWELL_BANDS` in the web app's `pages/today.html` — change them together.
 - `nwps_<grid>_XXX.png` (e.g. `nwps_cg1_012.png`) — nearshore combined
@@ -70,7 +73,7 @@ it keeps reading the files it started with: the runner leaves bundles in
   mosaicked onto one lattice at the finest source resolution (finer
   grids blend in over coarser ones across overlaps; the offshore edge is
   alpha-feathered so the frame fades into the global heatmap under it).
-  Named by the same global forecast hour as `heatmap_XXX.png` — overlay
+  Named by the same global forecast hour as `heatmap_XXX.webp` — overlay
   directly. `metadata.json` lists bounds and covered hours per grid tier
   under `nwps_layers` (max 144 h; hours before the office's cycle or past
   its horizon have no frame and the global layer shows through).

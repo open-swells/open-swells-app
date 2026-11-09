@@ -79,6 +79,14 @@ HEATMAP_COLORS = [
     "#a5d5f0", "#64a8e8", "#3178d2", "#15a3a3", "#2fb54e", "#a3c520",
     "#f2ce08", "#f59a0b", "#ea4b28", "#b31212", "#4a0a1e",
 ]
+# Ramp steps in the global heatmap (~0.08 m apart, far finer than the 0.5 m
+# legend bands). Half of the 255 the palette allows: no visible banding, and
+# with lossless WebP each frame is ~200 KB instead of ~380 KB as a 255-step
+# PNG. 64 steps showed banding rings in the open ocean.
+HEATMAP_STEPS = 128
+# The global heatmap's file format; published as "heatmap_format" in
+# metadata.json so the web app knows which extension to request.
+HEATMAP_FORMAT = "webp"
 
 
 def setup_logging(log_directory: str) -> None:
@@ -197,8 +205,13 @@ def render_heatmap_png(
     *,
     rows_scale: float = 2.0,
     alpha: np.ndarray | None = None,
+    steps: int = 255,
 ) -> dict:
-    """Render the height field as a continuous-color PNG heatmap.
+    """Render the height field as a continuous-color heatmap image.
+
+    The format follows png_path's extension: ".webp" writes lossless WebP
+    (RGBA, land fully transparent), anything else a PNG. steps is the number
+    of ramp colors (at most 255; index 0 is reserved for land).
 
     MapLibre stretches an image source linearly in Web Mercator space, so
     rows are resampled here from the equirectangular GRIB grid to equal
@@ -239,17 +252,18 @@ def render_heatmap_png(
         HEATMAP_ANCHORS[-1],
     )
 
-    # Write an indexed-color PNG with a palette built directly from the ramp:
-    # index 0 is transparent land, indices 1..255 are evenly spaced ramp
-    # steps (~0.04 m apart). Letting Pillow *derive* a palette (quantize) is
+    # Build the palette directly from the ramp: index 0 is transparent land,
+    # indices 1..steps are evenly spaced ramp steps (~0.04 m apart at 255).
+    # Letting Pillow *derive* a palette (quantize) is
     # not safe here — its octree merged rare colors (8 m+ storm cores) into
     # the transparent slot, punching holes in the heatmap. A fixed palette
     # keeps the file ~5x smaller than true RGBA with exact transparency.
-    steps = 255
+    if not 2 <= steps <= 255:
+        raise ValueError(f"steps must be 2..255, got {steps}")
     ramp_values = np.linspace(HEATMAP_ANCHORS[0], HEATMAP_ANCHORS[-1], steps)
     palette = np.zeros((256, 3), dtype=np.uint8)
     for channel in range(3):
-        palette[1:, channel] = np.interp(
+        palette[1:steps + 1, channel] = np.interp(
             ramp_values, HEATMAP_ANCHORS, colors[:, channel]
         ).astype(np.uint8)
 
@@ -257,12 +271,20 @@ def render_heatmap_png(
     indices = (1 + np.round(fraction * (steps - 1))).astype(np.uint8)
     indices[np.isnan(warped)] = 0
 
-    if alpha is not None:
-        alpha_warped = np.clip(alpha, 0.0, 1.0)[src_rows, :]
-        alpha_bytes = np.round(alpha_warped * 255).astype(np.uint8)
+    if alpha is not None or png_path.lower().endswith(".webp"):
+        if alpha is not None:
+            alpha_warped = np.clip(alpha, 0.0, 1.0)[src_rows, :]
+            alpha_bytes = np.round(alpha_warped * 255).astype(np.uint8)
+        else:
+            alpha_bytes = np.full(indices.shape, 255, dtype=np.uint8)
         alpha_bytes[indices == 0] = 0
-        rgba = np.dstack([palette[indices], alpha_bytes])
-        PILImage.fromarray(rgba).save(png_path, optimize=True)
+        rgba = PILImage.fromarray(np.dstack([palette[indices], alpha_bytes]))
+        if png_path.lower().endswith(".webp"):
+            # Lossless keeps every pixel on the ramp and the coastline
+            # exact; method 4 is as small as 6 here at ~1/30 the time.
+            rgba.save(png_path, lossless=True, quality=75, method=4)
+        else:
+            rgba.save(png_path, optimize=True)
     else:
         # fromarray yields mode "L"; putpalette converts it to "P" in place.
         # (Passing mode= to fromarray is deprecated and gone in Pillow 13.)
@@ -613,8 +635,10 @@ def write_metadata(
         # ...}); the web app reads only what is listed here.
         metadata["bundles"] = bundles
     if heatmap_bounds is not None:
-        # The web app pins the heatmap PNGs to these corner coordinates.
+        # The web app pins the heatmap images to these corner coordinates.
         metadata["heatmap_bounds"] = heatmap_bounds
+        # heatmap_<HHH>.<format>; metadata without it means .png.
+        metadata["heatmap_format"] = HEATMAP_FORMAT
     if nwps:
         if nwps.get("layers"):
             # Nearshore mosaic overlays: per-grid-tier bounds and which
@@ -722,8 +746,8 @@ def _process_single_hour(
             "wind": pack_wind(wind_data, stride=arrow_stride),
             "axes": grid_axes(data, arrow_stride),
         }
-        heatmap_path = os.path.join(files_dir, f"heatmap_{file_index}.png")
-        bounds = render_heatmap_png(data, heatmap_path)
+        heatmap_path = os.path.join(files_dir, f"heatmap_{file_index}.{HEATMAP_FORMAT}")
+        bounds = render_heatmap_png(data, heatmap_path, steps=HEATMAP_STEPS)
     except Exception as exc:
         logger.error("Error processing file %s: %s", file_index, exc, exc_info=True)
         return file_index, False, None, None, None
