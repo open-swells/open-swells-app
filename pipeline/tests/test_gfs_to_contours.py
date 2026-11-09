@@ -28,6 +28,50 @@ class MetadataTests(unittest.TestCase):
                 metadata = json.load(f)
         self.assertNotIn("tide_stations", metadata)
 
+    def test_heatmap_format_is_published_with_bounds(self):
+        with tempfile.TemporaryDirectory() as files_dir:
+            path = gfs_to_contours.write_metadata(
+                files_dir, "20261028", "18", heatmap_bounds={"north": 85.0}
+            )
+            with open(path) as f:
+                metadata = json.load(f)
+        self.assertEqual(metadata["heatmap_format"], "webp")
+
+
+class RenderHeatmapTests(unittest.TestCase):
+    def grid(self):
+        lat = np.array([[10.0, 10.0, 10.0], [0.0, 0.0, 0.0]])
+        lon = np.array([[0.0, 1.0, 2.0], [0.0, 1.0, 2.0]])
+        height = np.array([[0.25, 10.0, np.nan], [5.0, 2.0, 1.0]], dtype=np.float32)
+        return {"lat": lat, "lon": lon, "height": height}
+
+    def test_webp_is_lossless_with_transparent_land(self):
+        with tempfile.TemporaryDirectory() as directory:
+            png = f"{directory}/heatmap.png"
+            webp = f"{directory}/heatmap.webp"
+            gfs_to_contours.render_heatmap_png(self.grid(), png, rows_scale=1.0, steps=128)
+            gfs_to_contours.render_heatmap_png(self.grid(), webp, rows_scale=1.0, steps=128)
+            with Image.open(webp) as image:
+                self.assertEqual(image.format, "WEBP")
+                pixels = np.asarray(image.convert("RGBA"))
+            with Image.open(png) as image:
+                expected = np.asarray(image.convert("RGBA"))
+        # Same colors as the PNG (lossless), land fully transparent.
+        np.testing.assert_array_equal(pixels[expected[..., 3] > 0], expected[expected[..., 3] > 0])
+        self.assertEqual(pixels[0, 2, 3], 0)
+        self.assertTrue((pixels[..., 3][expected[..., 3] > 0] == 255).all())
+
+    def test_steps_limit_the_ramp(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/heatmap.png"
+            gfs_to_contours.render_heatmap_png(self.grid(), path, rows_scale=1.0, steps=128)
+            with Image.open(path) as image:
+                indices = np.asarray(image)
+        self.assertEqual(indices.max(), 128)  # the 10 m cell: top of the ramp
+        self.assertEqual(indices[0, 0], 1)  # 0.25 m: bottom of the ramp
+        with self.assertRaises(ValueError):
+            gfs_to_contours.render_heatmap_png(self.grid(), path, steps=256)
+
 
 class FakeMessage:
     def __init__(self, values, valid_date):

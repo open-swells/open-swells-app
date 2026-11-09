@@ -42,7 +42,7 @@ if ! command -v rsync >/dev/null; then
 fi
 
 shopt -s nullglob
-contour_files=("$SOURCE_PATH"/*.bin "$SOURCE_PATH"/*.png)
+contour_files=("$SOURCE_PATH"/*.bin "$SOURCE_PATH"/*.png "$SOURCE_PATH"/*.webp)
 shopt -u nullglob
 if [ -f "$SOURCE_PATH/tides.json" ]; then
     contour_files+=("$SOURCE_PATH/tides.json")

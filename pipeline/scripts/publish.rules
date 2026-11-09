@@ -14,6 +14,7 @@ P spot_tides.json.gz
 + *.geojson
 + *.geojson.gz
 + *.png
++ *.webp
 + tides.json
 + spot_forecasts.json.gz
 + spot_tides.json.gz
