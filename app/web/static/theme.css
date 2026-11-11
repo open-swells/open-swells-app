@@ -48,12 +48,13 @@
     --wind: #94a3b8;
     --tide: #2ec2c2;
 
-    /* Surf condition ramp: poor -> epic. Ordered by lightness as well as hue
-       so the four steps stay distinguishable without color vision. */
-    --cond-poor: #ef7a83;
-    --cond-fair: #eec478;
-    --cond-good: #4fd1bc;
-    --cond-epic: #86d4c6;
+    /* Surf condition ramp: poor -> epic. Yellow, light green, dark green,
+       purple: the greens step in lightness and epic breaks to a distinct
+       hue, so neighbouring steps never rely on hue alone. */
+    --cond-poor: #e3c35a;
+    --cond-fair: #a8dc7e;
+    --cond-good: #2f9e5c;
+    --cond-epic: #b48cf0;
 
     /* Entity accents used by badges, markers, and filters */
     --kind-buoy: #60a5fa;
@@ -282,6 +283,102 @@ body.embedded .page-close-button { display: inline-flex; }
         border: 1px solid var(--line-strong); box-shadow: 0 8px 24px #0006;
     }
     .spot-information .station-meta { line-height: 1.7; overflow-wrap: anywhere; }
+}
+
+/* --- 16-day outlook --------------------------------------------------- */
+/* The outlook strip, its day cards and the hover readout. Shared by the
+   spot and buoy pages and the favorites rows, so a favorite's outlook is
+   the same object as the page it opens. */
+
+.swell-strip { position: relative; margin-top: 12px; background: var(--raised); border: 1px solid var(--line); }
+.swell-strip .strip-title, .swell-strip #stripReadout, .swell-strip .strip-readout { font-family: var(--font-mono); }
+.swell-strip svg { display: block; }
+/* horizontal finger slides scrub the hover readout; vertical ones
+   scroll the page. No long-press callout or text selection. */
+.swell-strip svg, #chart svg { touch-action: pan-y; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
+.strip-hover-line { position: absolute; z-index: 3; top: 0; bottom: 0; display: none; width: 1px; background: var(--accent-soft); box-shadow: 0 0 7px rgba(72, 170, 168, .45); pointer-events: none; }
+/* Hover tooltips are the fastest way to read an exact value off any
+   chart here, so they are sized for reading, not for minimalism:
+   10px values, a full-contrast header, and a solid backdrop. */
+.strip-panel-tooltip {
+    position: absolute; z-index: 5; display: none; min-width: 168px;
+    padding: 9px 10px; border: 1px solid #365d7c; border-left: 2px solid var(--swell);
+    background: rgba(20, 21, 26, .98);
+    box-shadow: var(--shadow-pop);
+    color: var(--text); font-family: var(--font-mono);
+    font-size: 10px; line-height: 1.45; pointer-events: none;
+}
+/* One equal-width column per forecast day; the row scrolls on
+   narrow screens. The selected day is also shown as a band in the
+   strip above, so the strip stays readable while this scrolls. */
+.forecast-days {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(52px, 1fr);
+    gap: 2px;
+    margin-top: 2px;
+    overflow-x: auto;
+}
+.forecastcard {
+    min-width: 0;
+    padding: 7px 2px;
+    background: var(--raised);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    text-align: center;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+.forecastcard:hover { background: var(--hover); border-color: var(--line-strong); }
+/* on the favorites page each card is a link to that day on the full page */
+a.forecastcard { display: block; color: #fff; }
+/* The selected day is the chart's subject; mark it with the accent on
+   all four sides plus a top rule so it reads at a glance in a row of
+   sixteen otherwise identical cards. */
+.forecastcard.selectedforecast {
+    background: #14283a;
+    border-color: var(--accent);
+    box-shadow: inset 0 2px 0 var(--accent-bright);
+}
+.forecastcard .fc-day {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-2);
+    white-space: nowrap;
+}
+.forecastcard.selectedforecast .fc-day { color: var(--accent-soft); }
+.forecastcard .fc-height { font-size: 12px; font-weight: 600; margin-top: 3px; white-space: nowrap; }
+.forecastcard .fc-cond {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-top: 2px;
+}
+/* hover readout: time, then the headline (surf + rating), then a
+   small key/value subheader */
+.readout-time { color: var(--text-3); font-size: 10px; letter-spacing: .03em; }
+.readout-head { display: flex; align-items: center; gap: 8px; margin-top: 3px; white-space: nowrap; }
+.readout-surf { color: #fff; font-family: var(--font-sans); font-size: 18px; font-weight: 600; line-height: 1.15; }
+.readout-rating {
+    padding: 2px 6px 1px; border-radius: 2px;
+    background: var(--rating-color); color: var(--bg);
+    font-size: 10px; font-weight: 700; letter-spacing: .04em;
+}
+.readout-sub {
+    display: grid; grid-template-columns: auto 1fr; gap: 2px 10px;
+    margin-top: 7px; padding-top: 6px; border-top: 1px solid #3b3e49;
+    font-size: 10px; white-space: nowrap;
+}
+.readout-sub .k { color: var(--text-3); }
+.readout-sub .v { color: var(--text-1); }
+/* phones: the day-card row scrolls anyway, so give each card
+   room to be readable under a thumb */
+@media (max-width: 767px) {
+    .forecast-days { grid-auto-columns: minmax(68px, 1fr); }
+    .forecastcard { padding: 9px 4px; }
+    .forecastcard .fc-day { font-size: 10px; }
+    .forecastcard .fc-height { font-size: 13px; margin-top: 4px; }
+    .forecastcard .fc-cond { font-size: 9px; margin-top: 3px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

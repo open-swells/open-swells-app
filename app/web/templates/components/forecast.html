@@ -203,10 +203,10 @@
             dataGroupedByDay = groupDataByDay(data);
             const dayStats = {}; // key -> {avgFt, cond, label}, feeds the current-conditions card
             const CONDITION_COLORS = {
-                epic: themeColor('--cond-epic', '#86d4c6'),
-                good: themeColor('--cond-good', '#4fd1bc'),
-                fair: themeColor('--cond-fair', '#eec478'),
-                poor: themeColor('--cond-poor', '#ef7a83'),
+                epic: themeColor('--cond-epic', '#b48cf0'),
+                good: themeColor('--cond-good', '#2f9e5c'),
+                fair: themeColor('--cond-fair', '#a8dc7e'),
+                poor: themeColor('--cond-poor', '#e3c35a'),
             };
 
             // Hover readout shared by the 16-day strip and the day detail.
@@ -412,11 +412,9 @@
                 }
 
                 // swell lane
-                if (SURF_MODE) {
-                    stripMono(svg.append('text'), 9, CHART.label)
-                        .attr('x', 2).attr('y', swTop - 5)
-                        .text('SURF (FT)');
-                }
+                stripMono(svg.append('text'), 9, CHART.label)
+                    .attr('x', 2).attr('y', swTop - 5)
+                    .text(SURF_MODE ? 'SURF (FT)' : 'SWELL (FT)');
                 svg.append('path').datum(stripPts)
                     .attr('fill', 'url(#stripFill)')
                     .attr('d', d3.area().x(p => x(p.t)).y0(swBase).y1(p => y(p.ft)).curve(d3.curveMonotoneX));
@@ -1118,9 +1116,13 @@
                 });
             });
 
-            if (firstCard) {
-                firstCard.classList.add('selectedforecast');
-                const date = firstCard.getAttribute('data-date');
+            // ?day=YYYY-MM-DD opens on that day (the favorites page links
+            // its day cards here); otherwise the first day
+            const requestedDay = new URLSearchParams(location.search).get('day');
+            const initialCard = [...cards].find(card => card.getAttribute('data-date') === requestedDay) || firstCard;
+            if (initialCard) {
+                initialCard.classList.add('selectedforecast');
+                const date = initialCard.getAttribute('data-date');
                 displayClicked(date);
                 updateChart(currentDay, svg);
             }
@@ -1133,68 +1135,6 @@
     </script>
 
     <style>
-        .swell-strip { position: relative; margin-top: 12px; background: var(--raised); border: 1px solid var(--line); }
-        .swell-strip .strip-title, .swell-strip #stripReadout { font-family: var(--font-mono); }
-        .swell-strip svg { display: block; }
-        /* horizontal finger slides scrub the hover readout; vertical ones
-           scroll the page. No long-press callout or text selection. */
-        .swell-strip svg, #chart svg { touch-action: pan-y; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
-        .strip-hover-line { position: absolute; z-index: 3; top: 0; bottom: 0; display: none; width: 1px; background: var(--accent-soft); box-shadow: 0 0 7px rgba(72, 170, 168, .45); pointer-events: none; }
-        /* Hover tooltips are the fastest way to read an exact value off any
-           chart here, so they are sized for reading, not for minimalism:
-           10px values, a full-contrast header, and a solid backdrop. */
-        .strip-panel-tooltip {
-            position: absolute; z-index: 5; display: none; min-width: 168px;
-            padding: 9px 10px; border: 1px solid #365d7c; border-left: 2px solid var(--swell);
-            background: rgba(20, 21, 26, .98);
-            box-shadow: var(--shadow-pop);
-            color: var(--text); font-family: var(--font-mono);
-            font-size: 10px; line-height: 1.45; pointer-events: none;
-        }
-        /* One equal-width column per forecast day; the row scrolls on
-           narrow screens. The selected day is also shown as a band in the
-           strip above, so the strip stays readable while this scrolls. */
-        #forecastContainer {
-            display: grid;
-            grid-auto-flow: column;
-            grid-auto-columns: minmax(52px, 1fr);
-            gap: 2px;
-            margin-top: 2px;
-            overflow-x: auto;
-        }
-        .forecastcard {
-            min-width: 0;
-            padding: 7px 2px;
-            background: var(--raised);
-            border: 1px solid var(--line);
-            cursor: pointer;
-            text-align: center;
-            transition: border-color 120ms ease, background 120ms ease;
-        }
-        .forecastcard:hover { background: var(--hover); border-color: var(--line-strong); }
-        /* The selected day is the chart's subject; mark it with the accent on
-           all four sides plus a top rule so it reads at a glance in a row of
-           sixteen otherwise identical cards. */
-        .forecastcard.selectedforecast {
-            background: #14283a;
-            border-color: var(--accent);
-            box-shadow: inset 0 2px 0 var(--accent-bright);
-        }
-        .forecastcard .fc-day {
-            font-family: var(--font-mono);
-            font-size: 9px;
-            color: var(--text-2);
-            white-space: nowrap;
-        }
-        .forecastcard.selectedforecast .fc-day { color: var(--accent-soft); }
-        .forecastcard .fc-height { font-size: 12px; font-weight: 600; margin-top: 3px; white-space: nowrap; }
-        .forecastcard .fc-cond {
-            font-size: 9px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-            margin-top: 2px;
-        }
         /* the selected day sits on the page background, full width */
         .swell-detail { margin-top: 20px; }
         /* the selected day: the detail card's one loud element */
@@ -1233,32 +1173,6 @@
             line-height: 1.45;
             box-shadow: var(--shadow-pop);
         }
-        /* hover readout: time, then the headline (surf + rating), then a
-           small key/value subheader */
-        .readout-time { color: var(--text-3); font-size: 10px; letter-spacing: .03em; }
-        .readout-head { display: flex; align-items: center; gap: 8px; margin-top: 3px; white-space: nowrap; }
-        .readout-surf { color: #fff; font-family: var(--font-sans); font-size: 18px; font-weight: 600; line-height: 1.15; }
-        .readout-rating {
-            padding: 2px 6px 1px; border-radius: 2px;
-            background: var(--rating-color); color: var(--bg);
-            font-size: 10px; font-weight: 700; letter-spacing: .04em;
-        }
-        .readout-sub {
-            display: grid; grid-template-columns: auto 1fr; gap: 2px 10px;
-            margin-top: 7px; padding-top: 6px; border-top: 1px solid #3b3e49;
-            font-size: 10px; white-space: nowrap;
-        }
-        .readout-sub .k { color: var(--text-3); }
-        .readout-sub .v { color: var(--text-1); }
-        /* phones: the day-card row scrolls anyway, so give each card
-           room to be readable under a thumb */
-        @media (max-width: 767px) {
-            #forecastContainer { grid-auto-columns: minmax(68px, 1fr); }
-            .forecastcard { padding: 9px 4px; }
-            .forecastcard .fc-day { font-size: 10px; }
-            .forecastcard .fc-height { font-size: 13px; margin-top: 4px; }
-            .forecastcard .fc-cond { font-size: 9px; margin-top: 3px; }
-        }
     </style>
 
     <!-- 16-day outlook: swell + wind lanes. The selected day is shown as a
@@ -1273,7 +1187,7 @@
         <div id="stripHoverLine" class="strip-hover-line" aria-hidden="true"></div>
         <div id="stripTooltip" class="strip-panel-tooltip" role="tooltip"></div>
     </div>
-    <div id="forecastContainer"></div>
+    <div id="forecastContainer" class="forecast-days"></div>
     <div class="swell-detail">
         <!-- the selected day -->
         <div class="mb-1">
