@@ -28,6 +28,7 @@ from scipy.ndimage import gaussian_filter
 
 from bundle import bundle_name, pack_document, pack_grid, prune_bundles, write_bundle
 from composite import composite_swell, composite_wind
+from gribio import GRID_CACHE as _GRID_CACHE, decode, lat_lon_grid, retry_wait
 from nwps import process_nwps_domains
 from spot_forecasts import load_spots, sample_spots, write_spot_forecasts
 from fes_tides import resolve_config as resolve_fes_config
@@ -36,8 +37,6 @@ from wind import extract_wind, pack_wind
 
 logger = logging.getLogger("GFSWaveContours")
 logger.setLevel(logging.INFO)
-
-_GRID_CACHE: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
 
 # The two NOAA wave grids composited for whole-map coverage: the fine
 # grid only spans 15S-52.5N, the coarse one is pole-to-pole (see
@@ -106,39 +105,6 @@ def setup_logging(log_directory: str) -> None:
     logger.addHandler(file_handler)
     logger.addHandler(console_handler)
     logger.propagate = False
-
-
-def _grid_cache_key(msg) -> tuple:
-    keys = []
-    for attr in (
-        "gridType",
-        "Ni",
-        "Nj",
-        "latitudeOfFirstGridPointInDegrees",
-        "longitudeOfFirstGridPointInDegrees",
-        "latitudeOfLastGridPointInDegrees",
-        "longitudeOfLastGridPointInDegrees",
-    ):
-        try:
-            value = msg[attr]
-        except (KeyError, AttributeError, TypeError):
-            value = getattr(msg, attr, None)
-        if isinstance(value, (int, float)):
-            keys.append(float(value))
-        else:
-            keys.append(value)
-    return tuple(keys)
-
-
-def _get_lat_lon_grid(msg) -> tuple[np.ndarray, np.ndarray]:
-    key = _grid_cache_key(msg)
-    cached = _GRID_CACHE.get(key)
-    if cached is not None:
-        return cached
-    lats, lons = msg.latlons()
-    grid = (np.array(lons, dtype=np.float32), np.array(lats, dtype=np.float32))
-    _GRID_CACHE[key] = grid
-    return grid
 
 
 def _gaussian_filter_nan(array: np.ndarray, sigma: float) -> np.ndarray:
@@ -324,7 +290,7 @@ def _extract_wind_sea(grbs, valid_date) -> dict | None:
             return None
         if message.validDate != valid_date:
             raise ValueError("Mismatched valid times between GRIB fields")
-        wind_sea[key] = np.ma.filled(message.values, np.nan).astype(np.float32)
+        wind_sea[key], _ = decode(message)
     return wind_sea
 
 
@@ -355,20 +321,20 @@ def extract_from_grib2_to_np(filepath: str) -> dict:
             raise ValueError("Mismatched valid times between GRIB fields")
 
         height_msg = height_msgs[0]
-        lon_grid, lat_grid = _get_lat_lon_grid(height_msg)
-        combined_values = np.ma.filled(combined_msg.values, np.nan)
-        combined_mask = np.ma.getmaskarray(combined_msg.values)
+        lon_grid, lat_grid = lat_lon_grid(height_msg)
+        combined_values, combined_mask = decode(combined_msg)
         partitions = []
         for sequence, (partition_height, partition_period, partition_direction) in enumerate(
             zip(height_msgs, period_msgs, direction_msgs), start=1
         ):
+            height, height_mask = decode(partition_height)
             partitions.append(
                 {
                     "sequence": sequence,
-                    "height": np.ma.filled(partition_height.values, np.nan).astype(np.float32),
-                    "period": np.ma.filled(partition_period.values, np.nan).astype(np.float32),
-                    "direction": np.ma.filled(partition_direction.values, np.nan).astype(np.float32),
-                    "mask": np.ma.getmaskarray(partition_height.values),
+                    "height": height,
+                    "period": decode(partition_period)[0],
+                    "direction": decode(partition_direction)[0],
+                    "mask": height_mask,
                 }
             )
 
@@ -379,7 +345,7 @@ def extract_from_grib2_to_np(filepath: str) -> dict:
         # punches pale, apparently transparent holes into storm cores. The
         # combined field is continuous across both wind sea and swell; keep
         # the individual partitions below for the directional-arrow output.
-        height_values = combined_values.astype(np.float32)
+        height_values = combined_values
         mask = combined_mask | ~np.isfinite(combined_values)
 
         return {
@@ -960,6 +926,7 @@ def _download_file(
             logger.warning(
                 "Download attempt %d/%d failed for %s: %s", attempt, attempts, url, exc
             )
+            retry_wait(attempt, attempts)
     return False
 
 

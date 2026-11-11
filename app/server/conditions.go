@@ -45,6 +45,9 @@ type HourlyCondition struct {
 	WindMph  float64 `json:"wmph"`
 	WindDir  float64 `json:"wdir"` // direction wind comes from, degrees true
 	HasWind  bool    `json:"haswind"`
+	// Light is whether there is daylight to surf this hour by (see
+	// markDaylight). A day is rated by its light hours.
+	Light bool `json:"light"`
 }
 
 // angDiff returns the smallest absolute angle between two bearings, 0..180.
@@ -312,7 +315,9 @@ func ratingFor(score float64) string {
 	}
 }
 
-// windAt linearly interpolates the 3-hourly wind series to time t.
+// windAt linearly interpolates the wind series (hourly, 3-hourly past
+// f120) to time t, across at most one missing sample (maxBridgeHours), as
+// the swell rows are.
 func windAt(samples []WindSample, start time.Time, t time.Time) (speedMs, dir float64, ok bool) {
 	if len(samples) == 0 {
 		return 0, 0, false
@@ -328,7 +333,7 @@ func windAt(samples []WindSample, start time.Time, t time.Time) (speedMs, dir fl
 			}
 			prev := samples[i-1]
 			gap := float64(s.Hour - prev.Hour)
-			if gap > 3 { // series has a hole here; don't bridge it
+			if gap > maxBridgeHours { // series has a hole here; don't bridge it
 				return 0, 0, false
 			}
 			frac := (h - float64(prev.Hour)) / gap
@@ -405,15 +410,43 @@ func conditionSeries(hours []hourSwells, wind []WindSample, windStart time.Time,
 	return out
 }
 
+// civilTwilightDeg is the sun elevation down to which there is light
+// enough to surf: dawn patrol and the last waves at dusk count.
+const civilTwilightDeg = -6.0
+
+// markDaylight sets Light on the hours there is daylight at (lat, lon),
+// judged at the middle of each hour.
+func markDaylight(conds []HourlyCondition, lat, lon float64) {
+	for i := range conds {
+		mid := time.UnixMilli(conds[i].UnixMs).Add(30 * time.Minute).UTC()
+		conds[i].Light = sunElevation(lat, lon, mid) > civilTwilightDeg
+	}
+}
+
+// betterHour reports whether c is a better pick than best to rate a day
+// by: an hour with daylight beats any hour in the dark, then the higher
+// score wins. Night winds are the lightest of the day, so the top score is
+// usually an hour nobody can surf (about 70% of spot-days in a sampled
+// run); rating the day by it promises conditions that are gone by dawn. A
+// day with no light hours at all (polar night, or the last evening of a
+// run) still rates by its best hour. The browser's day ratings follow the
+// same rule (components/forecast.html and spotreport.html).
+func betterHour(c, best HourlyCondition) bool {
+	if c.Light != best.Light {
+		return c.Light
+	}
+	return c.Score > best.Score
+}
+
 // applyConditionSummary upgrades the daily summary's height-only condition
-// to the classifier's view of each day: a day is as good as its best hour,
-// and its height is that hour's surf range. Days are loc's calendar days,
-// matching generateForecastSummary.
+// to the classifier's view of each day: a day is as good as its best
+// surfable hour (betterHour), and its height is that hour's surf range.
+// Days are loc's calendar days, matching generateForecastSummary.
 func applyConditionSummary(summary []ForecastSummary, conds []HourlyCondition, loc *time.Location) {
 	best := map[string]HourlyCondition{}
 	for _, c := range conds {
 		day := time.UnixMilli(c.UnixMs).In(loc).Format("2006-01-02")
-		if b, ok := best[day]; !ok || c.Score > b.Score {
+		if b, ok := best[day]; !ok || betterHour(c, b) {
 			best[day] = c
 		}
 	}

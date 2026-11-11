@@ -38,6 +38,7 @@ import requests
 from scipy.ndimage import distance_transform_edt
 
 from bundle import bundle_name, pack_grid, write_bundle
+from gribio import decode, retry_wait
 
 logger = logging.getLogger("GFSWaveContours")
 
@@ -128,6 +129,7 @@ def _download(session: requests.Session, url: str, file_path: str, attempts: int
                 "NWPS download attempt %d/%d failed for %s: %s",
                 attempt, attempts, url, exc,
             )
+            retry_wait(attempt, attempts)
     return False
 
 
@@ -147,10 +149,8 @@ def extract_nwps_fields(filepath: str) -> dict:
         lats, lons = height_msgs[0].latlons()
         steps: dict[int, dict] = {}
         for message in height_msgs:
-            steps[int(message.forecastTime)] = {
-                "height": np.ma.filled(message.values, np.nan).astype(np.float32),
-                "mask": np.ma.getmaskarray(message.values),
-            }
+            height, mask = decode(message)
+            steps[int(message.forecastTime)] = {"height": height, "mask": mask}
         for name, key in (
             (TOTAL_SWELL_NAME, "swell"),
             (PRIMARY_PERIOD_NAME, "period"),
@@ -164,7 +164,7 @@ def extract_nwps_fields(filepath: str) -> dict:
             for message in messages:
                 step = steps.get(int(message.forecastTime))
                 if step is not None:
-                    step[key] = np.ma.filled(message.values, np.nan).astype(np.float32)
+                    step[key], _ = decode(message)
         return {
             "lon": np.asarray(lons, dtype=np.float64)[0, :],
             "lat": np.asarray(lats, dtype=np.float64)[:, 0],

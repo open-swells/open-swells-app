@@ -15,6 +15,45 @@ import (
 	"time"
 )
 
+func TestBundleReachesAgreesWithNearbyCells(t *testing.T) {
+	axis := func(from, step float64, n int) []float64 {
+		out := make([]float64, n)
+		for i := range out {
+			out[i] = from + step*float64(i)
+		}
+		return out
+	}
+	bundles := map[string]*gridBundle{
+		// an NWPS office domain, 0..360 longitudes, north to south
+		"regional": {header: bundleHeader{Lat: axis(35, -0.05, 60), Lon: axis(238, 0.05, 80)}},
+		// one straddling the antimeridian in -180..180 terms
+		"antimeridian": {header: bundleHeader{Lat: axis(-10, -0.1, 50), Lon: axis(175, 0.1, 100)}},
+		"global":       {header: bundleHeader{Lat: axis(85, -1, 171), Lon: axis(0, 1, 360)}},
+	}
+	rng := rand.New(rand.NewSource(1))
+	for name, b := range bundles {
+		reached := 0
+		for i := 0; i < 20000; i++ {
+			lat, lon := rng.Float64()*180-90, rng.Float64()*360-180
+			if i%2 == 0 { // half the points near the lattice, where the edges are
+				lat = b.header.Lat[0] + (rng.Float64()*1.4-0.2)*(b.header.Lat[len(b.header.Lat)-1]-b.header.Lat[0])
+				lon = b.header.Lon[0] + (rng.Float64()*1.4-0.2)*(b.header.Lon[len(b.header.Lon)-1]-b.header.Lon[0])
+				lon = math.Mod(lon+540, 360) - 180
+			}
+			near := len(b.nearbyCells(lat, lon, nwpsMaxDist2)) > 0
+			if near && !b.reaches(lat, lon, nwpsMaxDist2) {
+				t.Fatalf("%s: (%.3f, %.3f) has cells nearby but reaches is false", name, lat, lon)
+			}
+			if b.reaches(lat, lon, nwpsMaxDist2) {
+				reached++
+			}
+		}
+		if name == "regional" && (reached == 0 || reached > 12000) {
+			t.Errorf("regional: reaches held for %d of 20000 points, want only those near the domain", reached)
+		}
+	}
+}
+
 // writeTestBundle writes a grid bundle the way pipeline/bundle.py does.
 // values[hour][var] is a row-major lattice; NaN becomes NODATA.
 func writeTestBundle(t *testing.T, path string, lat, lon []float64, hours []int, vars []bundleVar, values map[int]map[string][]float64) {

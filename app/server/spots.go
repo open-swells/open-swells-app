@@ -498,8 +498,11 @@ func nearestNwps(points []nwpsPoint, lat, lon float64) (nwpsPoint, float64, bool
 			best = p
 		}
 	}
-	return best, bestDist, bestDist <= 0.01
+	return best, bestDist, bestDist <= nwpsMaxDist2
 }
+
+// nwpsMaxDist2 is how far (squared degrees) a spot's NWPS cell may be.
+const nwpsMaxDist2 = 0.01
 
 // nwpsNearest is a domain's nearest wet cell within ~0.1 deg at an hour,
 // with its squared-degree distance. Fields missing at that cell read 0, as
@@ -521,7 +524,7 @@ func nwpsNearest(staticDir string, d nwpsDomain, hour int, lat, lon float64) (nw
 		return nwpsPoint{}, 0, false
 	}
 	vh, vs, vp, vd := b.varIndex("h"), b.varIndex("s"), b.varIndex("p"), b.varIndex("d")
-	for _, c := range b.nearbyCells(lat, lon, 0.01) {
+	for _, c := range b.nearbyCells(lat, lon, nwpsMaxDist2) {
 		h, ok := f.value(vh, c.Index)
 		if !ok {
 			continue
@@ -541,19 +544,26 @@ type nwpsDomain struct {
 	File  string `json:"file"` // the domain's bundle; "" before the bundles
 }
 
-// nwpsPointDomains reads the nwps_points index from the run's metadata.
+// nwpsPointDomains is the nwps_points index from the run's metadata.
 func nwpsPointDomains(staticDir string) []nwpsDomain {
-	raw, err := os.ReadFile(filepath.Join(staticDir, "metadata.json"))
-	if err != nil {
-		return nil
+	return currentRunBundles(staticDir).NwpsPoints
+}
+
+// nwpsDomainsNear keeps the domains whose lattice reaches (lat, lon), so a
+// spot outside every domain (nearly all of them: NWPS covers a few
+// offices' waters) skips the per-hour lookups altogether. A domain whose
+// bundle can't be read is kept, and fails per hour as before.
+func nwpsDomainsNear(staticDir string, domains []nwpsDomain, lat, lon float64) []nwpsDomain {
+	var near []nwpsDomain
+	for _, d := range domains {
+		if d.File != "" {
+			if b, err := loadGridBundle(filepath.Join(staticDir, d.File)); err == nil && !b.reaches(lat, lon, nwpsMaxDist2) {
+				continue
+			}
+		}
+		near = append(near, d)
 	}
-	var meta struct {
-		NwpsPoints []nwpsDomain `json:"nwps_points"`
-	}
-	if err := json.Unmarshal(raw, &meta); err != nil {
-		return nil
-	}
-	return meta.NwpsPoints
+	return near
 }
 
 // nwpsSample returns the combined sea state closest to the spot across every
@@ -586,16 +596,69 @@ func lerpAngle(a, b, frac float64) float64 {
 	return math.Mod(a+diff*frac+360, 360)
 }
 
-// lerpSwell blends two grid samples. A partition is interpolated only when
-// both ends have it; otherwise the earlier sample's values are held so a
-// system fading out doesn't blend with an unrelated one.
+// partitionPerms are the ways to pair one sample's three partition slots
+// with another's.
+var partitionPerms = [6][3]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}}
+
+// partitionUnmatched is what leaving a wave train unpaired costs, in
+// partitionDistance units: a pair farther apart than twice this (say 6 s of
+// period, 60 degrees of direction, or 3 s and 30 degrees together) is two
+// different swells rather than one that changed.
+const partitionUnmatched = 1.0
+
+// partitionDistance is how unlike two wave trains are: 1 per 3 s of period
+// or 30 degrees of direction. Height is left out, since a swell filling in
+// or fading doubles or halves within hours while keeping its period and
+// direction.
+func partitionDistance(a, b swellPoint, i, j int) float64 {
+	return math.Abs(a.P[i]-b.P[j])/3 + angDiff(a.D[i], b.D[j])/30
+}
+
+// matchPartitions pairs a's partition slots with b's: match[i] is the slot
+// of b holding the swell in a's slot i, or -1 when b has no such swell.
+//
+// The model numbers a point's partitions by size, hour by hour, so a swell
+// keeps no fixed slot: when a building swell overtakes a fading one they
+// trade places. Pairing by slot would then interpolate each into the other
+// (a 16 s groundswell and a 7 s windswell meeting at a 11 s swell that
+// never existed), which is what rows between 3-hourly samples showed about
+// one time in six.
+func matchPartitions(a, b swellPoint) [3]int {
+	best, bestCost := partitionPerms[0], math.MaxFloat64
+	for _, perm := range partitionPerms {
+		cost := 0.0
+		for i, j := range perm {
+			switch {
+			case a.Has[i] && b.Has[j]:
+				cost += math.Min(partitionDistance(a, b, i, j), 2*partitionUnmatched)
+			case a.Has[i] || b.Has[j]:
+				cost += partitionUnmatched
+			}
+		}
+		if cost < bestCost-1e-9 { // ties keep the earlier, more slot-aligned pairing
+			best, bestCost = perm, cost
+		}
+	}
+	match := [3]int{-1, -1, -1}
+	for i, j := range best {
+		if a.Has[i] && b.Has[j] && partitionDistance(a, b, i, j) < 2*partitionUnmatched {
+			match[i] = j
+		}
+	}
+	return match
+}
+
+// lerpSwell blends two grid samples. Each partition is interpolated toward
+// the same swell in the later sample, whichever slot that is in (see
+// matchPartitions); one with no counterpart holds the earlier sample's
+// values, so a system fading out doesn't blend with an unrelated one.
 func lerpSwell(a, b swellPoint, frac float64) swellPoint {
 	out := a
-	for i := 0; i < 3; i++ {
-		if a.Has[i] && b.Has[i] {
-			out.H[i] = a.H[i] + (b.H[i]-a.H[i])*frac
-			out.P[i] = a.P[i] + (b.P[i]-a.P[i])*frac
-			out.D[i] = lerpAngle(a.D[i], b.D[i], frac)
+	for i, j := range matchPartitions(a, b) {
+		if j >= 0 {
+			out.H[i] = a.H[i] + (b.H[j]-a.H[i])*frac
+			out.P[i] = a.P[i] + (b.P[j]-a.P[i])*frac
+			out.D[i] = lerpAngle(a.D[i], b.D[j], frac)
 		}
 	}
 	if a.HasWindSea && b.HasWindSea {
@@ -704,36 +767,39 @@ func spotForecast(staticDir string, spot Spot) (ForecastData, []hourSwells) {
 	return gridSpotForecast(staticDir, lat, lon)
 }
 
-// fileSpotForecast uses the spot's own series. Only the gap-free run of
-// hours around the run's start is used, as with the grids: a failed hour
-// is null in the file and rows past it would bridge a hole in the
-// forecast. Hours before the start come from earlier runs (see
+// maxBridgeHours is the longest stretch between model samples that is
+// interpolated across. The model's own cadence is 3 hours past f120, so
+// this bridges one failed forecast hour anywhere in a run and no more.
+const maxBridgeHours = 6
+
+// fileSpotForecast uses the spot's own series. A failed hour is null in
+// the file; a short hole is interpolated across like the gaps between
+// 3-hourly samples (one failed download would otherwise cut a 16-day
+// forecast off at that hour), while a hole longer than maxBridgeHours ends
+// the forecast, or, among the hours before the run's start, drops what
+// precedes it. Hours before the start come from earlier runs (see
 // backfillSpotForecasts).
 func fileSpotForecast(staticDir string, set *spotForecastSet, series *spotSeries, lat, lon float64) (ForecastData, []hourSwells) {
 	start, err := time.Parse(forecastRunLayout, set.ForecastStart)
 	if err != nil {
 		return ForecastData{}, nil
 	}
-	first := 0
-	for first < len(set.Hours) && set.Hours[first] < 0 {
-		first++
-	}
-	if _, ok := series.point(first); !ok {
-		return ForecastData{}, nil // nothing from this run: don't show only the past
-	}
-	for first > 0 {
-		if _, ok := series.point(first - 1); !ok {
-			break
-		}
-		first--
-	}
 	var samples []spotSample
-	for i := first; i < len(set.Hours); i++ {
+	for i, hour := range set.Hours {
 		p, ok := series.point(i)
 		if !ok {
-			break
+			continue
 		}
-		samples = append(samples, spotSample{hour: set.Hours[i], p: p})
+		if n := len(samples); n > 0 && hour-samples[n-1].hour > maxBridgeHours {
+			if samples[n-1].hour >= 0 {
+				break
+			}
+			samples = samples[:0]
+		}
+		samples = append(samples, spotSample{hour: hour, p: p})
+	}
+	if len(samples) == 0 || samples[len(samples)-1].hour < 0 {
+		return ForecastData{}, nil // nothing from this run: don't show only the past
 	}
 	attachNwps(staticDir, samples, lat, lon)
 	return buildSpotForecast(start, samples)
@@ -743,7 +809,7 @@ func fileSpotForecast(staticDir string, set *spotForecastSet, series *spotSeries
 // 3-hourly, so hours between them interpolate the neighboring samples.
 // Hours backfilled from earlier runs have none: those runs' grids are gone.
 func attachNwps(staticDir string, samples []spotSample, lat, lon float64) {
-	domains := nwpsPointDomains(staticDir)
+	domains := nwpsDomainsNear(staticDir, nwpsPointDomains(staticDir), lat, lon)
 	if len(domains) == 0 {
 		return
 	}
@@ -900,7 +966,9 @@ func spotConditions(staticDir string, spot Spot, hours []hourSwells) []HourlyCon
 	if err == nil {
 		wind = spotWind(staticDir, spot)
 	}
-	return conditionSeries(hours, wind, windStart, err == nil, spotBeach(staticDir, spot))
+	conds := conditionSeries(hours, wind, windStart, err == nil, spotBeach(staticDir, spot))
+	markDaylight(conds, spot.Lat, spot.Lon)
+	return conds
 }
 
 // conditionsFromRun drops the hours backfilled before the forecast's run,
@@ -956,6 +1024,7 @@ type OutlookHour struct {
 	Surf   string  `json:"surf"`
 	Score  int     `json:"score"`
 	Rating string  `json:"rating"`
+	Light  bool    `json:"light"`
 }
 
 func outlookHours(conds []HourlyCondition, now time.Time) []OutlookHour {
@@ -965,7 +1034,7 @@ func outlookHours(conds []HourlyCondition, now time.Time) []OutlookHour {
 		if c.UnixMs < from {
 			continue
 		}
-		hours = append(hours, OutlookHour{UnixMs: c.UnixMs, HiFt: c.SurfHiFt, Surf: c.Surf, Score: c.Score, Rating: c.Rating})
+		hours = append(hours, OutlookHour{UnixMs: c.UnixMs, HiFt: c.SurfHiFt, Surf: c.Surf, Score: c.Score, Rating: c.Rating, Light: c.Light})
 	}
 	return hours
 }
@@ -1076,7 +1145,7 @@ func spotReport(staticDir string, spot Spot, forecastData ForecastData) (SpotRep
 		// can pair "seas" (the primary height) with the actual swell.
 		hour := int(math.Round(row.Time.Sub(start).Hours()/3)) * 3
 		if hour >= 0 {
-			if n := nwpsSample(staticDir, nwpsPointDomains(staticDir), hour, lat, lon); n != nil {
+			if n := nwpsSample(staticDir, nwpsDomainsNear(staticDir, nwpsPointDomains(staticDir), lat, lon), hour, lat, lon); n != nil {
 				report.SwellHeight = fmt.Sprintf("%.1f", n.S*3.28084)
 			}
 		}

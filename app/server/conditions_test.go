@@ -90,6 +90,46 @@ func TestWindAtInterpolates(t *testing.T) {
 	if _, _, ok := windAt(samples, start, start.Add(12*time.Hour)); ok {
 		t.Error("windAt far past the series should report no wind")
 	}
+	// One missing 3-hourly sample is bridged, like the swell rows; a longer
+	// hole is not.
+	samples = []WindSample{{Hour: 0, Speed: 2, Dir: 90}, {Hour: 6, Speed: 8, Dir: 90}, {Hour: 15, Speed: 8, Dir: 90}}
+	if s, _, ok := windAt(samples, start, start.Add(3*time.Hour)); !ok || s != 5 {
+		t.Errorf("windAt across one missing sample = %.1f (ok=%v), want 5.0", s, ok)
+	}
+	if _, _, ok := windAt(samples, start, start.Add(10*time.Hour)); ok {
+		t.Error("windAt inside a 9-hour hole should report no wind")
+	}
+}
+
+func TestDayIsRatedByItsLightHours(t *testing.T) {
+	// Huntington Beach, 17 July: 3am is dark, 9am light.
+	lat, lon := 33.655, -118.003
+	loc, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		t.Fatal(err)
+	}
+	night := time.Date(2026, 7, 17, 3, 0, 0, 0, loc)
+	morning := time.Date(2026, 7, 17, 9, 0, 0, 0, loc)
+	conds := []HourlyCondition{
+		{UnixMs: night.UnixMilli(), Score: 85, Rating: "epic", Surf: "4–5ft", SurfHiFt: 5},
+		{UnixMs: morning.UnixMilli(), Score: 50, Rating: "fair", Surf: "3–4ft", SurfHiFt: 4},
+	}
+	markDaylight(conds, lat, lon)
+	if conds[0].Light || !conds[1].Light {
+		t.Fatalf("light = %v at 3am, %v at 9am; want dark then light", conds[0].Light, conds[1].Light)
+	}
+	summary := []ForecastSummary{{Date: "2026-07-17"}}
+	applyConditionSummary(summary, conds, loc)
+	if summary[0].Condition != "fair" || summary[0].Score != 50 || summary[0].WaveHeight != "3–4ft" {
+		t.Errorf("day = %+v, want the best light hour (fair, 50, 3–4ft), not the glassy 3am", summary[0])
+	}
+
+	// With no light hour in the day, the best hour still rates it.
+	summary = []ForecastSummary{{Date: "2026-07-17"}}
+	applyConditionSummary(summary, conds[:1], loc)
+	if summary[0].Condition != "epic" {
+		t.Errorf("dark-only day = %s, want its best hour", summary[0].Condition)
+	}
 }
 
 func TestApplyConditionSummary(t *testing.T) {

@@ -343,7 +343,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "data-outlook=\"buoy\"", "data-outlook=\"spot\"", "swell-strip", "data-strip-readout", "href=\"/surf-spots/el-porto?day=", "href=\"/forecast/46221?day=", "fc-height\">3.2ft", "fc-cond", "Mon 7/20", "data-outlook-hours>[{\"t\":1753000000000,\"ft\":3,\"surf\":\"2–3ft\",\"score\":40,\"rating\":\"fair\"}]", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "12 mph", "W 270°", "WSW 250°", "SSW 195°", "rotate(250deg)", "rp-swell", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "data-outlook=\"buoy\"", "data-outlook=\"spot\"", "swell-strip", "data-strip-readout", "href=\"/surf-spots/el-porto?day=", "href=\"/forecast/46221?day=", "fc-height\">3.2ft", "fc-cond", "Mon 7/20", "data-outlook-hours>[{\"t\":1753000000000,\"ft\":3,\"surf\":\"2–3ft\",\"score\":40,\"rating\":\"fair\",\"light\":false}]", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "12 mph", "W 270°", "WSW 250°", "SSW 195°", "rotate(250deg)", "rp-swell", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}

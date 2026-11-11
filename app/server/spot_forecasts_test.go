@@ -139,15 +139,93 @@ func TestSpotForecastUsesFileSeriesHourly(t *testing.T) {
 	}
 }
 
-func TestSpotForecastStopsAtFailedHour(t *testing.T) {
+func TestSpotForecastBridgesFailedHour(t *testing.T) {
 	dir := t.TempDir()
 	spot := fixtureSpot()
 	spot["hs"] = []any{1.5, 1.6, nil, 1.8, 2.4}
 	writeSpotForecastFixture(t, dir, "20260720_00Z", "20260720_00Z", map[string]any{"a": spot})
 
+	forecast, hours := spotForecast(dir, Spot{ID: "a"})
+	if len(forecast.Forecast) != 7 || len(hours) != 7 {
+		t.Fatalf("rows = %d, classifier hours = %d, want all 7: the failed hour is interpolated", len(forecast.Forecast), len(hours))
+	}
+	if got := forecast.Forecast[2].PrimaryWaveHeight; got != "1.2" {
+		t.Fatalf("failed hour primary = %s, want 1.2 interpolated between 1.1 and 1.3", got)
+	}
+	if got, want := forecast.Forecast[6].Time, time.Date(2026, 7, 20, 6, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Fatalf("last row at %v, want %v: rows past the hole stay on their hours", got, want)
+	}
+}
+
+func TestSpotForecastBridgesFailedFirstHour(t *testing.T) {
+	dir := t.TempDir()
+	spot := fixtureSpot()
+	spot["hs"] = []any{nil, 1.6, 1.7, 1.8, 2.4}
+	writeSpotForecastFixture(t, dir, "20260720_00Z", "20260720_00Z", map[string]any{"a": spot})
+
+	forecast, _ := spotForecast(dir, Spot{ID: "a"})
+	if got := len(forecast.Forecast); got != 6 {
+		t.Fatalf("rows = %d, want hours 1..6", got)
+	}
+	if got, want := forecast.Forecast[0].Time, time.Date(2026, 7, 20, 1, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Fatalf("first row at %v, want %v", got, want)
+	}
+}
+
+func TestSpotForecastStopsAtLongHole(t *testing.T) {
+	dir := t.TempDir()
+	// Hours 2..8 failed: 7 hours between samples is more than one missed
+	// forecast hour, so nothing past the hole is shown.
+	spot := hourlySpot(12, 1.0)
+	hs := spot["hs"].([]any)
+	for i := 2; i <= 8; i++ {
+		hs[i] = nil
+	}
+	writeSpotForecastRun(t, dir, "20260720_00Z", "20260720_00Z", hourRange(12), map[string]any{"a": spot})
+
 	forecast, _ := spotForecast(dir, Spot{ID: "a"})
 	if got := len(forecast.Forecast); got != 2 {
-		t.Fatalf("rows = %d, want the 2-hour leading run before the failed hour", got)
+		t.Fatalf("rows = %d, want the 2 hours before the hole", got)
+	}
+}
+
+func TestLerpSwellFollowsSwellsAcrossSlots(t *testing.T) {
+	// A fading groundswell and a building windswell trade slots between
+	// two 3-hourly samples, as the model orders partitions by height.
+	a := swellPoint{
+		H: [3]float64{1.4, 1.2}, P: [3]float64{16, 7}, D: [3]float64{200, 290},
+		Has: [3]bool{true, true},
+	}
+	b := swellPoint{
+		H: [3]float64{1.5, 1.1}, P: [3]float64{7.5, 15.5}, D: [3]float64{295, 198},
+		Has: [3]bool{true, true},
+	}
+	if got := matchPartitions(a, b); got != [3]int{1, 0, -1} {
+		t.Fatalf("match = %v, want the two swells crossed", got)
+	}
+	mid := lerpSwell(a, b, 0.5)
+	if mid.P[0] != 15.75 || mid.D[0] != 199 || math.Abs(mid.H[0]-1.25) > 1e-9 {
+		t.Errorf("groundswell midway = %.2fm %.2fs %.0f, want 1.25m 15.75s 199", mid.H[0], mid.P[0], mid.D[0])
+	}
+	if mid.P[1] != 7.25 || mid.D[1] != 292.5 {
+		t.Errorf("windswell midway = %.2fs %.1f, want 7.25s 292.5", mid.P[1], mid.D[1])
+	}
+
+	// Swells that hold their slots pair as before.
+	steady := b
+	steady.H[0] = 2
+	if got := matchPartitions(b, steady); got != [3]int{0, 1, -1} {
+		t.Errorf("match = %v, want slots unchanged", got)
+	}
+
+	// A swell with nothing like it in the later sample is held, not
+	// blended into a different one.
+	other := swellPoint{H: [3]float64{1}, P: [3]float64{6}, D: [3]float64{90}, Has: [3]bool{true}}
+	if got := matchPartitions(a, other); got != [3]int{-1, -1, -1} {
+		t.Errorf("match = %v, want no pairing with an unrelated swell", got)
+	}
+	if held := lerpSwell(a, other, 0.5); held.P[0] != 16 || held.H[0] != 1.4 {
+		t.Errorf("unmatched swell = %.1fm %.0fs, want the earlier sample held", held.H[0], held.P[0])
 	}
 }
 

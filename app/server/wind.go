@@ -155,17 +155,7 @@ func windSeriesFor(staticDir string, lat, lon float64) []WindSample {
 // the client can place samples on the timeline of the run that produced
 // them (the station bulletin can be a newer cycle than the static layers).
 func windForecastStart(staticDir string) string {
-	raw, err := os.ReadFile(filepath.Join(staticDir, "metadata.json"))
-	if err != nil {
-		return ""
-	}
-	var meta struct {
-		ForecastStart string `json:"forecast_start"`
-	}
-	if err := json.Unmarshal(raw, &meta); err != nil {
-		return ""
-	}
-	return meta.ForecastStart
+	return currentRunBundles(staticDir).ForecastStart
 }
 
 func windForecastHandler(staticDir string) gin.HandlerFunc {

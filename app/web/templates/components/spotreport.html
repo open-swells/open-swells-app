@@ -296,10 +296,13 @@
         const hours = conds.filter(c => c.t >= dayStart && c.t < dayEnd);
 
         // Rate today's card using the same local day as the chart, taking
-        // its best hour from the model run onward.
+        // its best hour from the model run onward: the best with daylight,
+        // or of any hour on a day with no light ones (betterHour in
+        // server/conditions.go).
+        const betterHour = (c, best) => (c.light === best.light ? c.score > best.score : !!c.light);
         const runStart = window.SPOT_RUN_START || 0;
         const dayBest = hours.filter(c => +c.t >= runStart)
-            .reduce((b, c) => (!b || c.score > b.score ? c : b), null);
+            .reduce((b, c) => (!b || betterHour(c, b) ? c : b), null);
         if (dayBest && RATING[dayBest.rating]) {
             document.querySelectorAll('[data-current-condition-card]').forEach(card => {
                 card.style.setProperty('--condition-color', RATING[dayBest.rating]);
@@ -322,7 +325,7 @@
         // sunrise and sunset at the spot, in the viewer's day
         const sun = SUN.between(window.SUN_SITE, +dayStart, +dayEnd);
 
-        const best = hours.reduce((a, b) => (b.score > a.score ? b : a));
+        const best = hours.reduce((a, b) => (betterHour(b, a) ? b : a));
         const peakSurf = hours.reduce((a, b) => (b.ft_hi > a.ft_hi ? b : a));
         const peakWind = hasWind ? windHours.reduce((a, b) => (b.wmph > a.wmph ? b : a)) : null;
 
@@ -494,7 +497,7 @@
 {{if .HasConditions}}
 <script>
     // Hourly surf-condition classifier output (t = epoch ms UTC,
-    // score 0-100, rating, ft_lo/ft_hi/surf breaking surf range,
+    // score 0-100, rating, light (daylight to surf by), ft_lo/ft_hi/surf breaking surf range,
     // wmph/wdir wind).
     // The forecast component renders it as lanes aligned with the
     // swell and wind timelines.
