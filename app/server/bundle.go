@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"time"
 )
 
 var bundleMagic = []byte("OSB1")
@@ -76,9 +77,14 @@ var (
 // runBundles is what the readers need from metadata.json: this run's bundle
 // file per product, and the NWPS domains with theirs.
 type runBundles struct {
-	Bundles    map[string]string `json:"bundles"`
-	NwpsPoints []nwpsDomain      `json:"nwps_points"`
+	ForecastStart string            `json:"forecast_start"`
+	Bundles       map[string]string `json:"bundles"`
+	NwpsPoints    []nwpsDomain      `json:"nwps_points"`
 }
+
+// metadataSettle is how old metadata.json's mtime must be before the parsed
+// copy is trusted.
+const metadataSettle = 2 * time.Second
 
 var (
 	runBundlesMu      sync.Mutex
@@ -87,8 +93,8 @@ var (
 	runBundlesValue   runBundles
 )
 
-// currentRunBundles reads metadata.json's bundle names, re-parsing only when
-// the file changes. A new run's names replace the old run's, and bundles
+// currentRunBundles reads metadata.json's run and bundle names, re-parsing
+// only when the file changes: a spot page consults them a dozen times. A new run's names replace the old run's, and bundles
 // the new metadata doesn't list are dropped from the cache: the previous
 // run's files stay on disk for maps opened before it, but the server reads
 // only the current run.
@@ -100,7 +106,10 @@ func currentRunBundles(staticDir string) runBundles {
 	}
 	runBundlesMu.Lock()
 	defer runBundlesMu.Unlock()
-	if runBundlesDir == staticDir && runBundlesModTime == info.ModTime().UnixNano() {
+	// A file modified in the last moments is read again: its mtime may not
+	// tell two quick writes apart (timestamps can be milliseconds coarse).
+	settled := time.Since(info.ModTime()) > metadataSettle
+	if settled && runBundlesDir == staticDir && runBundlesModTime == info.ModTime().UnixNano() {
 		return runBundlesValue
 	}
 	var value runBundles
@@ -358,6 +367,28 @@ func (b *gridBundle) nearbyCells(lat, lon, maxDist2 float64) []gridCell {
 		return cells[a].Index < cells[c].Index
 	})
 	return cells
+}
+
+// reaches reports whether the lattice comes within sqrt(maxDist2) degrees
+// of (lat, lon): whether nearbyCells could return anything, without the
+// scan. Longitudes may be 0..360 or -180..180 on either side.
+func (b *gridBundle) reaches(lat, lon, maxDist2 float64) bool {
+	lats, lons := b.header.Lat, b.header.Lon
+	if len(lats) == 0 || len(lons) == 0 {
+		return false
+	}
+	radius := math.Sqrt(maxDist2)
+	south, north := math.Min(lats[0], lats[len(lats)-1]), math.Max(lats[0], lats[len(lats)-1])
+	if lat < south-radius || lat > north+radius {
+		return false
+	}
+	west, east := math.Min(lons[0], lons[len(lons)-1]), math.Max(lons[0], lons[len(lons)-1])
+	if east-west >= 360-2*radius {
+		return true
+	}
+	// lon's offset eastward from the west edge, 0..360
+	offset := math.Mod(math.Mod(lon-west, 360)+360, 360)
+	return offset <= east-west+radius || offset >= 360-radius
 }
 
 func (b *gridBundle) varIndex(name string) int {

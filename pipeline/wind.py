@@ -6,6 +6,7 @@ import numpy as np
 import pygrib
 
 from bundle import pack_grid
+from gribio import decode, lat_lon_grid
 
 logger = logging.getLogger("GFSWaveContours")
 
@@ -26,15 +27,16 @@ def extract_wind(filepath: str) -> dict:
         if len({message.validDate for message in messages}) != 1:
             raise ValueError("Mismatched valid times between wind fields")
 
-        lats, lons = speed_msg.latlons()
+        lons, lats = lat_lon_grid(speed_msg)
+        speed, mask = decode(speed_msg)
         return {
-            "lon": np.asarray(lons, dtype=np.float32),
-            "lat": np.asarray(lats, dtype=np.float32),
-            "speed": np.ma.filled(speed_msg.values, np.nan).astype(np.float32),
-            "direction": np.ma.filled(direction_msg.values, np.nan).astype(np.float32),
-            "u": np.ma.filled(u_msg.values, np.nan).astype(np.float32),
-            "v": np.ma.filled(v_msg.values, np.nan).astype(np.float32),
-            "mask": np.ma.getmaskarray(speed_msg.values),
+            "lon": lons,
+            "lat": lats,
+            "speed": speed,
+            "direction": decode(direction_msg)[0],
+            "u": decode(u_msg)[0],
+            "v": decode(v_msg)[0],
+            "mask": mask,
             "valid_date": speed_msg.validDate,
         }
     finally:
