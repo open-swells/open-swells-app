@@ -831,9 +831,9 @@
                 if (showWind) {
                     const lane = svg.append("g").attr("class", "wind-lane");
                     const wdTop = windTop, wdBase = windBottom, wdMid = (wdTop + wdBase) / 2;
-                    // a row of speed readings across the top of the panel;
-                    // the line plots beneath it
-                    const readingY = wdTop + 13, plotTop = wdTop + 24;
+                    // headroom above the tallest bar for its speed reading
+                    // and direction arrow
+                    const plotTop = wdTop + 24;
                     let windSummary = '';
                     if (windState === 'loading') {
                         lane.append("line").attr("class", "wind-loading")
@@ -865,14 +865,14 @@
                         const maxMph = d3.max(hourly, mph) || 0;
                         const yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 10)]).nice(4).range([wdBase, plotTop]);
                         // mph gridlines, values inside the plot; any that
-                        // would run into the reading row are left off
+                        // would crowd the top edge are left off
                         for (const t of yw.ticks(3)) {
                             if (t <= 0) continue;
                             lane.append("line")
                                 .attr("x1", 0).attr("x2", width)
                                 .attr("y1", yw(t)).attr("y2", yw(t))
                                 .attr("stroke", CHART.grid);
-                            if (yw(t) - 3 < readingY + 12) continue;
+                            if (yw(t) - 3 < wdTop + 12) continue;
                             lane.append("text").attr("class", "axis-label")
                                 .attr("x", 2).attr("y", yw(t) - 3)
                                 .attr("fill", CHART.axis)
@@ -892,24 +892,26 @@
                             .attr("rx", 1.5)
                             .attr("fill", CHART.wind)
                             .attr("fill-opacity", w => (w === windPeak ? 0.95 : 0.6));
-                        // direction arrows above the bars and speeds in the
-                        // reading row, thinned so they never crowd on narrow
-                        // screens; the peak is always shown
+                        // speeds sit just above their bar with the direction
+                        // arrow above that, thinned so they never crowd on
+                        // narrow screens; the peak is always shown
                         const stride = minPx => Math.max(1, Math.ceil(minPx / Math.max(x(1) - x(0), 1)));
                         const arrowEvery = Math.max(3, stride(22)), readingEvery = Math.max(3, stride(30));
                         hourly.forEach(w => {
                             const isPeak = w === windPeak;
+                            const showReading = isPeak || (w.hour % readingEvery === 0 && Math.abs(x(w.hour) - x(windPeak.hour)) >= 30);
+                            const barTop = yw(mph(w));
                             if (w.hour % arrowEvery === 0 || isPeak) {
                                 lane.append("path")
                                     .attr("d", arrowPath(6.5))
-                                    .attr("transform", `translate(${x(w.hour)}, ${yw(mph(w)) - 9}) rotate(${travelBearing(w.d)})`)
+                                    .attr("transform", `translate(${x(w.hour)}, ${barTop - (showReading ? 21 : 9)}) rotate(${travelBearing(w.d)})`)
                                     .attr("fill", CHART.wind)
                                     .attr("stroke", themeColor('--bg', '#0e0f12')).attr("stroke-width", 1).attr("stroke-linejoin", 'round');
                             }
-                            if (!isPeak && (w.hour % readingEvery || Math.abs(x(w.hour) - x(windPeak.hour)) < 30)) return;
+                            if (!showReading) return;
                             lane.append("text").attr("class", "wind-reading")
                                 .attr("x", Math.max(8, Math.min(width - 8, x(w.hour))))
-                                .attr("y", readingY)
+                                .attr("y", barTop - 4)
                                 .attr("text-anchor", 'middle')
                                 .attr("fill", CHART.wind)
                                 .attr("font-weight", isPeak ? 700 : 400)
