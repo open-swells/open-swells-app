@@ -1,18 +1,21 @@
 {{/* The one place the surf-condition ramp is defined for server-rendered
      markup; the client-side charts read the same values from the
      --cond-* custom properties in theme.css. */}}
-{{ define "condcolor" }}{{if eq . "epic"}}#86d4c6{{else if eq . "good"}}#4fd1bc{{else if eq . "fair"}}#eec478{{else}}#ef7a83{{end}}{{ end }}
+{{ define "condcolor" }}{{if eq . "epic"}}#b48cf0{{else if eq . "good"}}#2f9e5c{{else if eq . "fair"}}#a8dc7e{{else}}#e3c35a{{end}}{{ end }}
 {{ define "forecastsummary" }}
 <style>
-    .favorite-row { padding: 18px 20px 16px; background: var(--panel); border: 1px solid var(--line); }
-    .favorites-detailed .favorite-row { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 16px 28px; align-items: stretch; }
-    .favorites-detailed .favorite-row + .favorite-row { margin-top: 14px; }
+    /* A favorite is a station page in miniature: the same "now" report,
+       outlook strip and day cards, side by side so a row is one glance. */
+    .favorite-row { padding: 18px 20px; background: var(--panel); border: 1px solid var(--line); }
+    .favorite-row + .favorite-row { margin-top: 12px; }
+    .favorites-detailed .favorite-row { display: grid; grid-template-columns: minmax(280px, 340px) minmax(0, 1fr); gap: 16px 24px; }
     .favorite-left { min-width: 0; }
-    .favorite-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-    .favorite-name { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.3; color: #fff; }
+    .favorite-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .favorite-name { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.3; color: #fff; }
+    .favorites-detailed .favorite-name { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
     .offline-flag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--warn); white-space: nowrap; }
-    .location-meta { margin-top: 4px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
-    .favorite-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .location-meta { margin-top: 3px; display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .03em; color: var(--text-3); }
+    .favorite-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .link-button { min-height: 36px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; font-weight: 500; color: var(--text-1); background: var(--raised); border: 1px solid var(--line-strong); cursor: pointer; }
     .link-button:hover { color: #fff; background: var(--hover); }
     .link-button:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
@@ -20,86 +23,48 @@
     .action-icon { width: 13px; height: 13px; flex: none; }
     .remove-button { width: 36px; min-height: 36px; }
     .stat-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
-    .hour-block { margin-top: 16px; }
-    .hour-strip { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 38px; align-items: end; border-bottom: 1px solid var(--line); }
+    .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 9px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .location-badge-buoy { color: var(--kind-buoy); }
+    .location-badge-beach { color: var(--kind-beach); }
+
+    .favorite-report { margin-top: 16px; }
+    .favorite-report .rp-now { margin-bottom: 16px; }
+    .favorite-outlook { min-width: 0; }
+    .favorites-detailed .favorite-outlook { padding-left: 24px; border-left: 1px solid var(--line); }
+    .favorite-outlook .swell-strip { margin-top: 0; }
+    .strip-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 16px; padding: 8px 12px 0; }
+    .strip-head .strip-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .025em; color: var(--text-2); }
+    .strip-head .strip-readout { font-size: 10px; color: var(--text-3); }
+    .forecast-unavailable { display: grid; place-items: center; min-height: 120px; text-align: center; color: var(--text-2); }
+    .forecast-unavailable strong { display: block; color: var(--text-1); font-size: 12px; font-weight: 600; }
+    .forecast-unavailable span { display: block; margin-top: 5px; font-size: 10px; line-height: 1.45; }
+
+    /* today's rating by the hour, under the spot report */
+    .hour-block { margin-top: 18px; }
+    .hour-strip { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; height: 28px; align-items: end; border-bottom: 1px solid var(--line-strong); }
     .hour-candle { position: relative; height: 100%; display: flex; align-items: flex-end; }
     .hour-candle i { display: block; width: 100%; min-height: 2px; opacity: .85; }
     .hour-candle.is-unavailable i { background: var(--hover); opacity: .55; }
     .hour-candle.is-now i { opacity: 1; }
-    .hour-candle.is-now::after { content: ''; position: absolute; left: 50%; top: -7px; bottom: -1px; width: 1px; background: var(--accent-soft); }
-    .hour-scale { display: flex; justify-content: space-between; margin-top: 5px; font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
-    .favorite-outlook { position: relative; min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--line); padding-left: 24px; }
-    .outlook-scroll { min-width: 0; display: flex; flex: 1; flex-direction: column; }
-    .outlook-hover-line { position: absolute; z-index: 2; top: 0; width: 1px; background: var(--accent-soft); pointer-events: none; display: none; }
-    .outlook-panel-tooltip {
-        position: absolute; z-index: 4; display: none; min-width: 136px;
-        padding: 8px 9px; border: 1px solid #355a78; border-left: 2px solid var(--swell);
-        background: linear-gradient(145deg, rgba(37, 39, 49, .98), rgba(20, 21, 25, .98));
-        box-shadow: 0 10px 24px rgba(0, 0, 0, .42);
-        color: var(--text); font-family: var(--font-mono);
-        font-size: 10px; line-height: 1.45; pointer-events: none;
-    }
-    .forecast-tooltip-date { margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid #3b3e49; color: #fff; font-weight: 600; white-space: nowrap; }
-    .forecast-tooltip-row { display: grid; grid-template-columns: 8px 42px 1fr; align-items: center; gap: 5px; margin-top: 4px; white-space: nowrap; }
-    .forecast-tooltip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--tooltip-color); }
-    .forecast-tooltip-label { color: var(--text-3); font-size: 9px; letter-spacing: .04em; }
-    .forecast-tooltip-value { color: var(--tooltip-color); font-weight: 600; text-align: right; text-transform: capitalize; }
-    .outlook-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-    .outlook-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
-    .outlook-note { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--text-3); }
-    .day-ticks { flex: 1; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; margin-top: 10px; }
-    .day-tick { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
-    .day-tick-track { flex: 1; width: 100%; min-height: 40px; display: flex; align-items: flex-end; }
-    .day-tick-track i { display: block; width: 100%; min-height: 2px; opacity: .5; }
-    .day-tick:hover .day-tick-track i { opacity: 1; }
-    .day-tick span { height: 11px; line-height: 11px; font-family: var(--font-mono); font-size: 9px; color: var(--text-2); }
-    .day-tick .day-wave-height { color: var(--accent-soft); }
-    .day-tick .day-date-label { color: var(--text-2); white-space: nowrap; letter-spacing: -.02em; }
-    .lane-swell { position: relative; height: 56px; margin-top: 10px; }
-    .lane-swell svg { display: block; width: 100%; height: 100%; }
-    .swell-graph { position: relative; height: 56px; }
-    .swell-unit-label { position: absolute; z-index: 1; top: 2px; left: 2px; font-family: var(--font-mono); font-size: 9px; line-height: 10px; color: var(--text-3); pointer-events: none; }
-    .swell-peak { position: absolute; color: var(--swell); pointer-events: none; }
-    .swell-peak::after { content: ''; position: absolute; top: -2px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px var(--panel); }
-    .swell-peak span { position: absolute; top: var(--peak-label-top, -12px); left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: var(--font-mono); font-size: 9px; line-height: 10px; white-space: nowrap; color: var(--accent-soft); }
-    .lane-wind { position: relative; margin-top: 8px; }
-    .wind-graph { position: relative; height: 38px; padding-top: 8px; }
-    .wind-graph svg { display: block; width: 100%; height: 30px; }
-    .wind-peak { position: absolute; top: 0; color: var(--wind); pointer-events: none; }
-    .wind-peak::after { content: ''; position: absolute; top: 9px; left: -2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px var(--panel); }
-    .wind-peak span { position: absolute; top: 0; left: 0; transform: translateX(var(--peak-label-shift, -50%)); font-family: var(--font-mono); font-size: 9px; line-height: 10px; white-space: nowrap; color: currentColor; }
-    .lane-labels { display: flex; justify-content: space-between; padding-top: 6px; font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; color: var(--text-3); }
-    .spot-forecast-levels { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
-    .spot-forecast-levels .lane-swell { margin-top: 8px; }
-    .spot-conditions-head { margin-top: 10px; }
-    .location-badge { display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border: 1px solid currentColor; font-size: 9px; line-height: 1; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-    .location-badge-buoy { color: var(--kind-buoy); }
-    .location-badge-beach { color: var(--kind-beach); }
-    .favorite-report { margin-top: 16px; }
-    .favorite-report .rp-now { margin-bottom: 14px; }
-    .favorites-compact .favorite-report .rp-height { font-size: 24px; }
-    .compact-condition { margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
-    .forecast-unavailable { justify-content: center; text-align: center; color: var(--text-2); }
-    .forecast-unavailable strong { display: block; color: var(--text-1); font-size: 12px; font-weight: 600; }
-    .forecast-unavailable span { display: block; margin-top: 5px; font-size: 10px; line-height: 1.45; }
-    .unavailable-label { color: var(--text-2); }
-    .favorites-compact .favorite-row { padding: 12px; background: var(--raised); border: 1px solid var(--line); }
+    .hour-candle.is-now::after { content: ''; position: absolute; left: 50%; top: -5px; bottom: -1px; width: 1px; background: var(--accent-soft); }
+    .hour-scale { display: flex; justify-content: space-between; margin-top: 5px; font-family: var(--font-mono); font-size: 9px; color: var(--text-3); }
+
+    /* compact rows (the map's favorites panel) */
+    .favorites-compact .favorite-row { padding: 12px; background: var(--raised); }
     .favorites-compact .favorite-row + .favorite-row { margin-top: 8px; }
     .favorites-compact .favorite-name { font-size: 12px; }
+    .favorites-compact .favorite-actions { gap: 6px; }
+    .favorites-compact .favorite-report .rp-now { margin-bottom: 14px; }
+    .favorites-compact .favorite-report .rp-height { font-size: 24px; }
+    .compact-condition { margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+    .unavailable-label { color: var(--text-2); }
+
     @media (max-width: 900px) {
         .favorites-detailed .favorite-row { grid-template-columns: minmax(0, 1fr); }
-        .favorite-outlook { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 12px; }
-        .spot-forecast-levels { display: none; }
-        .spot-conditions-head { margin-top: 0; }
-        .day-tick .day-wave-height { display: none; }
-        .day-tick .day-date-label { font-size: 0; }
-        .day-tick .day-date-label::after { content: attr(data-short-label); font-size: 9px; }
+        .favorites-detailed .favorite-outlook { padding-left: 0; border-left: 0; }
     }
     @media (max-width: 640px) {
-        .favorite-row { padding: 14px; }
-        .outlook-scroll { display: block; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
-        .outlook-scroll > * { min-width: 480px; }
-        [data-buoy-outlook] .outlook-scroll > * { min-width: 960px; }
+        .favorite-row { padding: 14px 12px; }
     }
     @media (max-width: 400px) {
         .favorites-compact .favorite-head { flex-wrap: wrap; }
@@ -113,74 +78,79 @@
     <p class="mt-1 text-[11px] text-[#a6aab2]">Add a buoy or beach to build your forecast list.</p>
 </div>
 {{else}}
-    {{range .Buoys}}
+    {{range .Buoys}}{{$id := .ID}}
     <article class="favorite-row" data-favorite-type="buoy">
         <div class="favorite-left">
-            <div class="favorite-head">
-                <div class="min-w-0">
-                    <div class="flex items-baseline gap-3 min-w-0">
-                        <h3 class="favorite-name truncate">{{.Name}}</h3>
-                        {{if .Offline}}<span class="offline-flag">Offline since {{.OfflineSince}}</span>{{end}}
-                    </div>
-                    <div class="location-meta"><span class="location-badge location-badge-buoy" style="margin-right: 6px;">Buoy</span>{{.ID}}</div>
+        <header class="favorite-head">
+            <div class="min-w-0">
+                <div class="flex items-baseline gap-3 min-w-0">
+                    <h3 class="favorite-name truncate">{{.Name}}</h3>
+                    {{if .Offline}}<span class="offline-flag">Offline since {{.OfflineSince}}</span>{{end}}
                 </div>
-                <div class="favorite-actions">
-                    {{if $.Detailed}}
-                    <button onclick="openForecast('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
-                    {{else}}
-                    <button onclick="showFavoriteOnMap('buoy', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
-                    <a href="/forecast/{{.ID}}" target="_top" class="link-button full-forecast-link" title="Open full forecast" aria-label="Open full forecast for {{.Name}}">
-                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
-                    </a>
-                    {{end}}
-                    <button onclick="toggleFavorite('{{.ID}}')" class="page-header-action page-favorite-button is-favorite remove-button" aria-pressed="true" title="Remove from favorites" aria-label="Remove {{.Name}} from favorites"></button>
+                <div class="location-meta"><span class="location-badge location-badge-buoy">Buoy</span>{{.ID}}</div>
+            </div>
+            <div class="favorite-actions">
+                {{if $.Detailed}}
+                <button onclick="openForecast('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
+                {{else}}
+                <button onclick="showFavoriteOnMap('buoy', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
+                <a href="/forecast/{{.ID}}" target="_top" class="link-button full-forecast-link" title="Open full forecast" aria-label="Open full forecast for {{.Name}}">
+                    <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                </a>
+                {{end}}
+                <button onclick="toggleFavorite('{{.ID}}')" class="page-header-action page-favorite-button is-favorite remove-button" aria-pressed="true" title="Remove from favorites" aria-label="Remove {{.Name}} from favorites"></button>
+            </div>
+        </header>
+            <section class="favorite-report" aria-label="Current conditions">
+                {{template "buoynow" (buoyreport .SwellReport .WindReport)}}
+            </section>
+        </div>
+            {{if and $.Detailed .HasError}}
+            <div class="favorite-outlook forecast-unavailable" role="status">
+                <div><strong>{{.ErrorMsg}}</strong><span>Current buoy observations are still shown.</span></div>
+            </div>
+            {{else if and $.Detailed (gt (len .Summary) 1)}}
+            <section class="favorite-outlook" data-outlook="buoy" data-buoy-outlook data-station="{{.ID}}" data-href="/forecast/{{.ID}}" data-hourly-heights="{{range .Forecast.Forecast}}{{.PrimaryWaveHeight}} {{end}}" data-hourly-times="{{range .Forecast.Forecast}}{{.Time.UnixMilli}} {{end}}">
+                <div class="swell-strip">
+                    <div class="strip-head"><span class="strip-title">Swell &middot; wind &middot; 16 day outlook</span><span class="strip-readout" data-strip-readout></span></div>
+                    <div data-strip aria-label="16-day swell height and wind speed; select a day to open it"></div>
+                    <div class="strip-hover-line" aria-hidden="true"></div>
+                    <div class="strip-panel-tooltip" role="tooltip"></div>
                 </div>
-            </div>
-            <section class="favorite-report" aria-label="Current conditions">{{template "buoynow" (buoyreport .SwellReport .WindReport)}}</section>
-        </div>
-        {{if and $.Detailed .HasError}}
-        <div class="favorite-outlook forecast-unavailable" role="status">
-            <div><strong>{{.ErrorMsg}}</strong><span>Current buoy observations are still shown.</span></div>
-        </div>
-        {{else if and $.Detailed (gt (len .Summary) 1)}}
-        <div class="favorite-outlook" data-buoy-outlook data-station="{{.ID}}" data-hourly-heights="{{range .Forecast.Forecast}}{{.PrimaryWaveHeight}} {{end}}" data-hourly-times="{{range .Forecast.Forecast}}{{.Time.UnixMilli}} {{end}}">
-            <div class="outlook-head"><span class="outlook-label">16-day swell &amp; wind</span><span class="outlook-note" data-swell-note></span></div>
-            <div class="outlook-scroll">
-                <div class="lane-swell" data-swell-lane aria-label="16-day swell height trend"></div>
-                <div class="lane-wind" data-wind-lane aria-label="16-day wind speed trend" hidden></div>
-                <div class="lane-labels" data-lane-labels></div>
-            </div>
-        </div>
-        {{else if and (not $.Detailed) .HasError}}
-        <div class="compact-condition"><span class="stat-label">Outlook</span><span class="text-[9px] font-semibold uppercase unavailable-label">{{.ErrorMsg}}</span></div>
-        {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}
-        <div class="compact-condition"><span class="stat-label">Current swell</span><span class="text-[9px] font-semibold uppercase" style="color: #3b82f6;">{{$current.WaveHeight}}</span></div>
-        {{end}}
+                <div class="forecast-days">
+                    {{range .Summary}}<a class="forecastcard" href="/forecast/{{$id}}?day={{.Date}}" data-date="{{.Date}}"><div class="fc-day">{{.DateAbv}}</div><div class="fc-height">{{.WaveHeight}}</div></a>{{end}}
+                </div>
+            </section>
+            {{else if and (not $.Detailed) .HasError}}
+            <div class="compact-condition"><span class="stat-label">Outlook</span><span class="text-[9px] font-semibold uppercase unavailable-label">{{.ErrorMsg}}</span></div>
+            {{else if and (not $.Detailed) (gt (len .Summary) 0)}}{{$current := index .Summary 0}}
+            <div class="compact-condition"><span class="stat-label">Current swell</span><span class="text-[9px] font-semibold uppercase" style="color: #3b82f6;">{{$current.WaveHeight}}</span></div>
+            {{end}}
     </article>
     {{end}}
 
-    {{range .Spots}}
+    {{range .Spots}}{{$id := .ID}}
     <article class="favorite-row" data-favorite-type="spot">
         <div class="favorite-left">
-            <div class="favorite-head">
-                <div class="min-w-0">
-                    <div class="flex items-baseline gap-3 min-w-0">
-                        <h3 class="favorite-name truncate">{{.Name}}</h3>
-                    </div>
-                    <div class="location-meta"><span class="location-badge location-badge-beach" style="margin-right: 6px;">Beach</span>{{if .Region}}{{.Region}}{{end}}</div>
+        <header class="favorite-head">
+            <div class="min-w-0">
+                <div class="flex items-baseline gap-3 min-w-0">
+                    <h3 class="favorite-name truncate">{{.Name}}</h3>
                 </div>
-                <div class="favorite-actions">
-                    {{if $.Detailed}}
-                    <button onclick="openSpot('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
-                    {{else}}
-                    <button onclick="showFavoriteOnMap('spot', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
-                    <a href="/surf-spots/{{.ID}}" target="_top" class="link-button full-forecast-link" title="Open full forecast" aria-label="Open full forecast for {{.Name}}">
-                        <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
-                    </a>
-                    {{end}}
-                    <button onclick="toggleSpotFavorite('{{.ID}}')" class="page-header-action page-favorite-button is-favorite remove-button" aria-pressed="true" title="Remove from favorites" aria-label="Remove {{.Name}} from favorites"></button>
-                </div>
+                <div class="location-meta"><span class="location-badge location-badge-beach">Beach</span>{{if .Region}}{{.Region}}{{end}}</div>
             </div>
+            <div class="favorite-actions">
+                {{if $.Detailed}}
+                <button onclick="openSpot('{{.ID}}')" class="link-button open-button">Open <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></button>
+                {{else}}
+                <button onclick="showFavoriteOnMap('spot', '{{.ID}}', {{.Longitude}}, {{.Latitude}})" class="link-button">Show on map</button>
+                <a href="/surf-spots/{{.ID}}" target="_top" class="link-button full-forecast-link" title="Open full forecast" aria-label="Open full forecast for {{.Name}}">
+                    <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                </a>
+                {{end}}
+                <button onclick="toggleSpotFavorite('{{.ID}}')" class="page-header-action page-favorite-button is-favorite remove-button" aria-pressed="true" title="Remove from favorites" aria-label="Remove {{.Name}} from favorites"></button>
+            </div>
+        </header>
             {{/* the spot page's "now" report: rating and surf height, then
                  the swell trains beside the wind */}}
             <section class="favorite-report" aria-label="Current conditions">
@@ -197,31 +167,31 @@
                 </div>
                 {{end}}
                 {{if .HasReport}}{{template "spotprops" .Report}}{{end}}
+                {{if and $.Detailed (gt (len .CurrentConditions) 0)}}
+                <div class="hour-block">
+                    <p class="rp-cap">Today <span>&middot; rating by hour</span></p>
+                    <div class="hour-strip" data-hour-strip aria-label="Hourly conditions for today, midnight to midnight">
+                        {{range .CurrentConditions}}<div class="hour-candle" data-ts="{{.UnixMs}}" title="{{.Hour}}:00 &middot; {{.Condition}}"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div>{{end}}
+                    </div>
+                    <div class="hour-scale"><span data-hour-start></span><span data-hour-mid></span><span data-hour-end></span></div>
+                </div>
+                {{end}}
             </section>
-            {{if and $.Detailed (gt (len .CurrentConditions) 0)}}
-            <div class="hour-block">
-                <div class="hour-strip" data-hour-strip aria-label="Hourly conditions for today, midnight to midnight">
-                    {{range .CurrentConditions}}<div class="hour-candle" data-ts="{{.UnixMs}}" title="{{.Hour}}:00 &middot; {{.Condition}}"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div>{{end}}
+        </div>
+            {{if and $.Detailed (gt (len .Summary) 0)}}
+            <section class="favorite-outlook" data-outlook="spot" data-spot-outlook data-station="{{.ID}}" data-href="/surf-spots/{{.ID}}" data-hourly-heights="{{range .Forecast.Forecast}}{{.PrimaryWaveHeight}} {{end}}" data-hourly-times="{{range .Forecast.Forecast}}{{.Time.UnixMilli}} {{end}}">
+                <div class="swell-strip">
+                    <div class="strip-head"><span class="strip-title">Surf &middot; conditions &middot; 16 day outlook</span><span class="strip-readout" data-strip-readout></span></div>
+                    <div data-strip aria-label="16-day surf height and conditions; select a day to open it"></div>
+                    <div class="strip-hover-line" aria-hidden="true"></div>
+                    <div class="strip-panel-tooltip" role="tooltip"></div>
                 </div>
-                <div class="hour-scale"><span data-hour-start></span><span>Today · 24 hours</span><span data-hour-end></span></div>
-            </div>
+                <div class="forecast-days">
+                    {{range .Summary}}<a class="forecastcard" href="/surf-spots/{{$id}}?day={{.Date}}" data-date="{{.Date}}"><div class="fc-day">{{.DateAbv}}</div><div class="fc-height">{{.WaveHeight}}</div><div class="fc-cond" style="color: {{template "condcolor" .Condition}};">{{.Condition}}</div></a>{{end}}
+                </div>
+                <script type="application/json" data-outlook-hours>{{json .Outlook}}</script>
+            </section>
             {{end}}
-        </div>
-        {{if and $.Detailed (gt (len .Summary) 0)}}
-        <div class="favorite-outlook" data-spot-outlook data-station="{{.ID}}" data-hourly-heights="{{range .Forecast.Forecast}}{{.PrimaryWaveHeight}} {{end}}" data-hourly-times="{{range .Forecast.Forecast}}{{.Time.UnixMilli}} {{end}}">
-            <div class="outlook-scroll">
-                <div class="spot-forecast-levels" aria-label="16-day swell and wind levels">
-                    <div class="outlook-head"><span class="outlook-label">16-day swell &amp; wind</span><span class="outlook-note" data-swell-note></span></div>
-                    <div class="lane-swell" data-swell-lane aria-label="16-day swell height trend"></div>
-                    <div class="lane-wind" data-wind-lane aria-label="16-day wind speed trend" hidden></div>
-                </div>
-                <div class="outlook-head spot-conditions-head"><span class="outlook-label">16-day outlook</span><span class="outlook-note">Conditions</span></div>
-                <div class="day-ticks" aria-label="16-day conditions outlook">
-                    {{range .Summary}}<div class="day-tick" data-date="{{.Date}}" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"><div class="day-tick-track"><i style="height: {{.Score}}%; background: {{template "condcolor" .Condition}};"></i></div><span class="day-wave-height">{{.WaveHeight}}</span><span class="day-date-label" data-day-label data-short-label="{{.DayNum}}">{{.DateAbv}}</span></div>{{end}}
-                </div>
-            </div>
-        </div>
-        {{end}}
     </article>
     {{end}}
 {{end}}

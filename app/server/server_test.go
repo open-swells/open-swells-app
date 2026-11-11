@@ -289,7 +289,7 @@ func TestLoadTemplates(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("spot template failed to render: %v", err)
 	}
-	for _, want := range []string{`window.createForecastClock("Pacific/Honolulu")`, "data-spot-timezone", "Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #4fd1bc", "stripHoverLine", "stripTooltip", "readoutHTML", "readout-rating"} {
+	for _, want := range []string{`window.createForecastClock("Pacific/Honolulu")`, "data-spot-timezone", "Current conditions", "data-current-condition>good", "data-current-height>3.2ft", "--condition-color: #2f9e5c", "stripHoverLine", "stripTooltip", "readoutHTML", "readout-rating"} {
 		if !bytes.Contains(spotPage.Bytes(), []byte(want)) {
 			t.Errorf("spot condition summary is missing %q", want)
 		}
@@ -335,6 +335,7 @@ func TestLoadTemplates(t *testing.T) {
 			}}},
 			Summary:           []ForecastSummary{{DateAbv: "Mon 7/20", DayNum: "20", WaveHeight: "3.2ft", HeightFt: 3.2, Condition: "fair", Score: 40}},
 			CurrentConditions: []ConditionCandle{{Hour: "06", UnixMs: 1753000000000, Score: 40, Condition: "fair"}},
+			Outlook:           []OutlookHour{{UnixMs: 1753000000000, HiFt: 3, Surf: "2–3ft", Score: 40, Rating: "fair"}},
 		}},
 		Detailed: true,
 	}
@@ -342,7 +343,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "spot-forecast-levels", "day-wave-height", "data-day-label", "Mon 7/20", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "day-tick", "12 mph", "W 270°", "WSW 250°", "SSW 195°", "rotate(250deg)", "rp-swell", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "data-outlook=\"buoy\"", "data-outlook=\"spot\"", "swell-strip", "data-strip-readout", "href=\"/surf-spots/el-porto?day=", "href=\"/forecast/46221?day=", "fc-height\">3.2ft", "fc-cond", "Mon 7/20", "data-outlook-hours>[{\"t\":1753000000000,\"ft\":3,\"surf\":\"2–3ft\",\"score\":40,\"rating\":\"fair\"}]", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "12 mph", "W 270°", "WSW 250°", "SSW 195°", "rotate(250deg)", "rp-swell", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}
@@ -417,7 +418,7 @@ func TestEmbeddedThemeAsset(t *testing.T) {
 	if len(webstatic.ThemeCSS) == 0 {
 		t.Fatal("embedded theme stylesheet is empty")
 	}
-	for _, want := range []string{"--cond-good: #4fd1bc", "--text-2:", ".rp-height", ".station-shell"} {
+	for _, want := range []string{"--cond-good: #2f9e5c", "--text-2:", ".rp-height", ".station-shell", ".swell-strip", ".forecastcard", ".readout-rating"} {
 		if !bytes.Contains(webstatic.ThemeCSS, []byte(want)) {
 			t.Errorf("theme stylesheet is missing %q", want)
 		}

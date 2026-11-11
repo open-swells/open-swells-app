@@ -939,9 +939,35 @@ type SpotFavorite struct {
 	Forecast            ForecastData
 	Summary             []ForecastSummary
 	CurrentConditions   []ConditionCandle
-	Report              SpotReport
-	HasReport           bool
-	HasError            bool
+	// Outlook is the hourly surf height and rating behind the favorites
+	// row's 16-day strip, from a day back so today's column is complete.
+	Outlook   []OutlookHour
+	Report    SpotReport
+	HasReport bool
+	HasError  bool
+}
+
+// OutlookHour is one hour of a favorite's 16-day strip: the surf range's
+// top in feet, its label ("3–4ft"), and the rating. Trimmed from
+// HourlyCondition because a favorites page carries one series per spot.
+type OutlookHour struct {
+	UnixMs int64   `json:"t"`
+	HiFt   float64 `json:"ft"`
+	Surf   string  `json:"surf"`
+	Score  int     `json:"score"`
+	Rating string  `json:"rating"`
+}
+
+func outlookHours(conds []HourlyCondition, now time.Time) []OutlookHour {
+	from := now.Add(-24 * time.Hour).UnixMilli()
+	hours := make([]OutlookHour, 0, len(conds))
+	for _, c := range conds {
+		if c.UnixMs < from {
+			continue
+		}
+		hours = append(hours, OutlookHour{UnixMs: c.UnixMs, HiFt: c.SurfHiFt, Surf: c.Surf, Score: c.Score, Rating: c.Rating})
+	}
+	return hours
 }
 
 func spotFavoriteEntry(staticDir string, spot Spot, loc *time.Location) SpotFavorite {
@@ -956,6 +982,7 @@ func spotFavoriteEntry(staticDir string, spot Spot, loc *time.Location) SpotFavo
 	conditions := spotConditions(staticDir, spot, hours)
 	applyConditionSummary(entry.Summary, conditionsFromRun(conditions, forecastData), loc)
 	entry.CurrentConditions = currentConditionCandles(conditions)
+	entry.Outlook = outlookHours(conditions, time.Now())
 	entry.Report, entry.HasReport = spotReport(staticDir, spot, forecastData)
 	if c, ok := conditionNear(conditions, entry.Report.ValidUnixMs); ok && entry.HasReport {
 		entry.Report.Surf = c.Surf
