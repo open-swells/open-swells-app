@@ -805,6 +805,10 @@ func getSpotsForUser(db *sql.DB, uid string) ([]string, error) {
 // the verified token, never from request parameters.
 func requireAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if authClient == nil {
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "Sign-in is not configured on this server"})
+			return
+		}
 		const prefix = "Bearer "
 		header := c.GetHeader("Authorization")
 		if !strings.HasPrefix(header, prefix) {
@@ -1137,17 +1141,23 @@ func run() {
 
 	ctx := context.Background()
 
-	var opts []option.ClientOption
-	if credPath := os.Getenv("FIREBASE_CREDENTIALS"); credPath != "" {
-		opts = append(opts, option.WithCredentialsFile(credPath))
-	}
-	app, err := firebase.NewApp(ctx, nil, opts...)
-	if err != nil {
-		log.Fatalf("error initializing firebase app (set FIREBASE_CREDENTIALS to the service account key path): %v", err)
-	}
-	authClient, err = app.Auth(ctx)
-	if err != nil {
-		log.Fatalf("error getting firebase auth client: %v", err)
+	// Firebase credentials are optional: without them the app still serves
+	// forecasts, and sign-in and favorites are disabled (authClient stays nil).
+	var err error
+	credPath := os.Getenv("FIREBASE_CREDENTIALS")
+	if credPath == "" {
+		log.Printf("FIREBASE_CREDENTIALS not set; sign-in and favorites are disabled")
+	} else if _, statErr := os.Stat(credPath); statErr != nil {
+		log.Printf("warning: Firebase credentials not found at %q; sign-in and favorites are disabled: %v", credPath, statErr)
+	} else {
+		app, err := firebase.NewApp(ctx, nil, option.WithCredentialsFile(credPath))
+		if err != nil {
+			log.Fatalf("error initializing firebase app from %q: %v", credPath, err)
+		}
+		authClient, err = app.Auth(ctx)
+		if err != nil {
+			log.Fatalf("error getting firebase auth client: %v", err)
+		}
 	}
 
 	dbPath := getenvDefault("DB_PATH", "./main.db")
@@ -1295,6 +1305,10 @@ func run() {
 	})
 
 	renderFavoritesPage := func(c *gin.Context) {
+		if authClient == nil {
+			c.String(http.StatusServiceUnavailable, "Favorites are unavailable: this server has no Firebase credentials configured.")
+			return
+		}
 		renderTemplate(c, tmpl, "favorites.html", gin.H{
 			"SearchView": c.Request.URL.Path == "/favorites/search",
 		})
@@ -1420,6 +1434,10 @@ func run() {
 	})
 
 	api.POST("/auth", func(c *gin.Context) {
+		if authClient == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Sign-in is not configured on this server"})
+			return
+		}
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16<<10)
 		var req struct {
 			IDToken string `json:"idToken"`

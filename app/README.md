@@ -6,26 +6,35 @@
 
 ### Overview
 
-**[OpenSwells](https://go-surf-app-438594f906bc.herokuapp.com/)** is a free, open-source **surf report** and **16 day swell forecast from 170+ locations**. Reports and forecasts are from the [The Environmental Modeling Center Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php).
+**[OpenSwells](https://go-surf-app-438594f906bc.herokuapp.com/)** is a free, open-source **surf report** and **16 day swell forecast from 5,800+ locations**. Reports and forecasts are from the [The Environmental Modeling Center Operational Wave Models](https://polar.ncep.noaa.gov/waves/index.php).
 New forecasts are received every 6 hours. 
 
 ### Previously
 
-This project was previously a 3 day forecast for my local beach using an LSTM network, and later graph neural networks ([site](https://go-ml-surf-forecast.onrender.com/), [github](https://github.com/evancoons22/nbdc-buoy-data)). I have since expanded it to include a 16 days forecast for 170+ locations thanks to Environmental Modeling Center and NOAA.
+This project was previously a 3 day forecast for my local beach using an LSTM network, and later graph neural networks ([site](https://go-ml-surf-forecast.onrender.com/), [github](https://github.com/evancoons22/nbdc-buoy-data)). I have since expanded it to include a 16 days forecast for 5,800+ locations thanks to Environmental Modeling Center and NOAA.
 
 ### Running the App
 
 You can run this app locally from the `app/` directory of the monorepo.
 
 1. clone repo and `cd app`
-2. `$ FIREBASE_CREDENTIALS=/path/to/service-account-key.json go run ./server`
+2. `$ go run ./server`
 3. go to localhost:8081
 
-Configuration (all optional except Firebase credentials):
+This runs without Firebase credentials: forecasts, the map, spot and buoy
+pages all work, but sign-in and favorites are disabled (`/favorites` and the
+per-user APIs return 503). To enable them, point `FIREBASE_CREDENTIALS` at a
+Firebase service account key:
+
+```sh
+FIREBASE_CREDENTIALS=/path/to/service-account-key.json go run ./server
+```
+
+Configuration (all optional):
 
 | Env var | Default | Purpose |
 | --- | --- | --- |
-| `FIREBASE_CREDENTIALS` | (uses Application Default Credentials) | Path to the Firebase service account key |
+| `FIREBASE_CREDENTIALS` | (unset: sign-in and favorites disabled) | Path to the Firebase service account key; if unset or the file is missing, the app runs without sign-in and favorites |
 | `PORT` | `8081` | Listen port |
 | `DB_PATH` | `./main.db` | SQLite database path (created automatically; see `ops/migrations/001_initial.sql`) |
 | `FORECAST_DIR` | `./data/forecast` | Generated forecast GeoJSON, PNG, tide, and metadata files |
