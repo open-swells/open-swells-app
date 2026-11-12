@@ -7,6 +7,7 @@ The pipeline never imports from here.
 
 - [docs/data.md](docs/data.md): data sources, volumes, measured findings
 - [docs/approaches.md](docs/approaches.md): model ideas, plan, experiment log
+- [docs/compute.md](docs/compute.md): where to train and monitor, and what it costs
 
 ### Layout
 

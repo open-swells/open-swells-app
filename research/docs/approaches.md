@@ -127,6 +127,8 @@ Start with (a) for approaches 2 and 3, and try (b) once the harness exists.
 
 ## Compute
 
+Providers, costs and monitoring are in [compute.md](compute.md).
+
 | task | where |
 | --- | --- |
 | Data prep, approaches 0 and 1 | This machine (CPU). |
