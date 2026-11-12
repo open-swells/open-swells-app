@@ -213,6 +213,23 @@ a { color: inherit; text-decoration: none; }
 }
 .station-header-actions { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap; }
 
+/* Imperial/metric switch (units.js wires every [data-units-toggle]): a
+   two-segment pill whose lit half is the unit on screen. */
+.units-toggle {
+    display: inline-flex; flex: none; align-items: stretch;
+    min-height: 36px; padding: 2px; gap: 2px;
+    border: 1px solid var(--line-strong); background: var(--raised);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: .06em; text-transform: uppercase;
+    color: var(--text-3); cursor: pointer;
+}
+.units-toggle [data-units-option] { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; padding: 0 6px; }
+.units-toggle [data-units-option].is-active { background: var(--accent); color: #fff; }
+.units-toggle:hover [data-units-option]:not(.is-active) { color: #fff; }
+.units-toggle:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
+.units-toggle.is-compact { min-height: 22px; font-size: 9px; }
+.units-toggle.is-compact [data-units-option] { min-width: 22px; padding: 0 5px; }
+
 body.embedded .standalone-only { display: none !important; }
 /* Keep popup content evenly padded; the close button lives in the header. */
 body.embedded .station-shell { max-width: none; padding-top: 14px; }

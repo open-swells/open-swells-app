@@ -833,6 +833,9 @@ func validBuoyID(id string) bool {
 // caches fetch it anew whenever it changes.
 var themeCSSURL = fmt.Sprintf("/assets/theme.css?v=%x", sha256.Sum256(webstatic.ThemeCSS))[:len("/assets/theme.css?v=")+12]
 
+// unitsJSURL is versioned the same way as the theme stylesheet.
+var unitsJSURL = fmt.Sprintf("/assets/units.js?v=%x", sha256.Sum256(webstatic.UnitsJS))[:len("/assets/units.js?v=")+12]
+
 func loadTemplates(templateDir string) *template.Template {
 	tmpl := template.New("").Funcs(template.FuncMap{
 		"json":        jsonForTemplate,
@@ -844,6 +847,8 @@ func loadTemplates(templateDir string) *template.Template {
 		// content so a deploy never pairs new markup with a cached
 		// stylesheet that lacks its rules
 		"themecss": func() string { return themeCSSURL },
+		// unitsjs is the display-units script's URL, versioned likewise
+		"unitsjs": func() string { return unitsJSURL },
 		// NWS remark fields are often a literal "None." — not worth a row
 		"notnone": func(s string) bool {
 			t := strings.ToLower(strings.TrimRight(strings.TrimSpace(s), "."))
@@ -1252,6 +1257,10 @@ func run() {
 	router.GET("/assets/theme.css", staticLimiter.middleware(clientIPKey), func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=3600")
 		c.Data(http.StatusOK, "text/css; charset=utf-8", webstatic.ThemeCSS)
+	})
+	router.GET("/assets/units.js", staticLimiter.middleware(clientIPKey), func(c *gin.Context) {
+		c.Header("Cache-Control", "public, max-age=3600")
+		c.Data(http.StatusOK, "application/javascript; charset=utf-8", webstatic.UnitsJS)
 	})
 	router.GET("/static/*filepath", staticLimiter.middleware(clientIPKey), staticHandler(forecastDir))
 	router.GET("/robots.txt", seoIndex.handleRobots)

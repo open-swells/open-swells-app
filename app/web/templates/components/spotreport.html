@@ -102,11 +102,11 @@
         {{$current := index .ForecastSummary 0}}
         <div class="rp-now" data-current-condition-card style="--condition-color: {{template "condcolor" $current.Condition}};">
             <div class="rp-rating" data-current-condition>{{$current.Condition}}</div>
-            <div class="rp-height" data-current-height>{{$current.WaveHeight}}</div>
+            <div class="rp-height" data-u="surf" data-current-height>{{$current.WaveHeight}}</div>
         </div>
         {{else}}
         <div class="rp-now">
-            <div class="rp-height">{{if $r.Surf}}{{$r.Surf}}{{else}}{{$r.PrimaryHeight}}ft{{end}}</div>
+            <div class="rp-height" data-u="surf">{{if $r.Surf}}{{$r.Surf}}{{else}}{{$r.PrimaryHeight}}ft{{end}}</div>
             <div class="rp-sub">{{if $r.Surf}}Surf now{{else}}Wave height{{end}}</div>
         </div>
         {{end}}
@@ -118,20 +118,20 @@
                 <ul>
                     <li title="{{if $r.SwellHeight}}Combined seas{{else if $r.PrimaryIsWindSea}}Wind sea{{else}}Primary swell{{end}}">
                         <svg class="rp-arrow primary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.PrimaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
-                        <span class="v">{{$r.PrimaryHeight}}ft</span>
+                        <span class="v" data-u="h" data-v="{{$r.PrimaryHeight}}">{{$r.PrimaryHeight}}ft</span>
                         <span class="d"><span class="p"><span class="at">@ </span>{{$r.PrimaryPeriod}}s</span> <span class="m">{{bearing $r.PrimaryDegrees}}</span></span>
                     </li>
                     {{if $r.HasSecondary}}
                     <li title="Secondary swell">
                         <svg class="rp-arrow secondary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.SecondaryDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
-                        <span class="v">{{$r.SecondaryHeight}}ft</span>
+                        <span class="v" data-u="h" data-v="{{$r.SecondaryHeight}}">{{$r.SecondaryHeight}}ft</span>
                         <span class="d"><span class="p"><span class="at">@ </span>{{$r.SecondaryPeriod}}s</span> <span class="m">{{bearing $r.SecondaryDegrees}}</span></span>
                     </li>
                     {{end}}
                     {{if and $r.HasWindSea (not $r.PrimaryIsWindSea)}}
                     <li title="Wind sea">
                         <svg class="rp-arrow wind-sea" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.WindSeaDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
-                        <span class="v">{{$r.WindSeaHeight}}ft</span>
+                        <span class="v" data-u="h" data-v="{{$r.WindSeaHeight}}">{{$r.WindSeaHeight}}ft</span>
                         <span class="d"><span class="p"><span class="at">@ </span>{{$r.WindSeaPeriod}}s</span> <span class="m">{{bearing $r.WindSeaDegrees}}</span></span>
                     </li>
                     {{end}}
@@ -143,7 +143,7 @@
                     <ul><li>
                         {{if $r.HasWind}}
                         <svg class="rp-arrow wind" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{$r.WindDir}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>
-                        <span class="v">{{$r.WindSpeed}} mph</span>
+                        <span class="v" data-u="s" data-v="{{$r.WindSpeed}}" data-sp>{{$r.WindSpeed}} mph</span>
                         <span class="m">{{bearing $r.WindDir}}</span>
                         {{else}}<span class="m">Unavailable</span>{{end}}
                     </li></ul>
@@ -261,12 +261,17 @@
         const shortHour = d => hourFmt.format(d).toLowerCase().replace(' ', '');
         const shortTime = d => timeFmt.format(d).toLowerCase().replace(' ', '');
         const now = new Date();
+        // Display units (units.js): heights below, the "ft" fields
+        // included, are in the viewer's unit (ft or m), wind in mph or km/h.
+        const M_TO_H = Units.mVal(1), FT_TO_H = Units.ftVal(1), MPH_TO_S = Units.mphVal(1);
+        const HU = Units.h, SU = Units.s;
+        Units.reloadOnChange();
 
         // tide: hourly predictions when the station has them,
         // otherwise a half cosine between highs and lows
         const TIDE = window.SPOT_TIDES;
-        const tideEvents = TIDE && TIDE.events ? TIDE.events.map(e => ({ t: e.t, ft: e.v * 3.28084, high: e.high })) : [];
-        const tideHourly = TIDE && TIDE.hourly ? TIDE.hourly.v.map((v, i) => ({ t: TIDE.hourly.start + i * 3600e3, ft: v * 3.28084 })) : [];
+        const tideEvents = TIDE && TIDE.events ? TIDE.events.map(e => ({ t: e.t, ft: e.v * M_TO_H, high: e.high })) : [];
+        const tideHourly = TIDE && TIDE.hourly ? TIDE.hourly.v.map((v, i) => ({ t: TIDE.hourly.start + i * 3600e3, ft: v * M_TO_H })) : [];
         const tideAt = tMs => {
             const pts = tideHourly.length > 1 ? tideHourly : tideEvents;
             if (pts.length < 2 || tMs < pts[0].t || tMs > pts[pts.length - 1].t) return null;
@@ -283,14 +288,17 @@
         if (tideRow && next) {
             tideRow.querySelector('[data-tide-arrow]').style.transform = `rotate(${next.high ? 180 : 0}deg)`;
             tideRow.querySelector('[data-tide-next]').textContent = `${next.high ? 'High' : 'Low'} ${shortTime(new Date(next.t))}`;
-            tideRow.querySelector('[data-tide-ft]').textContent = `${next.ft.toFixed(1)}ft`;
+            tideRow.querySelector('[data-tide-ft]').textContent = `${next.ft.toFixed(1)}${HU}`;
             tideRow.querySelector('[data-tide-kind]').textContent = next.high ? '· rising' : '· falling';
             tideRow.hidden = false;
         }
 
         // --- Today: the viewer's local day as four lanes --------
         const el = document.querySelector('[data-today-chart]');
-        const conds = (window.SPOT_CONDITIONS || []).map(c => ({ ...c, t: new Date(c.t) }));
+        const conds = (window.SPOT_CONDITIONS || []).map(c => ({
+            ...c, t: new Date(c.t),
+            ft_lo: c.ft_lo * FT_TO_H, ft_hi: c.ft_hi * FT_TO_H, surf: Units.surf(c.surf), wmph: c.wmph * MPH_TO_S,
+        }));
         const todayKey = clock.dateKey(now);
         const { start: dayStart, end: dayEnd } = clock.dayBounds(todayKey);
         const hours = conds.filter(c => c.t >= dayStart && c.t < dayEnd);
@@ -335,8 +343,8 @@
         const describe = h => {
             const parts = [`<b>${shortHour(h.t)}</b>`, `<b>${h.surf}</b>`];
             const tide = tideAt(+h.t);
-            if (tide) parts.push(`tide ${tide.ft.toFixed(1)}ft ${tide.rising ? '↑' : '↓'}`);
-            if (h.haswind) parts.push(`${Math.round(h.wmph)} mph ${cardinal(h.wdir)}`);
+            if (tide) parts.push(`tide ${tide.ft.toFixed(1)}${HU} ${tide.rising ? '↑' : '↓'}`);
+            if (h.haswind) parts.push(`${Math.round(h.wmph)} ${SU} ${cardinal(h.wdir)}`);
             parts.push(rated(h));
             return parts.join(' · ');
         };
@@ -393,7 +401,7 @@
                 const g = svg.append('g').attr('transform', `translate(0,${lane.y})`);
                 if (lane.key !== 'cond') g.append('line').attr('class', 'grid').attr('x1', left).attr('x2', width - right).attr('y1', lane.h).attr('y2', lane.h);
                 if (lane.key === 'surf') {
-                    const ys = d3.scaleLinear().domain([0, Math.max(3, d3.max(hours, h => h.ft_hi) * 1.2)]).range([lane.h, 4]);
+                    const ys = d3.scaleLinear().domain([0, Math.max(3 * FT_TO_H, d3.max(hours, h => h.ft_hi) * 1.2)]).range([lane.h, 4]);
                     yTicks(g, ys);
                     g.append('path').attr('class', 'surf-band')
                         .attr('d', d3.area().x(at).y0(h => ys(h.ft_lo)).y1(h => ys(h.ft_hi)).curve(d3.curveMonotoneX)(hours));
@@ -413,10 +421,10 @@
                         const edge = tx > width - right - 40 ? 'end' : tx < left + 40 ? 'start' : 'middle';
                         const lx = edge === 'start' && e.high ? Math.max(tx, 34) : tx;
                         g.append('text').attr('class', 'tide-text').attr('x', lx).attr('y', e.high ? ty - 5 : ty + 11)
-                            .attr('text-anchor', edge).text(`${e.ft.toFixed(1)}ft ${shortTime(new Date(e.t))}`);
+                            .attr('text-anchor', edge).text(`${e.ft.toFixed(1)}${HU} ${shortTime(new Date(e.t))}`);
                     }
                 } else if (lane.key === 'wind') {
-                    const ys = d3.scaleLinear().domain([0, Math.max(15, peakWind.wmph * 1.25)]).range([lane.h, 4]);
+                    const ys = d3.scaleLinear().domain([0, Math.max(15 * MPH_TO_S, peakWind.wmph * 1.25)]).range([lane.h, 4]);
                     yTicks(g, ys);
                     g.append('g').selectAll('rect').data(windHours).join('rect').attr('class', 'wind-bar')
                         .attr('x', h => x(h.t) + 1).attr('width', Math.max(1, hourW - 2))

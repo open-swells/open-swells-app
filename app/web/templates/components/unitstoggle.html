@@ -1,0 +1,2 @@
+{{define "unitstoggle"}}{{/* Imperial/metric switch; units.js handles clicks and the lit half.
+     Pass "compact" for the small variant. */}}<button type="button" class="units-toggle{{if eq . "compact"}} is-compact{{end}}" data-units-toggle aria-label="Switch units"><span data-units-option="imperial">ft</span><span data-units-option="metric">m</span></button>{{end}}

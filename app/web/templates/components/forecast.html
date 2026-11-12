@@ -3,6 +3,14 @@
     {{template "sunscript" .}}
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Display units (units.js). Every height below — the "ft"
+            // fields included — is in the viewer's height unit (ft or m),
+            // and every wind speed in theirs (mph or km/h). A change of
+            // units reloads the page rather than redrawing each chart.
+            const M_TO_H = Units.mVal(1), FT_TO_H = Units.ftVal(1), MS_TO_S = Units.msVal(1);
+            const HU = Units.h, SU = Units.s;
+            Units.reloadOnChange();
+
             // Every chart color comes from the theme's custom properties, so
             // the SVG series, the legend chips, and the server-rendered
             // markup can never disagree about what "good" or "wind" looks like.
@@ -135,10 +143,10 @@
             // hourly predictions, which the curve follows instead.
             const TIDE = window.SPOT_TIDES || null;
             const tideEvents = TIDE && TIDE.events
-                ? TIDE.events.map(e => ({ t: e.t, ft: e.v * 3.28084, high: e.high }))
+                ? TIDE.events.map(e => ({ t: e.t, ft: e.v * M_TO_H, high: e.high }))
                 : [];
             const tideHourly = TIDE && TIDE.hourly
-                ? TIDE.hourly.v.map((v, i) => ({ t: TIDE.hourly.start + i * 3600e3, ft: v * 3.28084 }))
+                ? TIDE.hourly.v.map((v, i) => ({ t: TIDE.hourly.start + i * 3600e3, ft: v * M_TO_H }))
                 : [];
             // one y range for every day, so day-to-day tides compare at a glance
             const tideExtent = tideEvents.length > 1
@@ -215,22 +223,22 @@
             // have no surf model), over a short subheader of the main swell,
             // wind, and tide. Per-train swell detail stays on the chart.
             function readoutHTML({ when, surf, rating, swell, wind, tide }) {
-                const headline = surf || (swell ? `${swell.ft.toFixed(1)} ft` : '--');
+                const headline = surf || (swell ? `${swell.ft.toFixed(1)} ${HU}` : '--');
                 const badge = rating
                     ? `<span class="readout-rating" style="--rating-color: ${CONDITION_COLORS[rating]}">${rating.toUpperCase()}</span>`
                     : '';
                 const sub = [];
-                if (swell && surf) sub.push(['Swell', `${swell.ft.toFixed(1)} ft · ${swell.per}s ${cardinal(swell.deg)}`]);
+                if (swell && surf) sub.push(['Swell', `${swell.ft.toFixed(1)} ${HU} · ${swell.per}s ${cardinal(swell.deg)}`]);
                 else if (swell) sub.push(['Swell', `${swell.per}s ${cardinal(swell.deg)}`]);
-                if (wind) sub.push(['Wind', `${wind.mph} mph ${cardinal(wind.deg)}`]);
-                if (tide) sub.push(['Tide', `${tide.ft.toFixed(1)} ft ${tide.rising ? 'rising' : 'falling'}`]);
+                if (wind) sub.push(['Wind', `${wind.mph} ${SU} ${cardinal(wind.deg)}`]);
+                if (tide) sub.push(['Tide', `${tide.ft.toFixed(1)} ${HU} ${tide.rising ? 'rising' : 'falling'}`]);
                 return `<div class="readout-time">${when}</div>`
                     + `<div class="readout-head"><span class="readout-surf">${headline}</span>${badge}</div>`
                     + (sub.length ? `<div class="readout-sub">${sub.map(([k, v]) => `<span class="k">${k}</span><span class="v">${v}</span>`).join('')}</div>` : '');
             }
             // the main (largest) swell train in a forecast row
             const mainSwell = row => {
-                const ft = parseFloat(row.PrimaryWaveHeight) * 3.28084;
+                const ft = parseFloat(row.PrimaryWaveHeight) * M_TO_H;
                 if (!Number.isFinite(ft) || ft <= 0) return null;
                 return { ft, per: Math.round(parseFloat(row.PrimaryPeriod)), deg: row.PrimaryDegrees };
             };
@@ -238,7 +246,10 @@
             // Hourly surf-condition classifier output, injected by the spot
             // page (buoy pages have none). Rendered as a lane in the 16-day
             // strip and in the hourly detail chart, on their shared x scales.
-            const CONDS = (window.SPOT_CONDITIONS || []).map(c => ({ ...c, t: new Date(c.t) }));
+            const CONDS = (window.SPOT_CONDITIONS || []).map(c => ({
+                ...c, t: new Date(c.t),
+                ft_lo: c.ft_lo * FT_TO_H, ft_hi: c.ft_hi * FT_TO_H, surf: Units.surf(c.surf),
+            }));
             // Spot pages carry a breaking surf range per hour; the outlook
             // then charts surf height rather than the primary swell.
             const SURF_MODE = CONDS.length > 0 && typeof CONDS[0].surf === 'string';
@@ -272,12 +283,12 @@
                         .map(r => parseFloat(r.PrimaryWaveHeight))
                         .filter(Number.isFinite);
                     const avgFt = heights.length
-                        ? (heights.reduce((a, b) => a + b, 0) / heights.length) * 3.28084
+                        ? (heights.reduce((a, b) => a + b, 0) / heights.length) * M_TO_H
                         : 0;
                     // with surf ranges, a day shows its best hour's surf
                     const best = condDayBest[key];
                     const cond = best ? best.rating : null;
-                    const label = SURF_MODE && best ? best.surf : `${avgFt.toFixed(1)}ft`;
+                    const label = SURF_MODE && best ? best.surf : `${avgFt.toFixed(1)}${HU}`;
                     dayStats[key] = { avgFt, cond, label, surf: SURF_MODE && !!best };
                     const parts = key.split('-');
                     const d = localDayBounds(key).start;
@@ -322,8 +333,8 @@
                     .filter(c => c.t >= localToday && includedDays.has(localDateKey(c.t)))
                     .map(c => ({ t: c.t, ft: c.ft_hi, label: c.surf }))
                 : data.map(d => {
-                    const ft = (parseFloat(d.PrimaryWaveHeight) || 0) * 3.28084;
-                    return { t: d.dateObj, ft, label: `${ft.toFixed(1)} ft` };
+                    const ft = (parseFloat(d.PrimaryWaveHeight) || 0) * M_TO_H;
+                    return { t: d.dateObj, ft, label: `${ft.toFixed(1)} ${HU}` };
                 });
             let stripSel = null;
             let stripX = null;
@@ -417,7 +428,7 @@
                 // swell lane
                 stripMono(svg.append('text'), 9, CHART.label)
                     .attr('x', 2).attr('y', swTop - 5)
-                    .text(SURF_MODE ? 'SURF (FT)' : 'SWELL (FT)');
+                    .text(`${SURF_MODE ? 'SURF' : 'SWELL'} (${HU.toUpperCase()})`);
                 svg.append('path').datum(stripPts)
                     .attr('fill', 'url(#stripFill)')
                     .attr('d', d3.area().x(p => x(p.t)).y0(swBase).y1(p => y(p.ft)).curve(d3.curveMonotoneX));
@@ -433,14 +444,14 @@
                     .attr('x', Math.max(24, Math.min(width - 24, x(peak.t))))
                     .attr('y', Math.max(y(peak.ft) - 6, 10))
                     .attr('text-anchor', 'middle')
-                    .text(SURF_MODE ? peak.label : `${peak.ft.toFixed(1)} ft`);
+                    .text(SURF_MODE ? peak.label : `${peak.ft.toFixed(1)} ${HU}`);
 
                 // wind lane
                 let yw = null;
                 if (showWindLane) {
                     stripMono(svg.append('text'), 9, CHART.label)
                         .attr('x', 2).attr('y', wdTop - 5)
-                        .text('WIND (MPH)');
+                        .text(`WIND (${SU.toUpperCase()})`);
                 }
                 if (showWindLane && !hasWind) {
                     // still loading: pulsing placeholder in the lane
@@ -456,20 +467,20 @@
                         .text('loading wind…');
                 }
                 if (hasWind) {
-                    const maxMph = d3.max(windPts, w => w.s) * 2.237;
+                    const maxMph = d3.max(windPts, w => w.s) * MS_TO_S;
                     yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 5)]).range([wdBase, wdTop]);
                     svg.append('path').datum(windPts)
                         .attr('fill', 'none').attr('stroke', CHART.wind).attr('stroke-width', 1.5)
-                        .attr('d', d3.line().x(w => x(w.t)).y(w => yw(w.s * 2.237)).curve(d3.curveMonotoneX));
+                        .attr('d', d3.line().x(w => x(w.t)).y(w => yw(w.s * MS_TO_S)).curve(d3.curveMonotoneX));
                     const windPeak = windPts.reduce((a, b) => (b.s > a.s ? b : a));
                     svg.append('circle')
-                        .attr('cx', x(windPeak.t)).attr('cy', yw(windPeak.s * 2.237)).attr('r', 2)
+                        .attr('cx', x(windPeak.t)).attr('cy', yw(windPeak.s * MS_TO_S)).attr('r', 2)
                         .attr('fill', CHART.wind);
                     stripMono(svg.append('text'), 9, CHART.wind)
                         .attr('x', Math.max(28, Math.min(width - 28, x(windPeak.t))))
-                        .attr('y', Math.max(yw(windPeak.s * 2.237) - 5, wdTop + 8))
+                        .attr('y', Math.max(yw(windPeak.s * MS_TO_S) - 5, wdTop + 8))
                         .attr('text-anchor', 'middle')
-                        .text(`${(windPeak.s * 2.237).toFixed(0)} mph`);
+                        .text(`${(windPeak.s * MS_TO_S).toFixed(0)} ${SU}`);
                 }
 
                 // conditions lane: one bar per hour, height = score,
@@ -518,11 +529,11 @@
                             surf: SURF_MODE ? p.label : null,
                             rating: c ? c.rating : null,
                             swell: row ? mainSwell(row) : null,
-                            wind: w ? { mph: (w.s * 2.237).toFixed(0), deg: w.d } : null,
+                            wind: w ? { mph: (w.s * MS_TO_S).toFixed(0), deg: w.d } : null,
                             tide: tideAtTime(p.t.getTime()),
                         });
                         let text = `${stripTimeFmt(p.t)} · ${p.label}`;
-                        if (w) text += ` · ${(w.s * 2.237).toFixed(0)} mph`;
+                        if (w) text += ` · ${(w.s * MS_TO_S).toFixed(0)} ${SU}`;
                         if (c) text += ` · ${c.rating}`;
                         stripTooltip.style.display = 'block';
                         const tooltipWidth = stripTooltip.offsetWidth;
@@ -732,7 +743,7 @@
 
                 const surfDayPts = SURF_MODE ? condDayPts : [];
                 const maxWaveHeight = Math.max(
-                    d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight, d.TertiaryWaveHeight, d.QuaternaryWaveHeight, d.WindSeaHeight || 0)) * 3.28084,
+                    d3.max(data, d => Math.max(d.PrimaryWaveHeight, d.SecondaryWaveHeight, d.TertiaryWaveHeight, d.QuaternaryWaveHeight, d.WindSeaHeight || 0)) * M_TO_H,
                     d3.max(surfDayPts, c => c.ft_hi) || 0);
                 y.domain([0, maxWaveHeight * 1.08]);
                 yScale.domain([0, maxWaveHeight * 1.08]);
@@ -785,14 +796,14 @@
                     swellSummary = `Peak surf ${pk.surf} at ${fmtHour(pk.hour)}`;
                 } else {
                     const pk = data.reduce((a, b) => (+b.PrimaryWaveHeight > +a.PrimaryWaveHeight ? b : a));
-                    swellSummary = `Peak primary ${(pk.PrimaryWaveHeight * 3.28084).toFixed(1)} ft @ ${pk.PrimaryPeriod}s ${cardinal(pk.PrimaryDegrees)} at ${fmtHour(pk.hour)}`;
+                    swellSummary = `Peak primary ${(pk.PrimaryWaveHeight * M_TO_H).toFixed(1)} ${HU} @ ${pk.PrimaryPeriod}s ${cardinal(pk.PrimaryDegrees)} at ${fmtHour(pk.hour)}`;
                 }
-                panelTitle(0, surfDayPts.length ? 'SURF & SWELL HEIGHT (FT)' : 'SWELL HEIGHT (FT)', swellSummary);
+                panelTitle(0, `${surfDayPts.length ? 'SURF & SWELL HEIGHT' : 'SWELL HEIGHT'} (${HU.toUpperCase()})`, swellSummary);
 
-                const linePrimary = d3.line().x(d => x(d.hour)).y(d => y(d.PrimaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
-                const lineSecondary = d3.line().x(d => x(d.hour)).y(d => y(d.SecondaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
-                const lineTertiary = d3.line().x(d => x(d.hour)).y(d => y(d.TertiaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
-                const lineQuaternary = d3.line().x(d => x(d.hour)).y(d => y(d.QuaternaryWaveHeight * 3.28084)).curve(d3.curveMonotoneX);
+                const linePrimary = d3.line().x(d => x(d.hour)).y(d => y(d.PrimaryWaveHeight * M_TO_H)).curve(d3.curveMonotoneX);
+                const lineSecondary = d3.line().x(d => x(d.hour)).y(d => y(d.SecondaryWaveHeight * M_TO_H)).curve(d3.curveMonotoneX);
+                const lineTertiary = d3.line().x(d => x(d.hour)).y(d => y(d.TertiaryWaveHeight * M_TO_H)).curve(d3.curveMonotoneX);
+                const lineQuaternary = d3.line().x(d => x(d.hour)).y(d => y(d.QuaternaryWaveHeight * M_TO_H)).curve(d3.curveMonotoneX);
 
                 // breaking surf range behind the swell lines it comes from
                 svg.selectAll(".surfBand").data(surfDayPts.length > 1 ? [surfDayPts] : []).join("path").attr("class", "surfBand")
@@ -800,7 +811,7 @@
                     .attr("fill", chartColors.surf).attr("fill-opacity", 0.16)
                     .attr("stroke", chartColors.surf).attr("stroke-opacity", 0.45).attr("stroke-width", 0.75);
                 const windSeaRows = data.filter(d => parseFloat(d.WindSeaHeight) > 0);
-                const lineWindSea = d3.line().defined(d => parseFloat(d.WindSeaHeight) > 0).x(d => x(d.hour)).y(d => y(d.WindSeaHeight * 3.28084)).curve(d3.curveMonotoneX);
+                const lineWindSea = d3.line().defined(d => parseFloat(d.WindSeaHeight) > 0).x(d => x(d.hour)).y(d => y(d.WindSeaHeight * M_TO_H)).curve(d3.curveMonotoneX);
                 svg.selectAll(".lineWindSea").data(windSeaRows.length ? [data] : []).join("path").attr("class", "lineWindSea").attr("d", lineWindSea).attr("fill", "none").attr("stroke-width", 1.25).attr("stroke-dasharray", "4,3").attr("stroke", chartColors.lineWindSea);
 
                 svg.selectAll(".linePrimary").data([data]).join("path").attr("class", "linePrimary").attr("d", linePrimary).attr("fill", "none").attr("stroke-width", 1.5).attr("stroke", chartColors.linePrimary);
@@ -817,7 +828,7 @@
                     svg.selectAll(`.${cls}`)
                         .data(rows.filter((d, i) => i % arrowEvery === 0 && parseFloat(d[field]) > 0))
                         .join("path").attr("class", cls)
-                        .attr("transform", d => `translate(${x(d.hour)},${y(d[field] * 3.28084)}) rotate(${travelBearing(d[degField])})`)
+                        .attr("transform", d => `translate(${x(d.hour)},${y(d[field] * M_TO_H)}) rotate(${travelBearing(d[degField])})`)
                         .attr("d", arrowPath(size))
                         .attr("fill", color)
                         .attr("stroke", halo).attr("stroke-width", 1).attr("stroke-linejoin", 'round');
@@ -853,7 +864,7 @@
                             .attr("fill", CHART.label)
                             .text('no wind data for this day');
                     } else {
-                        const mph = w => w.s * 2.237;
+                        const mph = w => w.s * MS_TO_S;
                         // one bar per hour, interpolated between the model's
                         // 3-hourly samples, like the conditions bars beneath
                         const hourly = [];
@@ -917,9 +928,9 @@
                                 .attr("font-weight", isPeak ? 700 : 400)
                                 .text(mph(w).toFixed(0));
                         });
-                        windSummary = `Peak ${mph(windPeak).toFixed(0)} mph ${cardinal(windPeak.d)} at ${fmtHour(windPeak.hour)}`;
+                        windSummary = `Peak ${mph(windPeak).toFixed(0)} ${SU} ${cardinal(windPeak.d)} at ${fmtHour(windPeak.hour)}`;
                     }
-                    panelTitle(wdTop, 'WIND (MPH)', windSummary, CHART.wind);
+                    panelTitle(wdTop, `WIND (${SU.toUpperCase()})`, windSummary, CHART.wind);
                 }
 
                 // tide panel: the day's curve on a fixed range, highs
@@ -933,11 +944,11 @@
                     const yt = d3.scaleLinear()
                         .domain(tideExtent)
                         .range([tdBase - 18, tdTop + 20]);
-                    const ftLabel = v => `${v.toFixed(1)} ft`;
+                    const ftLabel = v => `${v.toFixed(1)} ${HU}`;
                     const station = TIDE.name && TIDE.name.length > 30 ? `${TIDE.name.slice(0, 29)}…` : (TIDE.name || TIDE.station);
                     // model tides (FES2022) are above a modeled MLLW, not NOAA's
                     const datum = (TIDE.datum || 'MLLW').toUpperCase();
-                    panelTitle(tdTop, `TIDE (FT, ${datum})`, `${station} · ${TIDE.km.toFixed(0)} km`, CHART.axis);
+                    panelTitle(tdTop, `TIDE (${HU.toUpperCase()}, ${datum})`, `${station} · ${TIDE.km.toFixed(0)} km`, CHART.axis);
                     for (const t of yt.ticks(4)) {
                         lane.append("line")
                             .attr("x1", 0).attr("x2", width)
@@ -1085,7 +1096,7 @@
                         surf: SURF_MODE && c ? c.surf : null,
                         rating: c ? c.rating : null,
                         swell: mainSwell(closestData),
-                        wind: w ? { mph: (w.s * 2.237).toFixed(0), deg: w.d } : null,
+                        wind: w ? { mph: (w.s * MS_TO_S).toFixed(0), deg: w.d } : null,
                         tide: tideDayPts.length ? tideAtTime(closestData.dateObj.getTime()) : null,
                     }));
                     // flip to the cursor's left when the tooltip would be
