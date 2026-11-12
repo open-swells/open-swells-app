@@ -343,7 +343,7 @@ func TestLoadTemplates(t *testing.T) {
 	if err := tmpl.ExecuteTemplate(&detailed, "forecastsummary", summaryData); err != nil {
 		t.Fatalf("forecast summary template failed to render: %v", err)
 	}
-	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "data-outlook=\"buoy\"", "data-outlook=\"spot\"", "swell-strip", "data-strip-readout", "href=\"/surf-spots/el-porto?day=", "href=\"/forecast/46221?day=", "fc-height\">3.2ft", "fc-cond", "Mon 7/20", "data-outlook-hours>[{\"t\":1753000000000,\"ft\":3,\"surf\":\"2–3ft\",\"score\":40,\"rating\":\"fair\",\"light\":false}]", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "12 mph", "W 270°", "WSW 250°", "SSW 195°", "rotate(250deg)", "rp-swell", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
+	for _, want := range []string{"data-hour-strip", "data-buoy-outlook", "data-spot-outlook", "data-hourly-heights=\"1.25 ", "data-hourly-heights=\"0.98 ", "data-outlook=\"buoy\"", "data-outlook=\"spot\"", "swell-strip", "data-strip-readout", "href=\"/surf-spots/el-porto?day=", "href=\"/forecast/46221?day=", "fc-height\" data-u=\"surf\">3.2ft", "fc-cond", "Mon 7/20", "data-outlook-hours>[{\"t\":1753000000000,\"ft\":3,\"surf\":\"2–3ft\",\"score\":40,\"rating\":\"fair\",\"light\":false}]", "data-favorite-type=\"buoy\"", "data-favorite-type=\"spot\"", "12 mph", "W 270°", "WSW 250°", "SSW 195°", "rotate(250deg)", "rp-swell", "data-favorite-condition-card", "Current conditions", "fair", "3.2ft"} {
 		if !bytes.Contains(detailed.Bytes(), []byte(want)) {
 			t.Errorf("detailed forecast summary is missing %q", want)
 		}
@@ -439,6 +439,34 @@ func TestEmbeddedThemeAsset(t *testing.T) {
 		}
 		if !bytes.Contains(page.Bytes(), []byte(`href="/assets/theme.css?v=`)) {
 			t.Errorf("%s does not link the shared theme stylesheet", name)
+		}
+	}
+}
+
+// Pages with readings load /assets/units.js before their own scripts, which
+// call window.Units while drawing; without it the charts throw and the
+// unit toggle does nothing.
+func TestEmbeddedUnitsAsset(t *testing.T) {
+	for _, want := range []string{"window.Units = Units", "data-units-toggle", "units:change"} {
+		if !bytes.Contains(webstatic.UnitsJS, []byte(want)) {
+			t.Errorf("units script is missing %q", want)
+		}
+	}
+	tmpl := loadTemplates("../web/templates")
+	pages := map[string]interface{}{
+		"landing.html":   LandingPageData{SpotCount: 1, BuoyCount: 1},
+		"map.html":       MapPageData{},
+		"favorites.html": gin.H{"SearchView": false},
+	}
+	for name, data := range pages {
+		var page bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&page, name, data); err != nil {
+			t.Fatalf("%s failed to render: %v", name, err)
+		}
+		for _, want := range []string{`src="/assets/units.js?v=`, "data-units-toggle"} {
+			if !bytes.Contains(page.Bytes(), []byte(want)) {
+				t.Errorf("%s is missing %q", name, want)
+			}
 		}
 	}
 }

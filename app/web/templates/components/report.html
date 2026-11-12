@@ -5,7 +5,7 @@
 {{define "buoynow"}}
 <div class="rp-now">
     <div class="rp-rating">Observed</div>
-    <div class="rp-height">{{if .HasSeas}}{{.Seas}}ft{{else}}--{{end}}</div>
+    <div class="rp-height" data-u="surf">{{if .HasSeas}}{{.Seas}}ft{{else}}--{{end}}</div>
     <div class="rp-sub">Significant wave height{{if .Steepness}} &middot; {{.Steepness}}{{end}}</div>
 </div>
 <div class="rp-props">
@@ -15,14 +15,14 @@
             {{if .HasSwell}}
             <li title="Swell">
                 {{if .SwellDegrees}}<svg class="rp-arrow primary" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.SwellDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>{{end}}
-                <span class="v">{{.SwellHeight}}ft</span>
+                <span class="v" data-u="h" data-v="{{.SwellHeight}}">{{.SwellHeight}}ft</span>
                 <span class="d"><span class="p"><span class="at">@ </span>{{.SwellPeriod}}s</span> <span class="m">{{bearing .SwellDegrees}}</span></span>
             </li>
             {{end}}
             {{if .HasWindSea}}
             <li title="Wind sea">
                 {{if .WindSeaDegrees}}<svg class="rp-arrow wind-sea" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.WindSeaDegrees}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>{{end}}
-                <span class="v">{{.WindSeaHeight}}ft</span>
+                <span class="v" data-u="h" data-v="{{.WindSeaHeight}}">{{.WindSeaHeight}}ft</span>
                 <span class="d"><span class="p"><span class="at">@ </span>{{.WindSeaPeriod}}s</span> <span class="m">{{bearing .WindSeaDegrees}}</span></span>
             </li>
             {{end}}
@@ -35,8 +35,8 @@
             <ul><li>
                 {{if .HasWind}}
                 {{if .WindDir}}<svg class="rp-arrow wind" viewBox="0 0 16 16" aria-hidden="true" style="transform: rotate({{.WindDir}}deg);"><path d="M7 2 H9 V9 H12 L8 14 L4 9 H7 Z"/></svg>{{end}}
-                <span class="v">{{.WindSpeed}} mph</span>
-                <span class="m">{{bearing .WindDir}}{{if .WindGust}} &middot; G{{.WindGust}}{{end}}</span>
+                <span class="v" data-u="s" data-v="{{.WindSpeed}}" data-sp>{{.WindSpeed}} mph</span>
+                <span class="m">{{bearing .WindDir}}{{if .WindGust}} &middot; G<span data-u="sn" data-v="{{.WindGust}}">{{.WindGust}}</span>{{end}}</span>
                 {{else}}<span class="m">Unavailable</span>{{end}}
             </li></ul>
         </section>
@@ -44,8 +44,8 @@
         <section class="rp-group" aria-label="Temperature">
             <h4 class="rp-cap">Water</h4>
             <ul><li>
-                <span class="v">{{if .WaterTemp}}{{.WaterTemp}}&deg;C{{else}}--{{end}}</span>
-                {{if .AirTemp}}<span class="m">Air {{.AirTemp}}&deg;C</span>{{end}}
+                <span class="v">{{if .WaterTemp}}<span data-u="t" data-v="{{.WaterTemp}}">{{.WaterTemp}}&deg;C</span>{{else}}--{{end}}</span>
+                {{if .AirTemp}}<span class="m">Air <span data-u="t" data-v="{{.AirTemp}}">{{.AirTemp}}&deg;C</span></span>{{end}}
             </li></ul>
         </section>
         {{end}}

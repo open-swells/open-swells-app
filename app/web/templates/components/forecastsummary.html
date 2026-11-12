@@ -118,7 +118,7 @@
                     <div class="strip-panel-tooltip" role="tooltip"></div>
                 </div>
                 <div class="forecast-days">
-                    {{range .Summary}}<a class="forecastcard" href="/forecast/{{$id}}?day={{.Date}}" data-date="{{.Date}}"><div class="fc-day">{{.DateAbv}}</div><div class="fc-height">{{.WaveHeight}}</div></a>{{end}}
+                    {{range .Summary}}<a class="forecastcard" href="/forecast/{{$id}}?day={{.Date}}" data-date="{{.Date}}"><div class="fc-day">{{.DateAbv}}</div><div class="fc-height" data-u="surf">{{.WaveHeight}}</div></a>{{end}}
                 </div>
             </section>
             {{else if and (not $.Detailed) .HasError}}
@@ -158,11 +158,11 @@
                 {{$current := index .Summary 0}}
                 <div class="rp-now" data-favorite-condition-card style="--condition-color: {{template "condcolor" $current.Condition}};">
                     <div class="rp-rating">{{$current.Condition}}</div>
-                    <div class="rp-height">{{$current.WaveHeight}}</div>
+                    <div class="rp-height" data-u="surf">{{$current.WaveHeight}}</div>
                 </div>
                 {{else if .HasReport}}
                 <div class="rp-now">
-                    <div class="rp-height">{{if .Report.Surf}}{{.Report.Surf}}{{else}}{{.Report.PrimaryHeight}}ft{{end}}</div>
+                    <div class="rp-height" data-u="surf">{{if .Report.Surf}}{{.Report.Surf}}{{else}}{{.Report.PrimaryHeight}}ft{{end}}</div>
                     <div class="rp-sub">{{if .Report.Surf}}Surf now{{else}}Wave height{{end}}</div>
                 </div>
                 {{end}}
@@ -187,7 +187,7 @@
                     <div class="strip-panel-tooltip" role="tooltip"></div>
                 </div>
                 <div class="forecast-days">
-                    {{range .Summary}}<a class="forecastcard" href="/surf-spots/{{$id}}?day={{.Date}}" data-date="{{.Date}}"><div class="fc-day">{{.DateAbv}}</div><div class="fc-height">{{.WaveHeight}}</div><div class="fc-cond" style="color: {{template "condcolor" .Condition}};">{{.Condition}}</div></a>{{end}}
+                    {{range .Summary}}<a class="forecastcard" href="/surf-spots/{{$id}}?day={{.Date}}" data-date="{{.Date}}"><div class="fc-day">{{.DateAbv}}</div><div class="fc-height" data-u="surf">{{.WaveHeight}}</div><div class="fc-cond" style="color: {{template "condcolor" .Condition}};">{{.Condition}}</div></a>{{end}}
                 </div>
                 <script type="application/json" data-outlook-hours>{{json .Outlook}}</script>
             </section>

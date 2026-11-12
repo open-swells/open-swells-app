@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{themecss}}">
+    <script src="{{unitsjs}}"></script>
     <style>
         .button { height: 36px; padding: 0 10px; }
         .view-switch { width: 162px; height: 36px; padding: 4px; }
@@ -119,7 +120,8 @@
                 <a href="/favorites" aria-current="page" class="view-switch-active flex items-center justify-center text-[11px] font-semibold">Favorites</a>
             </nav>
 
-            <div class="relative flex items-center">
+            <div class="relative flex items-center gap-2">
+                {{template "unitstoggle" ""}}
                 <button id="signInBtn" class="button profile-button">Sign in</button>
                 <div id="userMenu" class="surface absolute top-full right-0 mt-2 w-60 hidden overflow-hidden">
                     <div class="px-3 py-3 border-b border-[#2f3137]">
@@ -544,7 +546,14 @@
                 .sort((a, b) => a.t - b.t);
         }
 
+        // outlook strips are drawn once; a change of units redraws the page
+        Units.reloadOnChange();
+
         function drawOutlook(el) {
+            // Display units (units.js): heights below, "ft" fields included,
+            // are in the viewer's unit (ft or m), wind in mph or km/h.
+            const M_TO_H = Units.mVal(1), FT_TO_H = Units.ftVal(1), MS_TO_S = Units.msVal(1);
+            const HU = Units.h, SU = Units.s;
             const host = el.querySelector('[data-strip]');
             const panel = el.querySelector('.swell-strip');
             if (!host || !panel || !window.d3) return;
@@ -569,13 +578,13 @@
 
             const rawHeights = (el.dataset.hourlyHeights || '').trim().split(/\s+/).map(Number);
             const swell = (el.dataset.hourlyTimes || '').trim().split(/\s+/).map((ms, i) => ({
-                t: new Date(Number(ms)), ft: rawHeights[i] * 3.28084
+                t: new Date(Number(ms)), ft: rawHeights[i] * M_TO_H
             })).filter(point => Number.isFinite(point.ft) && inDomain(point));
             let conds = [];
             try {
                 const source = el.querySelector('[data-outlook-hours]');
                 conds = (source ? JSON.parse(source.textContent) || [] : [])
-                    .map(c => ({ ...c, t: new Date(c.t) })).filter(inDomain);
+                    .map(c => ({ ...c, t: new Date(c.t), ft: c.ft * FT_TO_H, surf: Units.surf(c.surf) })).filter(inDomain);
             } catch (error) {
                 console.warn('Surf outlook unavailable:', error);
             }
@@ -584,7 +593,7 @@
             const surfMode = conds.length > 1 && typeof conds[0].surf === 'string' && conds[0].surf !== '';
             const pts = surfMode
                 ? conds.map(c => ({ t: c.t, ft: c.ft, label: c.surf }))
-                : swell.map(p => ({ t: p.t, ft: p.ft, label: `${p.ft.toFixed(1)} ft` }));
+                : swell.map(p => ({ t: p.t, ft: p.ft, label: `${p.ft.toFixed(1)} ${HU}` }));
             if (pts.length < 2) return;
             const peak = pts.reduce((a, b) => (b.ft > a.ft ? b : a));
             const idleReadout = 'Select a day for hourly detail';
@@ -657,7 +666,7 @@
 
                 // surf / swell lane
                 mono(svg.append('text'), 9, CHART.label)
-                    .attr('x', 2).attr('y', swTop - 5).text(surfMode ? 'SURF (FT)' : 'SWELL (FT)');
+                    .attr('x', 2).attr('y', swTop - 5).text(`${surfMode ? 'SURF' : 'SWELL'} (${HU.toUpperCase()})`);
                 svg.append('path').datum(pts)
                     .attr('fill', `url(#${gradientId})`)
                     .attr('d', d3.area().x(p => x(p.t)).y0(swBase).y1(p => y(p.ft)).curve(d3.curveMonotoneX));
@@ -674,7 +683,7 @@
                 // wind lane
                 if (showWindLane) {
                     mono(svg.append('text'), 9, CHART.label)
-                        .attr('x', 2).attr('y', wdTop - 5).text('WIND (MPH)');
+                        .attr('x', 2).attr('y', wdTop - 5).text(`WIND (${SU.toUpperCase()})`);
                 }
                 if (showWindLane && !hasWind) {
                     const wdMid = (wdTop + wdBase) / 2;
@@ -687,20 +696,20 @@
                         .text('loading wind…');
                 }
                 if (hasWind) {
-                    const maxMph = d3.max(windPts, w => w.s) * 2.237;
+                    const maxMph = d3.max(windPts, w => w.s) * MS_TO_S;
                     const yw = d3.scaleLinear().domain([0, Math.max(maxMph * 1.25, 5)]).range([wdBase, wdTop]);
                     svg.append('path').datum(windPts)
                         .attr('fill', 'none').attr('stroke', CHART.wind).attr('stroke-width', 1.5)
-                        .attr('d', d3.line().x(w => x(w.t)).y(w => yw(w.s * 2.237)).curve(d3.curveMonotoneX));
+                        .attr('d', d3.line().x(w => x(w.t)).y(w => yw(w.s * MS_TO_S)).curve(d3.curveMonotoneX));
                     const windPeak = windPts.reduce((a, b) => (b.s > a.s ? b : a));
                     svg.append('circle')
-                        .attr('cx', x(windPeak.t)).attr('cy', yw(windPeak.s * 2.237)).attr('r', 2)
+                        .attr('cx', x(windPeak.t)).attr('cy', yw(windPeak.s * MS_TO_S)).attr('r', 2)
                         .attr('fill', CHART.wind);
                     mono(svg.append('text'), 9, CHART.wind)
                         .attr('x', Math.max(28, Math.min(width - 28, x(windPeak.t))))
-                        .attr('y', Math.max(yw(windPeak.s * 2.237) - 5, wdTop + 8))
+                        .attr('y', Math.max(yw(windPeak.s * MS_TO_S) - 5, wdTop + 8))
                         .attr('text-anchor', 'middle')
-                        .text(`${(windPeak.s * 2.237).toFixed(0)} mph`);
+                        .text(`${(windPeak.s * MS_TO_S).toFixed(0)} ${SU}`);
                 }
 
                 // conditions lane: one bar per hour, height = score, color = rating
@@ -741,8 +750,8 @@
                         const s = swell.length ? swell[bisect(swell, t)] : null;
                         const w = hasWind ? windPts[bisect(windPts, t)] : null;
                         const sub = [];
-                        if (surfMode && s) sub.push(['Swell', `${s.ft.toFixed(1)} ft`]);
-                        if (w) sub.push(['Wind', `${(w.s * 2.237).toFixed(0)} mph ${cardinal(w.d)}`]);
+                        if (surfMode && s) sub.push(['Swell', `${s.ft.toFixed(1)} ${HU}`]);
+                        if (w) sub.push(['Wind', `${(w.s * MS_TO_S).toFixed(0)} ${SU} ${cardinal(w.d)}`]);
                         tooltip.innerHTML = readoutHTML({ when: stripTimeFmt(p.t), headline: p.label, rating: c ? c.rating : null, sub });
                         tooltip.style.display = 'block';
                         const tooltipWidth = tooltip.offsetWidth, tooltipHeight = tooltip.offsetHeight;
@@ -757,7 +766,7 @@
                         }
                         if (readout) {
                             let text = `${stripTimeFmt(p.t)} · ${p.label}`;
-                            if (w) text += ` · ${(w.s * 2.237).toFixed(0)} mph`;
+                            if (w) text += ` · ${(w.s * MS_TO_S).toFixed(0)} ${SU}`;
                             if (c) text += ` · ${c.rating}`;
                             readout.textContent = text;
                             readout.style.color = '#bfdbfe';

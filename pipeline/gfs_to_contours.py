@@ -63,20 +63,21 @@ CONTOURS_VARS = [{"name": "geojson"}]
 # Height bands shared with the frontend color scale and legend (meters).
 # Levels must be identical for every forecast hour: per-file derived levels
 # made the band boundaries shift between frames, so the animation flickered.
-# 20 m is a catch-all top for the "8 m+" band.
+# 20 m is a catch-all top for the XXL "10 m+" band.
 FIXED_LEVELS = np.array(
-    [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 20.0]
+    [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 10.0, 20.0]
 )
 
 # Continuous color ramp for the heatmap PNGs. Colors match SWELL_BANDS in
-# the web app's pages/today.html (change them together); each color is
-# anchored at its band's midpoint so the legend stays truthful.
+# the web app's pages/map.html (change them together); each color is
+# anchored at its band's midpoint so the legend stays truthful. The open
+# top band is anchored at 12 m, so XXL seas reach full purple.
 HEATMAP_ANCHORS = np.array(
-    [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.5, 4.5, 5.5, 7.0, 10.0]
+    [0.25, 0.75, 1.25, 1.75, 2.25, 2.75, 3.5, 4.5, 5.5, 7.0, 9.0, 12.0]
 )
 HEATMAP_COLORS = [
     "#a5d5f0", "#64a8e8", "#3178d2", "#15a3a3", "#2fb54e", "#a3c520",
-    "#f2ce08", "#f59a0b", "#ea4b28", "#b31212", "#4a0a1e",
+    "#f2ce08", "#f59a0b", "#ea4b28", "#b31212", "#4a0a1e", "#9b3fd9",
 ]
 # Ramp steps in the global heatmap (~0.08 m apart, far finer than the 0.5 m
 # legend bands). Half of the 255 the palette allows: no visible banding, and

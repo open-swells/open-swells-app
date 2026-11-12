@@ -16,3 +16,9 @@ var FirebaseAuthJS []byte
 //
 //go:embed theme.css
 var ThemeCSS []byte
+
+// UnitsJS is the shared imperial/metric display-unit toggle and converters
+// every page loads before its own scripts.
+//
+//go:embed units.js
+var UnitsJS []byte

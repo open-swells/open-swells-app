@@ -22,6 +22,7 @@
             }
         </script>
         <link rel="stylesheet" href="{{themecss}}">
+        <script src="{{unitsjs}}"></script>
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
 
@@ -374,6 +375,7 @@
 
             <!-- Icons -->
             <div class="icons surface top-menu relative ml-auto flex items-center min-w-fit">
+                <span class="flex items-center px-1.5">{{template "unitstoggle" "compact"}}</span>
                 <a href="/about" class="desktop-only icon-button" title="About">
                     <svg xmlns="http://www.w3.org/2000/svg" 
                          viewBox="0 0 24 24" fill="none" stroke="currentColor" 
@@ -469,7 +471,7 @@
             <div class="legend surface absolute bottom-3 left-3 z-20 hidden lg:block">
                 <div class="legend-head">
                     <span class="legend-title">Swell height</span>
-                    <span class="legend-unit mono">M</span>
+                    <span class="legend-unit mono" data-u="HU">FT</span>
                 </div>
                 <div id="legendBands" class="legend-scale"></div>
                 <div id="legendReadout" class="legend-readout mono"></div>
@@ -834,21 +836,25 @@
                 return runUrl(`/static/swell_partitions_${String(hour).padStart(3, '0')}.geojson`);
             }
 
-            // Height bands — must match FIXED_LEVELS in gfs_to_contours.py.
-            // Storm-scale ramp (weather-map convention): calm blues through
-            // green/yellow into red and near-black for extreme swell.
+            // Height bands in meters — must match FIXED_LEVELS and the
+            // heatmap ramp in gfs_to_contours.py. Storm-scale ramp
+            // (weather-map convention): calm blues through green/yellow into
+            // red, near-black maroon, then purple for XXL swell (10 m+, the
+            // big-wave days). `ft` is the band floor as feet surfers read
+            // it, rounded, for the imperial legend.
             const SWELL_BANDS = [
-                { min: 0,   color: '#a5d5f0', label: '< 0.5' },
-                { min: 0.5, color: '#64a8e8', label: '0.5 – 1' },
-                { min: 1,   color: '#3178d2', label: '1 – 1.5' },
-                { min: 1.5, color: '#15a3a3', label: '1.5 – 2' },
-                { min: 2,   color: '#2fb54e', label: '2 – 2.5' },
-                { min: 2.5, color: '#a3c520', label: '2.5 – 3' },
-                { min: 3,   color: '#f2ce08', label: '3 – 4' },
-                { min: 4,   color: '#f59a0b', label: '4 – 5' },
-                { min: 5,   color: '#ea4b28', label: '5 – 6' },
-                { min: 6,   color: '#b31212', label: '6 – 8' },
-                { min: 8,   color: '#4a0a1e', label: '8+' },
+                { min: 0,   ft: 0,  color: '#a5d5f0' },
+                { min: 0.5, ft: 2,  color: '#64a8e8' },
+                { min: 1,   ft: 3,  color: '#3178d2' },
+                { min: 1.5, ft: 5,  color: '#15a3a3' },
+                { min: 2,   ft: 7,  color: '#2fb54e' },
+                { min: 2.5, ft: 8,  color: '#a3c520' },
+                { min: 3,   ft: 10, color: '#f2ce08' },
+                { min: 4,   ft: 13, color: '#f59a0b' },
+                { min: 5,   ft: 16, color: '#ea4b28' },
+                { min: 6,   ft: 20, color: '#b31212' },
+                { min: 8,   ft: 26, color: '#4a0a1e' },
+                { min: 10,  ft: 33, color: '#9b3fd9' },
             ];
 
             const fillColorExpression = ['step', ['get', 'contour_mean'], SWELL_BANDS[0].color];
@@ -856,20 +862,38 @@
                 fillColorExpression.push(band.min, band.color);
             }
 
+            // A band's label in the viewer's units: "< 2", "2 – 3", "33+".
+            function bandLabel(i) {
+                const floor = b => (Units.metric ? b.min : b.ft);
+                const lo = floor(SWELL_BANDS[i]);
+                const next = SWELL_BANDS[i + 1];
+                if (i === 0) return `< ${floor(next)}`;
+                return next ? `${lo} – ${floor(next)}` : `${lo}+`;
+            }
+
             // Legend rows, highest band on top. The swatches butt up against
-            // each other so the eleven bands read as one continuous scale
-            // rather than eleven separate keys.
+            // each other so the bands read as one continuous scale rather
+            // than separate keys. Rebuilt when the viewer switches units.
             const legendBands = document.getElementById('legendBands');
-            [...SWELL_BANDS].reverse().forEach(band => {
-                const row = document.createElement('div');
-                row.className = 'legend-band';
-                const swatch = document.createElement('i');
-                swatch.style.backgroundColor = band.color;
-                const label = document.createElement('span');
-                label.className = 'mono';
-                label.textContent = band.label;
-                row.append(swatch, label);
-                legendBands.appendChild(row);
+            function renderLegend() {
+                legendBands.replaceChildren();
+                for (let i = SWELL_BANDS.length - 1; i >= 0; i--) {
+                    const row = document.createElement('div');
+                    row.className = 'legend-band';
+                    const swatch = document.createElement('i');
+                    swatch.style.backgroundColor = SWELL_BANDS[i].color;
+                    const label = document.createElement('span');
+                    label.className = 'mono';
+                    label.textContent = bandLabel(i);
+                    row.append(swatch, label);
+                    legendBands.appendChild(row);
+                }
+            }
+            renderLegend();
+            window.addEventListener('units:change', () => {
+                renderLegend();
+                const readout = document.getElementById('legendReadout');
+                if (readout) readout.textContent = '';
             });
 
             const EMPTY_FC = { type: 'FeatureCollection', features: [] };
@@ -1319,7 +1343,7 @@
                     }
                 }
                 legendReadout.textContent = best
-                    ? `${best.properties.h} m at cursor`
+                    ? `${Units.heightM(best.properties.h)} at cursor`
                     : '';
             });
 
@@ -1327,9 +1351,10 @@
                 if (!legendReadout || wantsHeatmap()) return;
                 if (!e.features || !e.features.length) return;
                 const p = e.features[0].properties;
+                const band = v => Units.heightM(v, { digits: Units.metric ? 1 : 0 });
                 legendReadout.textContent = p.contour_max >= 20
-                    ? `≥ ${p.contour_min} m at cursor`
-                    : `${p.contour_min} – ${p.contour_max} m at cursor`;
+                    ? `≥ ${band(p.contour_min)} at cursor`
+                    : `${band(p.contour_min).replace(/ \S+$/, '')} – ${band(p.contour_max)} at cursor`;
             });
             map.on('mouseleave', 'contour-fills', () => {
                 if (legendReadout && !wantsHeatmap()) legendReadout.textContent = '';
@@ -1383,13 +1408,13 @@
             map.on('mouseenter', 'swell-arrows', (e) => {
                 const p = e.features[0].properties;
                 const lngLat = e.lngLat;
-                const base = `<div class="text-xs">${p.h} m @ ${p.p} s from ${p.d}&deg;</div>`;
+                const base = `<div class="text-xs">${Units.heightM(p.h)} @ ${p.p} s from ${p.d}&deg;</div>`;
                 arrowPopup.setLngLat(lngLat).setHTML(base).addTo(map);
 
                 swellSystemsAt(forecastHours[currentIndex], lngLat).catch(() => null).then(systems => {
                     if (!arrowPopup.isOpen() || !systems) return;
                     const rows = systems.map(s =>
-                        `<div class="text-xs" style="color: #d5d7dc;">${s.h} m @ ${s.p} s from ${s.d}&deg;</div>`);
+                        `<div class="text-xs" style="color: #d5d7dc;">${Units.heightM(s.h)} @ ${s.p} s from ${s.d}&deg;</div>`);
                     if (rows.length > 1) {
                         arrowPopup.setHTML(base +
                             `<div class="mono" style="margin: 6px 0 2px; font-size: 9px; color: #a6aab2; text-transform: uppercase;">Swell systems</div>` +
@@ -2201,8 +2226,6 @@
                 return new Date(t.replace(' ', 'T') + 'Z');
             }
 
-            const M_TO_FT = 3.28084;
-
             function tidePopupHTML(st) {
                 const now = Date.now();
                 const preds = (st.predictions || []).map(e => ({ t: tideDate(e.t).getTime(), v: parseFloat(e.v) }));
@@ -2235,9 +2258,9 @@
                     }
                 }
                 const fmtTime = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' });
-                html += `<div class="text-xs text-white font-semibold">${(level * M_TO_FT).toFixed(1)} ft &middot; ${rising ? 'rising' : 'falling'}</div>`;
+                html += `<div class="text-xs text-white font-semibold">${Units.heightM(level)} &middot; ${rising ? 'rising' : 'falling'}</div>`;
                 if (extremum) {
-                    html += `<div class="text-[11px] text-[#b7bac1] mt-0.5">${extremum.kind} ${(extremum.v * M_TO_FT).toFixed(1)} ft at ${fmtTime.format(new Date(extremum.t))}</div>`;
+                    html += `<div class="text-[11px] text-[#b7bac1] mt-0.5">${extremum.kind} ${Units.heightM(extremum.v)} at ${fmtTime.format(new Date(extremum.t))}</div>`;
                 }
 
                 // sparkline: last 24h observed (gray) + next 48h predicted (teal)
