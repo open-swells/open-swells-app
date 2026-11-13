@@ -4,7 +4,7 @@
 *.grib2
 *.csv
 *.log
-.env
+.env*
 logs
 files
 __pycache__/

@@ -2,12 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-FILES_DIR="$PROJECT_ROOT/files"
+source "$SCRIPT_DIR/paths.sh"
 
 if [ ! -d "$FILES_DIR" ]; then
-    echo "Directory not found: $FILES_DIR"
-    exit 1
+    echo "Nothing to delete: $FILES_DIR does not exist yet"
+    exit 0
 fi
 
 echo "Deleting files from $FILES_DIR"

@@ -2,8 +2,9 @@
 # Deploy the forecast pipeline to the forecast host over SSH.
 #
 # Syncs this directory to PIPELINE_DIR, refreshes the virtualenv from
-# uv.lock, and smoke-tests the result. The host's .env, .venv, files/,
-# logs/ and scheduling (cron or systemd timer) are left untouched.
+# uv.lock, and smoke-tests the result. Only code lives in PIPELINE_DIR: the
+# host's config (/etc/open-swells) and data (/var/lib/open-swells), its
+# .venv and its scheduling (cron or systemd timer) are left untouched.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,6 +18,9 @@ FORCE="${FORCE:-0}"
 # Seconds to wait for an in-progress run to finish before giving up (CI sets
 # this so a push doesn't fail just because it landed mid-run).
 WAIT_FOR_RUN="${WAIT_FOR_RUN:-0}"
+# The host's shared layout (see scripts/paths.sh).
+REMOTE_CONFIG_DIR="${REMOTE_CONFIG_DIR:-/etc/open-swells}"
+REMOTE_DATA_DIR="${REMOTE_DATA_DIR:-/var/lib/open-swells}"
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "uv is required locally to run the pipeline tests." >&2
@@ -47,11 +51,28 @@ if run_in_progress; then
   echo "A forecast run is in progress; deploying anyway (FORCE=1)."
 fi
 
+echo "Checking the config and data directories on $PIPELINE_HOST..."
+# Before syncing: code that expects the shared layout must not replace
+# code that still runs from the old one.
+if ! ssh "$PIPELINE_HOST" "test -r '$REMOTE_CONFIG_DIR/open-swells-pipeline.env' && test -w '$REMOTE_DATA_DIR/pipeline'"; then
+  cat >&2 <<EOF
+$PIPELINE_HOST is missing $REMOTE_CONFIG_DIR/open-swells-pipeline.env or a
+writable $REMOTE_DATA_DIR/pipeline. Move it to the shared layout once, from
+the repository root:
+
+  scp ops/setup-dirs.sh ops/migrate-legacy-layout.sh $PIPELINE_HOST:/tmp/
+  ssh -t $PIPELINE_HOST 'sudo bash /tmp/migrate-legacy-layout.sh --pipeline $PIPELINE_DIR'
+
+Nothing was deployed.
+EOF
+  exit 1
+fi
+
 echo "Creating $PIPELINE_DIR on $PIPELINE_HOST..."
 ssh "$PIPELINE_HOST" "mkdir -p '$PIPELINE_DIR'"
 
-# Excluded paths are also protected from --delete, so the host's state and
-# anything matched by .gitignore (files/, logs/, .env, ...) survive.
+# Excluded paths are also protected from --delete, so anything matched by
+# .gitignore (including leftovers such as .env.migrated) survives.
 echo "Syncing pipeline files to $PIPELINE_HOST:$PIPELINE_DIR..."
 rsync -az --delete \
   --exclude '.git/' \
@@ -61,7 +82,7 @@ rsync -az --delete \
   ./ "$PIPELINE_HOST:$PIPELINE_DIR/"
 
 echo "Installing dependencies and verifying on $PIPELINE_HOST..."
-ssh "$PIPELINE_HOST" "PIPELINE_DIR='$PIPELINE_DIR' bash -s" <<'REMOTE_SCRIPT'
+ssh "$PIPELINE_HOST" "PIPELINE_DIR='$PIPELINE_DIR' REMOTE_DATA_DIR='$REMOTE_DATA_DIR' bash -s" <<'REMOTE_SCRIPT'
 set -euo pipefail
 
 cd "$PIPELINE_DIR"
@@ -91,12 +112,8 @@ done
 if ! .venv/bin/python -c 'import pyfes' 2>/dev/null; then
   echo "Warning: PyFES is not importable; spots far from NOAA stations get no tides." >&2
 fi
-if [[ ! -f "$HOME/.cache/openswells-fes2022/ocean_tide_extrapolated.yaml" ]]; then
-  echo "Warning: FES2022 data not found in ~/.cache/openswells-fes2022 (see scripts/fes_download.sh)." >&2
-fi
-
-if [[ ! -f .env ]]; then
-  echo "Warning: $PIPELINE_DIR/.env is missing; runs cannot publish until it exists." >&2
+if [[ ! -f "$REMOTE_DATA_DIR/reference/fes2022/ocean_tide_extrapolated.yaml" ]]; then
+  echo "Warning: FES2022 data not found in $REMOTE_DATA_DIR/reference/fes2022 (see scripts/fes_download.sh)." >&2
 fi
 
 if crontab -l 2>/dev/null | grep -v '^[[:space:]]*#' | grep -qF "$PIPELINE_DIR/run.sh"; then
@@ -108,4 +125,4 @@ else
 fi
 REMOTE_SCRIPT
 
-echo "Deploy complete: ssh $PIPELINE_HOST 'tail -f $PIPELINE_DIR/logs/grib-run.log'"
+echo "Deploy complete: ssh $PIPELINE_HOST 'tail -f $REMOTE_DATA_DIR/pipeline/logs/grib-run.log'"

@@ -17,27 +17,36 @@ This project was previously a 3 day forecast for my local beach using an LSTM ne
 
 You can run this app locally from the `app/` directory of the monorepo.
 
-1. clone repo and `cd app`
-2. `$ go run ./server`
-3. go to localhost:8081
+1. clone repo, then once: `sudo ops/setup-dirs.sh` (creates
+   `/etc/open-swells` and `/var/lib/open-swells`; see
+   [Data and config layout](../README.md#data-and-config-layout))
+2. fill `/var/lib/open-swells/forecast`: `pipeline/run.sh --local`
+   (after `uv sync` in `pipeline/`; add `--limit 6` for a quick run), or
+   copy production's with `app/ops/sync-forecast.sh`
+3. `cd app && go run ./server`
+4. go to localhost:8081
+
+The app uses the same paths as in production: its database is
+`/var/lib/open-swells/main.db` and its config is
+`/etc/open-swells/open-swells-app.env` (optional; the process environment
+wins over it). `app/.env` only holds `SERVER_IP` for deploys.
 
 This runs without Firebase credentials: forecasts, the map, spot and buoy
 pages all work, but sign-in and favorites are disabled (`/favorites` and the
-per-user APIs return 503). To enable them, point `FIREBASE_CREDENTIALS` at a
-Firebase service account key:
-
-```sh
-FIREBASE_CREDENTIALS=/path/to/service-account-key.json go run ./server
-```
+per-user APIs return 503). To enable them, put a Firebase service account
+key at `/etc/open-swells/firebase.json` (or point `FIREBASE_CREDENTIALS` at
+one).
 
 Configuration (all optional):
 
 | Env var | Default | Purpose |
 | --- | --- | --- |
-| `FIREBASE_CREDENTIALS` | (unset: sign-in and favorites disabled) | Path to the Firebase service account key; if unset or the file is missing, the app runs without sign-in and favorites |
+| `OPENSWELLS_CONFIG_DIR` | `/etc/open-swells` | Holds `open-swells-app.env` (read at startup) and `firebase.json` |
+| `OPENSWELLS_DATA_DIR` | `/var/lib/open-swells` | Holds the database, `forecast/` and the spot forecast history |
+| `FIREBASE_CREDENTIALS` | `$OPENSWELLS_CONFIG_DIR/firebase.json` if it exists | Path to the Firebase service account key; with none, the app runs without sign-in and favorites |
 | `PORT` | `8081` | Listen port |
-| `DB_PATH` | `./main.db` | SQLite database path (created automatically; see `ops/migrations/001_initial.sql`) |
-| `FORECAST_DIR` | `./data/forecast` | Generated forecast bundles, heatmap images, tide, and metadata files |
+| `DB_PATH` | `$OPENSWELLS_DATA_DIR/main.db` | SQLite database path (created automatically; see `ops/migrations/001_initial.sql`) |
+| `FORECAST_DIR` | `$OPENSWELLS_DATA_DIR/forecast` | Generated forecast bundles, heatmap images, tide, and metadata files |
 | `SPOTS_PATH` | `./data/spots.json` | Tracked surf-spot reference data |
 | `TEMPLATE_DIR` | `./web/templates` | Go HTML page and component templates |
 | `SITE_URL` | `https://openswells.com` | Public origin used for canonical URLs, Open Graph metadata, robots.txt, and sitemaps |
@@ -55,14 +64,14 @@ Configuration (all optional):
 `GET /healthz` returns 200 when the database is reachable and the contour
 data is fresh (<24h), 503 otherwise — point uptime monitoring at it.
 
-The ignored `data/forecast/` directory contains generated forecast products.
-For local development it is populated by `../pipeline/run.sh --local`.
-In production, the pipeline on the forecast host delivers those files to
-this directory over rsync. They remain available to the browser under the
-existing `/static/` URL path.
+`/var/lib/open-swells/forecast` contains generated forecast products. For
+local development it is populated by `../pipeline/run.sh --local`; in
+production, the pipeline on the forecast host delivers those files to the
+same path over rsync. They are served to the browser under the `/static/`
+URL path.
 
 The app writes `spot_forecast_history.json.gz` beside (not inside) the
-forecast directory, e.g. `/var/lib/open-swells/`, so it isn't served or
+forecast directory, in `/var/lib/open-swells/`, so it isn't served or
 touched by the pipeline's publish. It holds a day either side of the latest
 run's start, and fills in today's hours before the current run began. The
 app's user needs write access there; deleting it is safe (day views are
@@ -114,11 +123,14 @@ Create `/etc/open-swells/open-swells-app.env` with mode `0640`, owned by
 
 ```sh
 PORT=8081
-DB_PATH=/var/lib/open-swells/main.db
-FORECAST_DIR=/var/lib/open-swells/forecast
-FIREBASE_CREDENTIALS=/etc/open-swells/firebase.json
 TRUSTED_PROXIES=127.0.0.1,::1
 ```
+
+The database, forecasts and Firebase key are found at their standard paths
+(`/var/lib/open-swells/main.db`, `/var/lib/open-swells/forecast`,
+`/etc/open-swells/firebase.json`) without being listed; existing files that
+still set `DB_PATH`, `FORECAST_DIR` or `FIREBASE_CREDENTIALS` to those paths
+keep working.
 
 Then run `systemctl daemon-reload` and deploy. The forecast producer should
 write to `/var/lib/open-swells/forecast`; the application account needs write

@@ -2,19 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-ENV_FILE="${ENV_FILE:-"$PROJECT_ROOT/.env"}"
-if [ ! -f "$ENV_FILE" ]; then
-    echo "Error: env file not found at $ENV_FILE" >&2
-    exit 1
-fi
+source "$SCRIPT_DIR/paths.sh"
+require_env_file
 
-set -a
-source "$ENV_FILE"
-set +a
-
-SOURCE_PATH="${SOURCE_PATH:-${PROJECT_ROOT}/files}"
+SOURCE_PATH="$FILES_DIR"
 DEST_PATH="${DEST_PATH:-}"
 SSH_KEY_PATH="${SSH_KEY_PATH:-}"
 

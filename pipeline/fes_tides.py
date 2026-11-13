@@ -32,6 +32,8 @@ from datetime import UTC, datetime, timedelta
 
 import numpy as np
 
+from paths import reference_dir
+
 logger = logging.getLogger("GFSWaveContours")
 
 FES_SOURCE = "FES2022"
@@ -42,8 +44,9 @@ FES_TYPE = "M"
 FES_ID_PREFIX = "fes:"
 FES_SITES_NAME = "fes_sites.json"
 # Where the pipeline looks for the atlas when FES_CONFIG is unset: PyFES's
-# ocean_tide_extrapolated.yaml beside the ocean_tide_extrapolated/ grids.
-DEFAULT_FES_CONFIG = os.path.expanduser("~/.cache/openswells-fes2022/ocean_tide_extrapolated.yaml")
+# ocean_tide_extrapolated.yaml beside the ocean_tide_extrapolated/ grids,
+# under $OPENSWELLS_DATA_DIR/reference/fes2022.
+DEFAULT_FES_CONFIG = reference_dir("fes2022", "ocean_tide_extrapolated.yaml")
 
 SITE_STEP_DEG = 0.05
 PROBE_RINGS_DEG = (0.05, 0.1, 0.2, 0.3)

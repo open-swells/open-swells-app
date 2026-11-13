@@ -13,14 +13,18 @@ sudo systemctl enable my_python_script.timer
 sudo systemctl start my_python_script.timer
 ```
 
-**necessary .env: **
+**Where things live**: the pipeline keeps nothing in its checkout. Config
+is `/etc/open-swells/open-swells-pipeline.env`; the work directory, logs
+and tide cache are under `/var/lib/open-swells/pipeline/`, and `--local`
+publishes to `/var/lib/open-swells/forecast`, the directory the app reads.
+`scripts/paths.sh` defines the layout (the top-level README has the whole
+tree). Create it once with `sudo ops/setup-dirs.sh` from the repository
+root. Logs: `/var/lib/open-swells/pipeline/logs/grib-run.log`.
+
+**`/etc/open-swells/open-swells-pipeline.env`** (needed to publish to the
+server; a `--local` run works without it):
 ```
-SOURCE_PATH=...../grib-parse-collect/files
 DEST_PATH=<user>@<app-server>:/var/lib/open-swells/forecast/
-PYTHON_SCRIPT=....../grib-parse-collect/gfs_to_contours.py
-PYTHON_INTERPRETER=...../bin/python3
-FILES_DIR=....../grib-parse-collect/files
-LOG_DIR=...../grib-parse-collect/logs
 SSH_KEY_PATH=...../.ssh/openswells_deploy_ed25519
 PARALLEL_HOURS=3               # optional: worker processes for forecast hours
                                # (default: cores-1, capped at 4; each worker
@@ -33,6 +37,8 @@ NWPS_GRIDS=CG1                 # optional: CG1 (~4 km full domain) and/or
 SPOTS_PATH=...../spots.json    # optional: surf spots to sample into
                                # spot_forecasts.json.gz (default:
                                # spots.json in this repository)
+OPENSWELLS_DATA_DIR=/data/os   # optional: move the whole data tree
+                               # (default /var/lib/open-swells)
 ```
 
 `SSH_KEY_PATH` must refer to a dedicated deployment key. Do not use an SSH
@@ -40,9 +46,11 @@ server host key (such as `/etc/ssh/ssh_host_ed25519_key`) or a personal key
 that is also used for other accounts. Restrict the corresponding server-side
 key to the forecast upload destination and operations it actually needs.
 
-`FILES_DIR` is erased at the beginning of a run and therefore must resolve to
-a child directory of this repository. The runner rejects `/`, the repository
-root itself, paths outside the repository, and symlinks that resolve outside
+`FILES_DIR` (default `/var/lib/open-swells/pipeline/work`) is erased at the
+beginning of a run and therefore must resolve to a child directory of
+`$OPENSWELLS_DATA_DIR/pipeline`. The runner rejects `/`, the data root
+(which holds the app's database on a dev machine), the published
+`forecast/` directory, paths elsewhere, and symlinks that resolve outside
 it.
 
 **Source grids**: every layer is a composite of two NOAA GFS-Wave products —
@@ -58,7 +66,7 @@ directly); everything else is one bundle per product per run, named
 `bundles` (and per domain under `nwps_points`) in `metadata.json`. A
 publish keeps the previous run's bundles alongside, so a map opened before
 it keeps reading the files it started with: the runner leaves bundles in
-`files/` and the pipeline prunes all but the current and previous run's.
+the work directory and the pipeline prunes all but the current and previous run's.
 
 - `heatmap_XXX.webp` — continuous-color combined wind-wave-and-swell height
   field in Web Mercator with transparent land; the app's primary wave layer.
@@ -133,8 +141,8 @@ hand-tuned `swell_window` are left alone.
 
 ```sh
 # gshhg-bin-2.3.7.zip from https://www.soest.hawaii.edu/pwessel/gshhg/
-unzip gshhg-bin-2.3.7.zip gshhs_f.b -d ~/.cache/openswells-gshhg
-.venv/bin/python -I spot_facing.py --gshhg ~/.cache/openswells-gshhg/gshhs_f.b \
+unzip gshhg-bin-2.3.7.zip gshhs_f.b -d /var/lib/open-swells/reference/gshhg
+.venv/bin/python -I spot_facing.py --gshhg /var/lib/open-swells/reference/gshhg/gshhs_f.b \
     --report facing_report.csv spots.json ../app/data/spots.json
 ```
 
@@ -154,7 +162,7 @@ results for a few spots without writing anything.
   predictions for reference stations, for the tide panel on spot pages.
   A spot's `tide_station` in `spots.json` overrides the nearest station.
   CO-OPS rate-limits bursts, so stations fetched earlier the same UTC day
-  are reused from `TIDE_CACHE_DIR` (default `~/.cache/openswells-tides`);
+  are reused from `TIDE_CACHE_DIR` (default `/var/lib/open-swells/pipeline/tide-cache`);
   a failed fetch keeps the server's previous file (`P` in publish.rules).
   Spots with no CO-OPS station within 50 km fall back to the FES2022 global
   tide atlas when `FES_CONFIG` names a PyFES config (see below); NOAA stays
@@ -185,7 +193,7 @@ on the pipeline host, so spot pages never call an outside service.
    libeigen3-dev`: plain `libboost-dev` there is 1.74, too old.
 3. **Config.** Copy PyFES's `data/fes2022b/ocean_tide_extrapolated.yaml` and
    make its paths absolute. The default location is
-   `~/.cache/openswells-fes2022/` (grids in `ocean_tide_extrapolated/`, config
+   `/var/lib/open-swells/reference/fes2022/` (grids in `ocean_tide_extrapolated/`, config
    `ocean_tide_extrapolated.yaml`), used whenever that config exists and
    `FES_CONFIG` is unset; set `FES_CONFIG` to use another path, or to an
    empty value to turn the fallback off. `scripts/fes_download.sh` fetches
@@ -219,13 +227,12 @@ See `webgl-swell-rendering.md` (kept outside this repository) for the
 possible next step (client-side WebGL rendering with temporal interpolation).
 
 `run.sh --verbose` draws a live progress bar in the terminal (the log is
-unaffected); `--local` copies output to this monorepo's `app/data/forecast`
-directory instead of the server. Override that
-location for a one-off run with `LOCAL_DEST_PATH=/path/to/data/forecast`.
+unaffected); `--local` publishes to this machine's
+`/var/lib/open-swells/forecast` instead of the server: the same path the
+app reads by default, here and in production. Override it for a one-off run
+with `FORECAST_DIR=/path/to/forecast`.
 `--limit <n>` processes only the first n forecast hours for quick render checks
-(don't publish a limited run to the server — see Publishing below). The application should set
-`FORECAST_DIR='./data/forecast'` so it reads the generated files from the same
-location.
+(don't publish a limited run to the server — see Publishing below).
 
 **Publishing**: both the server copy and `--local` sync the files directory
 with `rsync --delete` through `scripts/publish.rules`. Forecast products the
