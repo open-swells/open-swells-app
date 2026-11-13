@@ -445,9 +445,10 @@ func TestEmbeddedThemeAsset(t *testing.T) {
 
 // Pages with readings load /assets/units.js before their own scripts, which
 // call window.Units while drawing; without it the charts throw and the
-// unit toggle does nothing.
+// units setting does nothing. The setting itself lives in the options menu
+// of the map and favorites pages; the landing page has no controls for it.
 func TestEmbeddedUnitsAsset(t *testing.T) {
-	for _, want := range []string{"window.Units = Units", "data-units-toggle", "units:change"} {
+	for _, want := range []string{"window.Units = Units", "data-units-set", "data-menu-trigger", "units:change"} {
 		if !bytes.Contains(webstatic.UnitsJS, []byte(want)) {
 			t.Errorf("units script is missing %q", want)
 		}
@@ -463,10 +464,13 @@ func TestEmbeddedUnitsAsset(t *testing.T) {
 		if err := tmpl.ExecuteTemplate(&page, name, data); err != nil {
 			t.Fatalf("%s failed to render: %v", name, err)
 		}
-		for _, want := range []string{`src="/assets/units.js?v=`, "data-units-toggle"} {
-			if !bytes.Contains(page.Bytes(), []byte(want)) {
-				t.Errorf("%s is missing %q", name, want)
-			}
+		if !bytes.Contains(page.Bytes(), []byte(`src="/assets/units.js?v=`)) {
+			t.Errorf("%s does not load the units script", name)
+		}
+		hasMenu := bytes.Contains(page.Bytes(), []byte(`data-units-set="metric"`)) &&
+			bytes.Contains(page.Bytes(), []byte("data-menu-trigger"))
+		if wantMenu := name != "landing.html"; hasMenu != wantMenu {
+			t.Errorf("%s units menu present = %v, want %v", name, hasMenu, wantMenu)
 		}
 	}
 }

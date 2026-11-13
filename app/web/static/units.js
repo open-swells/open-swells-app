@@ -13,7 +13,8 @@
 //   <span data-u="surf">3–4ft</span>                  surf range label
 //   <span data-u="hu"></span> / data-u="HU"            "ft"/"m" (upper case)
 //
-// Elements with [data-units-toggle] become the ft/m switch. Charts read the
+// [data-units-set="imperial|metric"] buttons choose the system; they sit in
+// the options menu (see the menu wiring at the end). Charts read the
 // helpers below while drawing and listen for "units:change" to redraw.
 (function () {
     const KEY = 'openswells.units';
@@ -119,12 +120,8 @@
 
     function syncToggles(root = document) {
         if (!root.querySelectorAll) return;
-        root.querySelectorAll('[data-units-toggle]').forEach(btn => {
-            btn.setAttribute('aria-label', `Units: ${system}. Switch to ${system === 'metric' ? 'imperial' : 'metric'}`);
-            btn.title = system === 'metric' ? 'Showing metric. Switch to feet' : 'Showing feet. Switch to metric';
-            btn.querySelectorAll('[data-units-option]').forEach(opt => {
-                opt.classList.toggle('is-active', opt.dataset.unitsOption === system);
-            });
+        root.querySelectorAll('[data-units-set]').forEach(btn => {
+            btn.setAttribute('aria-checked', String(btn.dataset.unitsSet === system));
         });
     }
 
@@ -140,11 +137,48 @@
         if (next !== system) { system = next; announce(); }
     });
 
+    // Options menus. A [data-menu-root] holds one [data-menu-trigger] and
+    // one [data-menu]; clicks inside an open menu leave it open so several
+    // settings can be changed in one visit.
+    function closeMenus(except) {
+        document.querySelectorAll('[data-menu]:not([hidden])').forEach(menu => {
+            if (menu === except) return;
+            menu.hidden = true;
+            menu.closest('[data-menu-root]')?.querySelector('[data-menu-trigger]')?.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    function openMenu(trigger, menu) {
+        menu.classList.remove('menu-left');
+        menu.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        // anchored to the trigger's right edge unless that runs off screen
+        if (menu.getBoundingClientRect().left < 8) menu.classList.add('menu-left');
+    }
+
     document.addEventListener('click', e => {
-        const btn = e.target.closest && e.target.closest('[data-units-toggle]');
-        if (!btn) return;
-        e.preventDefault();
-        Units.toggle();
+        const target = e.target.closest ? e.target : null;
+        const set = target && target.closest('[data-units-set]');
+        if (set) { Units.set(set.dataset.unitsSet); return; }
+        const trigger = target && target.closest('[data-menu-trigger]');
+        if (trigger) {
+            const menu = trigger.closest('[data-menu-root]')?.querySelector('[data-menu]');
+            if (!menu) return;
+            const wasOpen = !menu.hidden;
+            closeMenus();
+            if (!wasOpen) openMenu(trigger, menu);
+            return;
+        }
+        closeMenus(target && target.closest('[data-menu]'));
+    });
+
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Escape') return;
+        const open = document.querySelector('[data-menu]:not([hidden])');
+        if (!open) return;
+        const trigger = open.closest('[data-menu-root]')?.querySelector('[data-menu-trigger]');
+        closeMenus();
+        if (trigger) trigger.focus();
     });
 
     // Fragments added later (htmx swaps, favorites cards) convert themselves.

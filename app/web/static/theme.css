@@ -72,6 +72,10 @@
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
+    /* One corner radius for every control and surface. Deliberately tiny:
+       the UI is square-cut, this only takes the pixel off the corners. */
+    --radius: 2px;
+
     --shadow-panel: 0 12px 30px rgba(0, 0, 0, .35);
     --shadow-pop: 0 16px 36px rgba(0, 0, 0, .5);
 }
@@ -123,6 +127,7 @@ a { color: inherit; text-decoration: none; }
 .surface {
     background: var(--panel);
     border: 1px solid var(--line);
+    border-radius: var(--radius);
 }
 
 .icon-button {
@@ -131,10 +136,11 @@ a { color: inherit; text-decoration: none; }
     border: 1px solid transparent;
     background: transparent;
     color: var(--text-2);
+    border-radius: var(--radius);
     cursor: pointer;
     transition: background 120ms ease, color 120ms ease;
 }
-.icon-button:hover { color: #fff; background: var(--hover); border-color: var(--line-strong); }
+.icon-button:hover, .icon-button[aria-expanded="true"] { color: #fff; background: var(--hover); }
 
 /* One button shape. .cta-button and .ghost-button are the landing page's
    names for the primary and default variants — they must stay in this
@@ -147,6 +153,7 @@ a { color: inherit; text-decoration: none; }
     background: var(--raised);
     color: var(--text-1);
     font-size: 12px; font-weight: 500;
+    border-radius: var(--radius);
     cursor: pointer;
     transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
@@ -185,6 +192,7 @@ a { color: inherit; text-decoration: none; }
     background: var(--raised);
     color: var(--text-1);
     font-size: 11px;
+    border-radius: var(--radius);
 }
 .station-action:hover { background: var(--hover); color: #fff; }
 
@@ -193,10 +201,11 @@ a { color: inherit; text-decoration: none; }
     display: inline-flex; flex: none; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 500; white-space: nowrap;
     background: var(--raised);
+    border-radius: var(--radius);
     cursor: pointer;
 }
 .page-open-button { border: 1px solid var(--line-strong); color: var(--text-1); }
-.page-open-button:hover { background: var(--hover); color: #fff; }
+.page-open-button:hover, .page-open-button[aria-expanded="true"] { background: var(--hover); color: #fff; }
 .page-open-button svg { width: 15px; height: 15px; }
 .page-favorite-button {
     width: 36px; padding: 0;
@@ -213,22 +222,78 @@ a { color: inherit; text-decoration: none; }
 }
 .station-header-actions { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap; }
 
-/* Imperial/metric switch (units.js wires every [data-units-toggle]): a
-   two-segment pill whose lit half is the unit on screen. */
-.units-toggle {
-    display: inline-flex; flex: none; align-items: stretch;
-    min-height: 36px; padding: 2px; gap: 2px;
-    border: 1px solid var(--line-strong); background: var(--raised);
-    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
-    letter-spacing: .06em; text-transform: uppercase;
-    color: var(--text-3); cursor: pointer;
+/* --- Menus and segmented controls ------------------------------------ */
+/* Settings live behind a trigger rather than on the page: units.js opens
+   the [data-menu] inside a [data-menu-root] when its [data-menu-trigger]
+   is pressed, and closes it on Escape or a click elsewhere. */
+.options { position: relative; display: inline-flex; flex: none; }
+.options-trigger.page-header-action { width: 36px; padding: 0; }
+.options-trigger svg { width: 16px; height: 16px; }
+.menu {
+    position: absolute; z-index: 60; top: calc(100% + 6px); right: 0;
+    width: 236px; padding: 4px;
+    background: #1b1c20; border: 1px solid var(--line-strong); border-radius: var(--radius);
+    box-shadow: var(--shadow-pop);
+    color: var(--text-1); font-family: var(--font-sans); font-size: 13px; font-weight: 400;
+    text-align: left; letter-spacing: 0; text-transform: none;
 }
-.units-toggle [data-units-option] { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; padding: 0 6px; }
-.units-toggle [data-units-option].is-active { background: var(--accent); color: #fff; }
-.units-toggle:hover [data-units-option]:not(.is-active) { color: #fff; }
-.units-toggle:focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; }
-.units-toggle.is-compact { min-height: 22px; font-size: 9px; }
-.units-toggle.is-compact [data-units-option] { min-width: 22px; padding: 0 5px; }
+.menu[hidden] { display: none; }
+.menu.menu-left { right: auto; left: 0; }
+.menu-label { padding: 6px 8px 4px; font-size: 11px; font-weight: 500; color: var(--text-3); }
+.menu-sep { height: 1px; margin: 4px -4px; background: var(--line); }
+.menu-row, .menu-item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; min-height: 32px; padding: 0 8px;
+    border-radius: var(--radius);
+}
+.menu-row { justify-content: space-between; padding-right: 4px; }
+.menu-item {
+    border: 0; background: transparent; color: var(--text-1);
+    font-size: 13px; text-align: left; cursor: pointer;
+    transition: background 100ms ease, color 100ms ease;
+}
+.menu-item:hover { background: var(--hover); color: #fff; }
+.menu-item > svg { flex: none; width: 15px; height: 15px; color: var(--text-3); }
+.menu-item:hover > svg { color: var(--text-1); }
+.menu-item .menu-hint { margin-left: auto; font-size: 11px; color: var(--text-3); }
+/* a checkbox item draws its box as a small switch at the row's end */
+.menu-item input[type="checkbox"] {
+    appearance: none; -webkit-appearance: none;
+    position: relative; flex: none; order: 2; margin: 0 0 0 auto;
+    width: 24px; height: 14px;
+    background: var(--line-strong); border-radius: 7px; cursor: pointer;
+    transition: background 120ms ease;
+}
+.menu-item input[type="checkbox"]::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px;
+    background: #fff; border-radius: 50%; transition: transform 120ms ease;
+}
+.menu-item input[type="checkbox"]:checked { background: var(--accent-bright); }
+.menu-item input[type="checkbox"]:checked::after { transform: translateX(10px); }
+
+/* Segmented control: the chosen segment is a lighter neutral, not the
+   brand colour, so it reads as a setting rather than a call to action. */
+.segmented {
+    display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px;
+    padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.segmented > * {
+    height: 24px; padding: 0 9px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 0; background: transparent; color: var(--text-2);
+    font-size: 12px; font-weight: 500; white-space: nowrap;
+    border-radius: 1px; cursor: pointer;
+    transition: background 100ms ease, color 100ms ease;
+}
+.segmented > *:hover { color: #fff; }
+.segmented > [aria-checked="true"], .segmented > [aria-current="page"] {
+    background: var(--hover); color: #fff; box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+/* Map / Favorites switch in the header of both views. */
+.view-switch { height: 36px; padding: 3px; background: var(--panel); border-color: var(--line-strong); }
+.view-switch > * { height: 28px; min-width: 76px; }
+@media (max-width: 1399px) { .view-switch > * { min-width: 64px; } }
 
 body.embedded .standalone-only { display: none !important; }
 /* Keep popup content evenly padded; the close button lives in the header. */
@@ -307,7 +372,7 @@ body.embedded .page-close-button { display: inline-flex; }
    spot and buoy pages and the favorites rows, so a favorite's outlook is
    the same object as the page it opens. */
 
-.swell-strip { position: relative; margin-top: 12px; background: var(--raised); border: 1px solid var(--line); }
+.swell-strip { position: relative; margin-top: 12px; background: var(--raised); border: 1px solid var(--line); border-radius: var(--radius); }
 .swell-strip .strip-title, .swell-strip #stripReadout, .swell-strip .strip-readout { font-family: var(--font-mono); }
 .swell-strip svg { display: block; }
 /* horizontal finger slides scrub the hover readout; vertical ones
@@ -319,7 +384,7 @@ body.embedded .page-close-button { display: inline-flex; }
    10px values, a full-contrast header, and a solid backdrop. */
 .strip-panel-tooltip {
     position: absolute; z-index: 5; display: none; min-width: 168px;
-    padding: 9px 10px; border: 1px solid #365d7c; border-left: 2px solid var(--swell);
+    padding: 9px 10px; border: 1px solid #365d7c; border-left: 2px solid var(--swell); border-radius: var(--radius);
     background: rgba(20, 21, 26, .98);
     box-shadow: var(--shadow-pop);
     color: var(--text); font-family: var(--font-mono);
@@ -341,6 +406,7 @@ body.embedded .page-close-button { display: inline-flex; }
     padding: 7px 2px;
     background: var(--raised);
     border: 1px solid var(--line);
+    border-radius: var(--radius);
     cursor: pointer;
     text-align: center;
     transition: border-color 120ms ease, background 120ms ease;
