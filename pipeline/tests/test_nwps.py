@@ -201,7 +201,7 @@ class RenderAlphaTests(unittest.TestCase):
         lon = np.linspace(240.0, 241.0, 8)
         lat2d, lon2d = np.meshgrid(lat, lon, indexing="ij")
         height = np.full((8, 8), 2.0, dtype=np.float32)
-        height[0, 0] = np.nan  # one no-data cell stays fully transparent
+        height[0, 0] = np.nan  # land cell: filled from its neighbors
         alpha = np.ones((8, 8), dtype=np.float32)
         alpha[:, -1] = 0.25  # feathered east edge
         with tempfile.TemporaryDirectory() as tmp:
@@ -213,7 +213,7 @@ class RenderAlphaTests(unittest.TestCase):
                 self.assertEqual(img.mode, "RGBA")
                 data = np.asarray(img)
         self.assertEqual(bounds["north"], 34.0)
-        self.assertEqual(data[0, 0, 3], 0)  # NaN cell transparent
+        np.testing.assert_array_equal(data[0, 0], data[0, 1])  # land filled
         self.assertEqual(data[-1, 0, 3], 255)  # interior opaque
         self.assertEqual(data[-1, -1, 3], 64)  # 0.25 * 255 rounded
         self.assertGreater(data[-1, -1, :3].sum(), 0)  # still colored

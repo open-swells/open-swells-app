@@ -45,7 +45,28 @@ class RenderHeatmapTests(unittest.TestCase):
         height = np.array([[0.25, 12.0, np.nan], [5.0, 2.0, 1.0]], dtype=np.float32)
         return {"lat": lat, "lon": lon, "height": height}
 
-    def test_webp_is_lossless_with_transparent_land(self):
+    def test_land_takes_nearest_wet_value(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/heatmap.png"
+            gfs_to_contours.render_heatmap_png(self.grid(), path, rows_scale=1.0, steps=128)
+            with Image.open(path) as image:
+                indices = np.asarray(image)
+        # The NaN cell at [0, 2] copies a nearest wet neighbor (both
+        # [0, 1] and [1, 2] are at distance 1) and is opaque, not index 0.
+        self.assertIn(indices[0, 2], (indices[0, 1], indices[1, 2]))
+        self.assertTrue((indices > 0).all())
+
+    def test_all_nan_grid_stays_transparent(self):
+        data = self.grid()
+        data["height"] = np.full_like(data["height"], np.nan)
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/heatmap.png"
+            gfs_to_contours.render_heatmap_png(data, path, rows_scale=1.0, steps=128)
+            with Image.open(path) as image:
+                indices = np.asarray(image)
+        self.assertTrue((indices == 0).all())
+
+    def test_webp_is_lossless_and_opaque(self):
         with tempfile.TemporaryDirectory() as directory:
             png = f"{directory}/heatmap.png"
             webp = f"{directory}/heatmap.webp"
@@ -56,10 +77,9 @@ class RenderHeatmapTests(unittest.TestCase):
                 pixels = np.asarray(image.convert("RGBA"))
             with Image.open(png) as image:
                 expected = np.asarray(image.convert("RGBA"))
-        # Same colors as the PNG (lossless), land fully transparent.
-        np.testing.assert_array_equal(pixels[expected[..., 3] > 0], expected[expected[..., 3] > 0])
-        self.assertEqual(pixels[0, 2, 3], 0)
-        self.assertTrue((pixels[..., 3][expected[..., 3] > 0] == 255).all())
+        # Same colors as the PNG (lossless); land is filled, so all opaque.
+        np.testing.assert_array_equal(pixels, expected)
+        self.assertTrue((pixels[..., 3] == 255).all())
 
     def test_steps_limit_the_ramp(self):
         with tempfile.TemporaryDirectory() as directory:

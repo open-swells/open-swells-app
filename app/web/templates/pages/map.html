@@ -879,6 +879,55 @@
 
             const EMPTY_FC = { type: 'FeatureCollection', features: [] };
 
+            // Basemap (CARTO Voyager, Protomaps schema) source + colors the
+            // land mask reuses.
+            const BASEMAP_SOURCE = 'protomaps';
+            const LAND_COLOR = '#c3c3c3';
+            const LAKE_COLOR = '#b0d0d6';
+
+            // Terrarium DEM tiles with everything below sea level clamped to
+            // 0 m. The hillshade sits above the swell heatmap (so land keeps
+            // its relief over the land mask); without this, seafloor relief
+            // would shade the ocean colors.
+            maplibregl.addProtocol('land-dem', (params, callback) => {
+                const controller = new AbortController();
+                const url = 'https://' + params.url.slice('land-dem://'.length);
+                fetch(url, { signal: controller.signal })
+                    .then(r => {
+                        if (!r.ok) throw new Error(`${r.status} for ${url}`);
+                        return r.blob();
+                    })
+                    .then(blob => createImageBitmap(blob, {
+                        premultiplyAlpha: 'none',
+                        colorSpaceConversion: 'none',
+                    }))
+                    .then(bitmap => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = bitmap.width;
+                        canvas.height = bitmap.height;
+                        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                        ctx.drawImage(bitmap, 0, 0);
+                        if (bitmap.close) bitmap.close();
+                        const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                        const px = image.data;
+                        // Terrarium: elevation = R*256 + G + B/256 - 32768, so
+                        // R < 128 is below sea level. 0 m is (128, 0, 0).
+                        for (let i = 0; i < px.length; i += 4) {
+                            if (px[i] < 128) {
+                                px[i] = 128;
+                                px[i + 1] = 0;
+                                px[i + 2] = 0;
+                            }
+                        }
+                        return createImageBitmap(image);
+                    })
+                    .then(bitmap => callback(null, bitmap))
+                    .catch(err => {
+                        if (!controller.signal.aborted) callback(err);
+                    });
+                return { cancel: () => controller.abort() };
+            });
+
             function makeArrowImage(size = 44) {
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = size;
@@ -904,19 +953,19 @@
             }
 
             function addSwellLayers() {
-                for (const layer of ['hillshade', 'contour-fills', 'swell-arrows']) {
+                for (const layer of ['hillshade', 'land-mask', 'lake-mask', 'contour-fills', 'swell-arrows']) {
                     if (map.getLayer(layer)) map.removeLayer(layer);
                 }
                 for (const source of ['terrain-dem', 'contours', 'arrows']) {
                     if (map.getSource(source)) map.removeSource(source);
                 }
 
-                // Terrain relief under the swell layers (free AWS open data).
-                // The contours no longer cover land, so this gives the land
-                // its geography back.
+                // Terrain relief over the land mask (free AWS open data).
+                // Tiles go through the land-dem:// protocol, which flattens
+                // the seafloor so the relief never shades the swell colors.
                 map.addSource('terrain-dem', {
                     type: 'raster-dem',
-                    tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+                    tiles: ['land-dem://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
                     encoding: 'terrarium',
                     tileSize: 256,
                     maxzoom: 12,
@@ -946,6 +995,33 @@
                         'fill-outline-color': 'rgba(0, 0, 0, 0.12)'
                     }
                 });
+
+                // Land mask: the basemap's own landmass polygons, drawn over
+                // the swell rasters. The heatmap is a coarse model grid
+                // (~25 km cells) whose land cells never line up with the
+                // real coast; masking with vector land gives a crisp
+                // coastline at every zoom. Lakes sit inside "earth", so
+                // they're punched back out in the water color.
+                if (map.getSource(BASEMAP_SOURCE)) {
+                    map.addLayer({
+                        id: 'land-mask',
+                        type: 'fill',
+                        source: BASEMAP_SOURCE,
+                        'source-layer': 'earth',
+                        paint: { 'fill-color': LAND_COLOR, 'fill-antialias': true },
+                    });
+                    map.addLayer({
+                        id: 'lake-mask',
+                        type: 'fill',
+                        source: BASEMAP_SOURCE,
+                        'source-layer': 'water',
+                        filter: ['all',
+                            ['==', ['geometry-type'], 'Polygon'],
+                            ['!=', ['get', 'kind'], 'ocean'],
+                        ],
+                        paint: { 'fill-color': LAKE_COLOR },
+                    });
+                }
 
                 if (!map.hasImage('swell-arrow')) {
                     map.addImage('swell-arrow', makeArrowImage(), { pixelRatio: 2 });
@@ -1274,7 +1350,7 @@
             function applyLandColor() {
                 for (const layer of map.getStyle().layers) {
                     if (layer.type === 'background') {
-                        map.setPaintProperty(layer.id, 'background-color', '#c3c3c3');
+                        map.setPaintProperty(layer.id, 'background-color', LAND_COLOR);
                     } else if (layer.type === 'fill' && /landcover|landuse|park|aeroway|wood|grass/.test(layer.id)) {
                         map.setLayoutProperty(layer.id, 'visibility', 'none');
                     }
@@ -1294,10 +1370,31 @@
                         break;
                     }
                 }
-                // Bottom-to-top: hillshade, swell fills, arrows, then labels.
                 map.moveLayer('swell-arrows', firstSymbolId);
-                map.moveLayer('contour-fills', 'swell-arrows');
-                map.moveLayer('hillshade', 'contour-fills');
+
+                // Slot the swell stack right above the basemap's water fills,
+                // so roads draw over the land mask:
+                // water -> heatmap/NWPS -> contours -> land/lake mask ->
+                // hillshade -> rivers, boundaries, roads -> arrows -> labels.
+                const styleLayers = map.getStyle().layers;
+                let lastWaterIdx = -1;
+                styleLayers.forEach((layer, i) => {
+                    if (layer.type === 'fill' && layer['source-layer'] === 'water') lastWaterIdx = i;
+                });
+                const swellStack = ['contour-fills', 'land-mask', 'lake-mask', 'hillshade']
+                    .filter(id => map.getLayer(id));
+                const stackIds = new Set([...swellStack, 'swell-arrows']);
+                // No basemap water layer (unexpected style): keep the old
+                // placement, just under the arrows.
+                const anchorId = lastWaterIdx < 0 ? 'swell-arrows' : styleLayers
+                    .slice(lastWaterIdx + 1)
+                    .find(layer => !stackIds.has(layer.id))?.id;
+                for (const id of swellStack) map.moveLayer(id, anchorId);
+                // Basemap lines styled beneath the water fills (rivers,
+                // boundaries) would otherwise vanish under the land mask.
+                for (const layer of styleLayers.slice(0, lastWaterIdx)) {
+                    if (layer.type === 'line') map.moveLayer(layer.id, anchorId);
+                }
                 maybeAddHeatmapLayers(); // if metadata arrived before the style
                 maybeAddNwpsLayers();
                 updateMap(currentIndex);

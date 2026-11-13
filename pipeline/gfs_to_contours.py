@@ -24,7 +24,7 @@ from PIL import Image as PILImage
 from geojson import Feature, FeatureCollection
 from shapely.geometry import Polygon
 from shapely.ops import transform as shapely_transform
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import distance_transform_edt, gaussian_filter
 
 from bundle import bundle_name, pack_document, pack_grid, prune_bundles, write_bundle
 from composite import composite_swell, composite_wind
@@ -166,6 +166,15 @@ def _hex_to_rgb(color: str) -> tuple[int, int, int]:
     return (int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16))
 
 
+def _fill_nearest(grid: np.ndarray) -> np.ndarray:
+    """Replace NaN cells with the value of the nearest finite cell."""
+    missing = np.isnan(grid)
+    if not missing.any() or missing.all():
+        return grid
+    indices = distance_transform_edt(missing, return_distances=False, return_indices=True)
+    return grid[tuple(indices)]
+
+
 def render_heatmap_png(
     data: dict,
     png_path: str,
@@ -177,13 +186,18 @@ def render_heatmap_png(
     """Render the height field as a continuous-color heatmap image.
 
     The format follows png_path's extension: ".webp" writes lossless WebP
-    (RGBA, land fully transparent), anything else a PNG. steps is the number
-    of ramp colors (at most 255; index 0 is reserved for land).
+    (RGBA), anything else a PNG. steps is the number of ramp colors (at
+    most 255; index 0 is reserved for transparent no-data).
 
     MapLibre stretches an image source linearly in Web Mercator space, so
     rows are resampled here from the equirectangular GRIB grid to equal
     Mercator spacing; displaying the PNG at the returned bounds then puts
-    every pixel at the correct latitude. Land is transparent.
+    every pixel at the correct latitude.
+
+    Land cells take the value of the nearest wet cell, so the image is
+    solid color with no coastline of its own: the model's land mask is a
+    ~25 km grid that never matches the real coast, so the map draws vector
+    land on top instead. Only an all-NaN grid stays transparent.
 
     alpha, if given, is a per-cell 0..1 opacity multiplier (same shape as
     the height grid) and switches the output from indexed-palette to RGBA —
@@ -193,6 +207,7 @@ def render_heatmap_png(
     height = data["height"].astype(np.float32, copy=False)
     mask = data.get("height_mask")
     grid = np.where(mask, np.nan, height) if mask is not None else height
+    grid = _fill_nearest(grid)
 
     lats = data["lat"][:, 0].astype(np.float64)
     lons = data["lon"][0, :].astype(np.float64)
@@ -208,7 +223,7 @@ def render_heatmap_png(
     n_rows = int(grid.shape[0] * rows_scale)
     y_targets = np.linspace(merc_y(lats[0]), merc_y(lats[-1]), n_rows)
     target_lats = np.degrees(2 * np.arctan(np.exp(y_targets)) - np.pi / 2)
-    # Nearest source row per target row keeps the land/sea edge crisp.
+    # Nearest source row per target row (no blending across rows).
     src_rows = np.abs(target_lats[:, None] - lats[None, :]).argmin(axis=1)
     warped = grid[src_rows, :]
 
@@ -219,7 +234,7 @@ def render_heatmap_png(
         HEATMAP_ANCHORS[-1],
     )
 
-    # Build the palette directly from the ramp: index 0 is transparent land,
+    # Build the palette directly from the ramp: index 0 is transparent no-data,
     # indices 1..steps are evenly spaced ramp steps (~0.04 m apart at 255).
     # Letting Pillow *derive* a palette (quantize) is
     # not safe here — its octree merged rare colors (8 m+ storm cores) into
