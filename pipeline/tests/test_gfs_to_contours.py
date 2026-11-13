@@ -42,7 +42,7 @@ class RenderHeatmapTests(unittest.TestCase):
     def grid(self):
         lat = np.array([[10.0, 10.0, 10.0], [0.0, 0.0, 0.0]])
         lon = np.array([[0.0, 1.0, 2.0], [0.0, 1.0, 2.0]])
-        height = np.array([[0.25, 10.0, np.nan], [5.0, 2.0, 1.0]], dtype=np.float32)
+        height = np.array([[0.25, 12.0, np.nan], [5.0, 2.0, 1.0]], dtype=np.float32)
         return {"lat": lat, "lon": lon, "height": height}
 
     def test_webp_is_lossless_with_transparent_land(self):
@@ -67,7 +67,7 @@ class RenderHeatmapTests(unittest.TestCase):
             gfs_to_contours.render_heatmap_png(self.grid(), path, rows_scale=1.0, steps=128)
             with Image.open(path) as image:
                 indices = np.asarray(image)
-        self.assertEqual(indices.max(), 128)  # the 10 m cell: top of the ramp
+        self.assertEqual(indices.max(), 128)  # the 12 m cell: top of the ramp
         self.assertEqual(indices[0, 0], 1)  # 0.25 m: bottom of the ramp
         with self.assertRaises(ValueError):
             gfs_to_contours.render_heatmap_png(self.grid(), path, steps=256)
@@ -108,7 +108,7 @@ class ExtractHeightTests(unittest.TestCase):
         # This is the failure mode seen in storm eyes: partition 1 is valid,
         # but it contains a small background swell while combined seas are high.
         swell = np.ma.array([[0.4, 2.0], [3.0, 4.0]], mask=False)
-        combined = np.ma.array([[9.0, 3.0], [4.0, 5.0]], mask=False)
+        combined = np.ma.array([[12.0, 3.0], [4.0, 5.0]], mask=False)
         period = np.ma.array([[10.0, 10.0], [10.0, 10.0]], mask=False)
         direction = np.ma.array([[90.0, 90.0], [90.0, 90.0]], mask=False)
 
@@ -134,7 +134,7 @@ class ExtractHeightTests(unittest.TestCase):
         # The fixture has no wind wave fields: the hour still extracts.
         self.assertIsNone(result["wind_sea"])
         np.testing.assert_array_equal(result["height"], combined.astype(np.float32))
-        self.assertEqual(result["height"][0, 0], 9.0)
+        self.assertEqual(result["height"][0, 0], 12.0)
         self.assertFalse(result["height_mask"].any())
         self.assertTrue(grib_file.closed)
 
