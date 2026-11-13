@@ -86,9 +86,13 @@ def grids_from_env() -> list[str]:
 
 
 def _grib_url(region: str, wfo: str, grid: str, date_str: str, cycle_hour: str) -> str:
+    # NCEP renamed these files after the 2026-11-09 cycles, from
+    # lox_nwps_CG1_20261109_0600.grib2 to nwps.t06z.cg1.lox.grib2. The date
+    # now lives only in the directory, and the directory keeps the upper-case
+    # grid name.
     return (
         f"{BASE_URL}/{region}.{date_str}/{wfo}/{cycle_hour}/{grid}/"
-        f"{wfo}_nwps_{grid}_{date_str}_{cycle_hour}00.grib2"
+        f"nwps.t{cycle_hour}z.{grid.lower()}.{wfo}.grib2"
     )
 
 
