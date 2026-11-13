@@ -1133,8 +1133,12 @@ func healthHandler(db *sql.DB, staticDir string, surfStore *SurfZoneStore) gin.H
 // run configures and starts the OpenSwells HTTP server. It blocks until the
 // process receives an interrupt or termination signal.
 func run() {
-	if err := loadDotEnv(".env"); err != nil {
-		log.Printf("warning: failed to load .env: %v", err)
+	// Runtime config comes from the environment, then the config
+	// directory's env file (see paths.go). Under systemd the same file is
+	// also the unit's EnvironmentFile, so loading it again changes nothing.
+	envFile := filepath.Join(configDir(), appEnvFile)
+	if err := loadDotEnv(envFile); err != nil {
+		log.Printf("warning: failed to load %s: %v", envFile, err)
 	}
 
 	ctx := context.Background()
@@ -1142,9 +1146,10 @@ func run() {
 	// Firebase credentials are optional: without them the app still serves
 	// forecasts, and sign-in and favorites are disabled (authClient stays nil).
 	var err error
-	credPath := os.Getenv("FIREBASE_CREDENTIALS")
+	credPath := firebaseCredentialsPath()
 	if credPath == "" {
-		log.Printf("FIREBASE_CREDENTIALS not set; sign-in and favorites are disabled")
+		log.Printf("no Firebase credentials (FIREBASE_CREDENTIALS unset, no %s); sign-in and favorites are disabled",
+			filepath.Join(configDir(), firebaseKeyFile))
 	} else if _, statErr := os.Stat(credPath); statErr != nil {
 		log.Printf("warning: Firebase credentials not found at %q; sign-in and favorites are disabled: %v", credPath, statErr)
 	} else {
@@ -1158,8 +1163,12 @@ func run() {
 		}
 	}
 
-	dbPath := getenvDefault("DB_PATH", "./main.db")
-	forecastDir := getenvDefault("FORECAST_DIR", "./data/forecast")
+	dbPath := getenvDefault("DB_PATH", filepath.Join(dataDir(), "main.db"))
+	forecastDir := getenvDefault("FORECAST_DIR", filepath.Join(dataDir(), "forecast"))
+	if err := requireWritableDir(filepath.Dir(dbPath)); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("database %s, forecasts %s", dbPath, forecastDir)
 	go runForecastCacheWarmer(context.Background(), forecastDir)
 	port := getenvDefault("PORT", "8081")
 

@@ -8,7 +8,8 @@ cd "$REPO_ROOT"
 ENV_FILE="${ENV_FILE:-.env}"
 DEPLOY_USER="${DEPLOY_USER:-root}"
 REMOTE_FORECAST_DIR="${REMOTE_FORECAST_DIR:-/var/lib/open-swells/forecast}"
-LOCAL_FORECAST_DIR="${LOCAL_FORECAST_DIR:-data/forecast}"
+# Same path as on the server: the app reads it by default on both.
+LOCAL_FORECAST_DIR="${LOCAL_FORECAST_DIR:-${OPENSWELLS_DATA_DIR:-/var/lib/open-swells}/forecast}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing $ENV_FILE. Add SERVER_IP to it before syncing forecasts." >&2

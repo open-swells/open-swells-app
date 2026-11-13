@@ -4,19 +4,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-ENV_FILE="${ENV_FILE:-"$PROJECT_ROOT/.env"}"
-if [ ! -f "$ENV_FILE" ]; then
-    echo "Error: env file not found at $ENV_FILE" >&2
-    exit 1
-fi
-
-set -a
-source "$ENV_FILE"
-set +a
+source "$SCRIPT_DIR/paths.sh"
 
 PYTHON_SCRIPT="${PYTHON_SCRIPT:-"$PROJECT_ROOT/gfs_to_contours.py"}"
-FILES_DIR="${FILES_DIR:-"$PROJECT_ROOT/files"}"
-LOG_DIR="${LOG_DIR:-"$PROJECT_ROOT/logs"}"
 
 for var in PYTHON_SCRIPT FILES_DIR LOG_DIR; do
     value="${!var:-}"
@@ -27,17 +17,18 @@ for var in PYTHON_SCRIPT FILES_DIR LOG_DIR; do
 done
 
 # This directory is emptied before every run. Resolve symlinks and `..` first,
-# then require the result to remain strictly below the project root. This keeps
-# a typo such as FILES_DIR=/ (or an external directory) from becoming a
-# destructive cleanup target.
-CANONICAL_PROJECT_ROOT="$(realpath -e "$PROJECT_ROOT")"
+# then require the result to remain strictly below the pipeline's data
+# directory ($OPENSWELLS_DATA_DIR/pipeline). That keeps a typo such as
+# FILES_DIR=/ , the data root (which holds the app's database) or the
+# published forecast directory from becoming a destructive cleanup target.
+CANONICAL_PIPELINE_DATA_DIR="$(realpath -m "$PIPELINE_DATA_DIR")"
 CANONICAL_FILES_DIR="$(realpath -m "$FILES_DIR")"
 case "$CANONICAL_FILES_DIR" in
-    "$CANONICAL_PROJECT_ROOT"/*)
+    "$CANONICAL_PIPELINE_DATA_DIR"/*)
         FILES_DIR="$CANONICAL_FILES_DIR"
         ;;
     *)
-        echo "Error: FILES_DIR must be a child of $CANONICAL_PROJECT_ROOT; got $CANONICAL_FILES_DIR" >&2
+        echo "Error: FILES_DIR must be a child of $CANONICAL_PIPELINE_DATA_DIR; got $CANONICAL_FILES_DIR" >&2
         exit 1
         ;;
 esac
@@ -67,7 +58,7 @@ if [ ! -x "$PYTHON_BIN" ]; then
     exit 1
 fi
 
-export FILES_DIR LOG_DIR
+export FILES_DIR LOG_DIR TIDE_CACHE_DIR OPENSWELLS_DATA_DIR
 
 echo "Running Python script with interpreter: $PYTHON_BIN"
 "$PYTHON_BIN" "$PYTHON_SCRIPT"

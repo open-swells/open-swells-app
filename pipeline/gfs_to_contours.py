@@ -32,6 +32,7 @@ from gribio import GRID_CACHE as _GRID_CACHE, decode, lat_lon_grid, retry_wait
 from nwps import process_nwps_domains
 from spot_forecasts import load_spots, sample_spots, write_spot_forecasts
 from fes_tides import resolve_config as resolve_fes_config
+from paths import pipeline_dir
 from tides import DEFAULT_TIDE_CACHE_DIR, SPOT_TIDES_NAME, write_spot_tides, write_tides
 from wind import extract_wind, pack_wind
 
@@ -927,12 +928,10 @@ def _download_file(
 
 
 def main() -> None:
-    files_dir = os.environ.get("FILES_DIR")
-    if not files_dir:
-        raise EnvironmentError("FILES_DIR environment variable is not set")
-    log_dir = os.environ.get("LOG_DIR")
-    if not log_dir:
-        raise EnvironmentError("LOG_DIR environment variable is not set")
+    # run.sh exports these from scripts/paths.sh; the defaults match it.
+    files_dir = os.environ.get("FILES_DIR") or pipeline_dir("work")
+    log_dir = os.environ.get("LOG_DIR") or pipeline_dir("logs")
+    os.makedirs(files_dir, exist_ok=True)
 
     setup_logging(log_dir)
 
@@ -1030,7 +1029,7 @@ def main() -> None:
         # High/low tides at the station nearest each spot, for the spot
         # pages' tide chart, and FES2022 predictions for spots no station
         # is near when FES_CONFIG names a PyFES config (default
-        # ~/.cache/openswells-fes2022/, if there). Predictions are
+        # $OPENSWELLS_DATA_DIR/reference/fes2022/, if there). Predictions are
         # astronomical, so when this fails publish.rules keeps the
         # previous run's file on the server.
         if spot_ids:

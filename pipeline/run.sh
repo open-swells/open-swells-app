@@ -3,10 +3,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL=false
 VERBOSE=false
 LIMIT=0
-LOCAL_DEST_PATH="${LOCAL_DEST_PATH:-"$SCRIPT_DIR/../app/data/forecast"}"
+# Config, work, log and publish directories (FILES_DIR, LOG_DIR,
+# FORECAST_DIR, ...): see scripts/paths.sh.
+source "$SCRIPT_DIR/scripts/paths.sh"
 
 usage() {
     echo "Usage: $0 [--local] [--verbose] [--limit <n>]"
+    echo "  --local      publish to this machine's $FORECAST_DIR instead of the server"
     echo "  --limit <n>  only process the first n forecast hours (quick checks)"
 }
 
@@ -41,18 +44,15 @@ while [ "$#" -gt 0 ]; do
 done
 
 copy_files_locally() {
-    local source_path="${SOURCE_PATH:-"$SCRIPT_DIR/files"}"
-    local dest_path="$LOCAL_DEST_PATH"
+    local source_path="$FILES_DIR"
+    local dest_path="$FORECAST_DIR"
 
     if [ ! -d "$source_path" ]; then
         echo "Error: source path not found at $source_path" >&2
         exit 1
     fi
 
-    if [ ! -d "$dest_path" ]; then
-        echo "Error: local destination path not found at $dest_path" >&2
-        exit 1
-    fi
+    mkdir -p "$dest_path"
 
     if ! command -v rsync >/dev/null; then
         echo "Error: rsync is required for local copy" >&2
@@ -91,7 +91,10 @@ copy_files_locally() {
     fi
 }
 
-mkdir -p "$SCRIPT_DIR/logs"
+require_data_dir
+if [ "$LOCAL" != true ]; then
+    require_env_file
+fi
 if [ "$LIMIT" -gt 0 ]; then
     export GRIB_LIMIT="$LIMIT"
     echo "Limiting run to the first $LIMIT forecast hours"
@@ -100,9 +103,9 @@ if [ "$VERBOSE" = true ]; then
     # The parser draws a progress bar on /dev/tty; the full output still
     # goes only to the log so control characters never end up in it.
     export GRIB_PROGRESS=1
-    echo "Progress will display here; full log: $SCRIPT_DIR/logs/grib-run.log"
+    echo "Progress will display here; full log: $LOG_DIR/grib-run.log"
 fi
-exec >>"$SCRIPT_DIR/logs/grib-run.log" 2>&1
+exec >>"$LOG_DIR/grib-run.log" 2>&1
 echo "==== $(date -Is) START $$ ===="
 
 # set -e matters for ordering: if generation fails, the copy step never
@@ -116,7 +119,7 @@ echo "Starting grib parse runner"
 "$SCRIPT_DIR/scripts/grib_parse_runner.sh"
 
 if [ "$LOCAL" = true ]; then
-    echo "Copying files locally to app/data/forecast"
+    echo "Copying files locally to $FORECAST_DIR"
     copy_files_locally
 else
     echo "Copying files to server"

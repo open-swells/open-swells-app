@@ -28,6 +28,8 @@ from datetime import UTC, datetime, timedelta
 
 import requests
 
+from paths import pipeline_dir
+
 import fes_tides
 
 logger = logging.getLogger("GFSWaveContours")
@@ -42,7 +44,7 @@ EARTH_RADIUS_KM = 6371.0
 # Each run's spot_tides file is also kept here (FILES_DIR is wiped per
 # run); stations it holds from the same UTC day are reused instead of
 # refetched, so each station costs about one fetch a day.
-DEFAULT_TIDE_CACHE_DIR = os.path.expanduser("~/.cache/openswells-tides")
+DEFAULT_TIDE_CACHE_DIR = pipeline_dir("tide-cache")
 
 
 def _get_json(session: requests.Session, url: str, params: dict | None = None) -> dict:

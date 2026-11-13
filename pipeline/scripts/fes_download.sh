@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Fetch the FES2022b ocean_tide_extrapolated grids from AVISO+ and unpack
-# them into FES_DIR (default ~/.cache/openswells-fes2022), the folder the
-# pipeline reads by default (see fes_tides.DEFAULT_FES_CONFIG).
+# them into FES_DIR (default $OPENSWELLS_DATA_DIR/reference/fes2022, i.e.
+# /var/lib/open-swells/reference/fes2022), the folder the pipeline reads by
+# default (see fes_tides.DEFAULT_FES_CONFIG).
 #
 # Needs an AVISO+ account with FES access, as a netrc file in FES_DIR:
 #   machine ftp-access.aviso.altimetry.fr login <user> password <password>
@@ -10,7 +11,7 @@
 # .nc files are skipped and partial downloads continue.
 set -uo pipefail
 
-FES_DIR="${FES_DIR:-"$HOME/.cache/openswells-fes2022"}"
+FES_DIR="${FES_DIR:-"${OPENSWELLS_DATA_DIR:-/var/lib/open-swells}/reference/fes2022"}"
 export N="$FES_DIR/.aviso-netrc"
 export B="sftp://ftp-access.aviso.altimetry.fr:2221/auxiliary/tide_model/fes2022b/ocean_tide_extrapolated"
 if [ ! -f "$N" ]; then

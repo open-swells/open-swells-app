@@ -15,8 +15,11 @@ directory:
 - **pipeline** (`pipeline/scripts/deploy.sh`): refuses to deploy while a
   forecast run is in progress (override with `FORCE=1`). It rsyncs
   `pipeline/` to the host, runs `uv sync --frozen`, and smoke-tests the
-  scripts and imports. The host's `.env`, `.venv`, `files/`, `logs/` and its
-  cron entry are left untouched. Override the target with `PIPELINE_HOST`
+  scripts and imports. It first checks that the host uses the shared
+  [config and data layout](README.md#data-and-config-layout)
+  (`/etc/open-swells/open-swells-pipeline.env`, a writable
+  `/var/lib/open-swells/pipeline`) and stops, deploying nothing, if not.
+  The host's config, data, `.venv` and cron entry are left untouched. Override the target with `PIPELINE_HOST`
   (an SSH alias, default `rochester-remote-evan`) and `PIPELINE_DIR`.
 
 ### Automatic deploys
