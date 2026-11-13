@@ -1,0 +1,7 @@
+{{/* Display options, kept behind a trigger. units.js opens and closes the
+     menu and wires the units buttons. "optionsmenu" is the whole control
+     (pass the trigger's classes); pages with more settings, like the map,
+     build their own menu around "optionsicon" and "unitsrow". */}}
+{{define "optionsicon"}}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9M19 7h1M4 17h1M11 17h9"/><circle cx="16" cy="7" r="2.5"/><circle cx="8" cy="17" r="2.5"/></svg>{{end}}
+{{define "unitsrow"}}<div class="menu-row"><span>Units</span><div class="segmented" role="radiogroup" aria-label="Units"><button type="button" role="radio" aria-checked="false" data-units-set="imperial" title="Feet, mph, °F">Imperial</button><button type="button" role="radio" aria-checked="false" data-units-set="metric" title="Meters, km/h, °C">Metric</button></div></div>{{end}}
+{{define "optionsmenu"}}<div class="options" data-menu-root><button type="button" class="options-trigger {{.}}" data-menu-trigger aria-haspopup="true" aria-expanded="false" aria-label="Display options" title="Display options">{{template "optionsicon"}}</button><div class="menu" data-menu hidden><div class="menu-label">Display options</div>{{template "unitsrow"}}</div></div>{{end}}

@@ -35,44 +35,54 @@
            which defeats Tailwind's absolute/inset-0 — size it explicitly. */
         #map { width: 100%; height: 100%; }
         /* Floating chrome sits over a light-to-dark basemap, so map surfaces
-           are more opaque and more strongly shadowed than page surfaces —
-           readability over the map wins over seeing through to it. */
+           stay near-opaque (the blur only softens what little shows
+           through) with a hairline edge and a layered shadow to lift them
+           off the map. Every top control is one 36px row. */
         .surface {
-            background: rgba(20, 21, 25, .97);
-            border: 1px solid var(--line-strong);
-            box-shadow: 0 10px 28px rgba(0, 0, 0, .45);
+            background: rgba(22, 23, 27, .94);
+            -webkit-backdrop-filter: blur(14px) saturate(140%);
+            backdrop-filter: blur(14px) saturate(140%);
+            border: 1px solid rgba(255, 255, 255, .11);
+            border-radius: var(--radius);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .38);
         }
-        .top-menu { min-height: 44px; padding: 5px; gap: 3px; }
+        .view-switch { background: rgba(22, 23, 27, .94); border-color: rgba(255, 255, 255, .11); }
+        .map-chip { height: 36px; padding: 0 11px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #fff; }
+        .top-menu { height: 36px; padding: 2px; gap: 2px; }
+        .top-menu .icon-button { width: 30px; height: 30px; }
+        .top-menu .toolbar-button {
+            height: 30px; padding-inline: 10px; border: 0; background: transparent;
+            color: var(--text-1); font-size: 12px;
+        }
+        .top-menu .toolbar-button:hover { background: var(--hover); color: #fff; }
+        .top-menu .menu { top: calc(100% + 8px); right: -3px; }
         /* Legend: a continuous color scale rather than a stack of separate
            keys, so it takes less of the map and reads top-to-bottom. */
-        .legend { width: 168px; padding: 9px 10px 8px; }
-        .legend-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 7px; }
-        .legend-title { font-size: 11px; font-weight: 600; color: #fff; }
-        .legend-unit { font-size: 9px; letter-spacing: .08em; color: var(--text-3); }
+        .legend { width: 148px; padding: 9px 10px; }
+        .legend-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+        .legend-title { font-size: 11px; font-weight: 500; color: var(--text-1); }
+        .legend-unit { font-size: 10px; color: var(--text-3); }
         .legend-scale { display: flex; flex-direction: column; }
-        .legend-band { display: flex; align-items: center; gap: 8px; height: 13px; }
-        .legend-band i { width: 22px; height: 100%; flex: none; }
-        .legend-band span { font-size: 10px; color: var(--text-1); }
+        .legend-band { display: flex; align-items: center; gap: 8px; height: 12px; }
+        .legend-band i { width: 14px; height: 100%; flex: none; }
+        .legend-band:first-child i { border-radius: 1px 1px 0 0; }
+        .legend-band:last-child i { border-radius: 0 0 1px 1px; }
+        .legend-band span { font-size: 10px; color: var(--text-2); }
         .legend-readout {
-            margin-top: 8px; min-height: 14px;
-            font-size: 10px; line-height: 14px; color: var(--accent-soft);
+            margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line);
+            font-size: 10px; line-height: 14px; color: var(--text-1);
         }
-        .legend-toggles { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--line); display: grid; gap: 5px; }
-        .legend-toggle {
-            display: flex; align-items: center; gap: 7px;
-            font-size: 11px; color: var(--text-1); cursor: pointer;
-        }
-        .legend-toggle:hover { color: #fff; }
-        .legend-toggle input { width: 13px; height: 13px; accent-color: var(--accent); cursor: pointer; }
-        .top-menu .toolbar-button { height: 34px; padding-inline: 11px; }
-        .view-switch { width: 162px; height: 36px; padding: 4px; }
-        .view-switch a { width: 76px; height: 28px; flex: none; transition: background 120ms ease, color 120ms ease; }
-        /* The current view is stated with the brand accent, not a grey fill —
-           at 11px a grey-on-grey pill was easy to misread. */
-        .view-switch-active { background: var(--accent); color: #fff; }
-        #signInBtn.is-user { width: 32px; padding: 0; border: 0; background: transparent; }
+        .legend-readout:empty { display: none; }
+        .map-status { height: 36px; padding: 0 11px; align-items: center; gap: 8px; font-size: 11px; color: var(--text-3); }
+        .map-status .mono { font-size: 10px; color: var(--text-1); }
+        .timeline-bar { padding: 5px 14px 5px 5px; gap: 10px; }
+        .timeline-now { display: flex; flex-direction: column; flex: none; min-width: 92px; padding-right: 12px; border-right: 1px solid var(--line); }
+        .timeline-now #timeDay { font-size: 12px; font-weight: 500; line-height: 1.25; color: #fff; }
+        .timeline-now #timeClock { margin-top: 1px; font-size: 10px; line-height: 1.25; color: var(--text-2); }
+        #signInBtn.is-user { width: 30px; padding: 0; }
+        #signInBtn.is-user img { width: 22px; height: 22px; }
         .mobile-account-button { flex: none; }
-        .mobile-account-button img { width: 24px; height: 24px; border-radius: 999px; }
+        .mobile-account-button img { width: 22px; height: 22px; border-radius: 999px; }
         .compact-only { display: none; }
         /* Buoy popup card. Styled with plain CSS rather than runtime
            Tailwind utility classes so the buttons hold their size and
@@ -91,6 +101,7 @@
             display: flex; gap: 7px; align-items: center; justify-content: center;
             font-size: 12px; font-weight: 500; cursor: pointer;
             border: 1px solid #43454c; background: #1f2026; color: #edeef1;
+            border-radius: var(--radius);
         }
         .favorite-btn:hover { background: #2f3137; border-color: #55575e; }
         .favorite-btn.is-favorite { color: #6fcf97; border-color: #47725a; background: #192a22; }
@@ -124,7 +135,7 @@
         #forecastDialog { transform: translateY(8px) scale(.99); transition: transform 150ms ease; }
         #forecastModal.is-open #forecastDialog { transform: translateY(0) scale(1); }
         .maplibregl-popup { font-family: 'Inter', sans-serif; }
-        .maplibregl-popup-content { background: #17181b !important; color: #edeef1; border: 1px solid #43454c; border-radius: 0 !important; padding: 12px !important; box-shadow: 0 12px 30px rgba(0,0,0,.35) !important; }
+        .maplibregl-popup-content { background: #17181b !important; color: #edeef1; border: 1px solid #43454c; border-radius: var(--radius) !important; padding: 12px !important; box-shadow: 0 12px 30px rgba(0,0,0,.35) !important; }
         .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
         .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
         .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: #43454c !important; }
@@ -256,13 +267,13 @@
         }
         .timeline-progress {
             position: absolute; left: 0; bottom: 15px;
-            height: 1px; background: #2563eb;
+            height: 1px; background: var(--accent-bright);
             pointer-events: none;
         }
         .timeline-playhead {
             position: absolute; top: 4px; bottom: 12px;
-            width: 2px; background: #60a5fa;
-            transform: translateX(-1px);
+            width: 1px; background: #fff;
+            transform: translateX(-0.5px);
             pointer-events: none;
         }
         .timeline-playhead::after {
@@ -270,7 +281,7 @@
             position: absolute; top: -3px; left: 50%;
             transform: translateX(-50%);
             width: 7px; height: 7px;
-            background: #60a5fa;
+            background: #fff; border-radius: 1px;
         }
         /* Keyboard and screen readers only: pointer drags are handled on
            the track (see timeline scrubbing), because the native thumb is
@@ -310,8 +321,6 @@
                 position: static; width: 100%; max-width: 540px; margin-top: 4px;
                 max-height: min(55dvh, 380px);
             }
-            nav[aria-label="Primary view"] { top: 0.75rem; width: 138px; }
-            nav[aria-label="Primary view"] a { width: 65px; }
         }
         @media (max-width: 767px) { #forecastDialog { width: 100vw; height: 100dvh; max-height: none; border: 0; } }
         /* Keep the bottom bar clear of the iOS home indicator */
@@ -336,9 +345,9 @@
         </div>
 
         <!-- Primary view switch -->
-        <nav class="surface view-switch absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center" aria-label="Primary view">
-            <a href="/map" aria-current="page" class="view-switch-active flex items-center justify-center text-[11px] font-semibold">Map</a>
-            <a href="/favorites" class="flex items-center justify-center text-[11px] font-medium text-[#a6aab2] hover:text-white hover:bg-[#292a30]">Favorites</a>
+        <nav class="segmented view-switch absolute top-3 left-1/2 -translate-x-1/2 z-30" aria-label="Primary view">
+            <a href="/map" aria-current="page">Map</a>
+            <a href="/favorites">Favorites</a>
         </nav>
 
         <!-- 2) Header "island" at the top -->
@@ -346,8 +355,8 @@
 
           <!-- Logo -->
           <div class="title hidden sm:block justify-self-start min-w-fit">
-                <h1 class="text-sm font-semibold text-white">
-                    <a href="/" class="surface h-9 px-3 flex items-center gap-2"><svg class="brand-mark" width="18" height="18" viewBox="0 0 32 32" aria-hidden="true" style="flex:none"><path d="M4 20c4 0 4-4 8-4s4 4 8 4 4-4 8-4" fill="none" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round"/></svg> OpenSwells</a>
+                <h1>
+                    <a href="/" class="surface map-chip"><svg class="brand-mark" width="18" height="18" viewBox="0 0 32 32" aria-hidden="true" style="flex:none"><path d="M4 20c4 0 4-4 8-4s4 4 8 4 4-4 8-4" fill="none" stroke="#3b82f6" stroke-width="3.5" stroke-linecap="round"/></svg> OpenSwells</a>
                 </h1>
             </div>
 
@@ -359,53 +368,52 @@
 
             <!-- Search -->
             <div id="searchBox" class="searchbox relative w-full max-w-[440px]">
-                <div class="surface relative h-9 flex items-center focus-within:border-[#1e3a8a]">
+                <div class="surface relative h-9 flex items-center focus-within:border-[#3b82f6]">
                     <svg class="absolute left-3 pointer-events-none text-[#a6aab2]" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
                     <input
                      type="text"
                      id="searchInput"
                      autocomplete="off"
-                     class="w-full h-full bg-transparent pl-9 pr-10 text-[13px] text-white placeholder-[#a6aab2] outline-none border-0"
+                     class="w-full h-full bg-transparent pl-9 pr-10 text-[13px] text-white placeholder-[#8b9099] outline-none border-0"
                      placeholder="Search stations..."
                      >
-                    <kbd class="mono absolute right-2.5 hidden md:flex items-center justify-center w-5 h-5 text-[10px] text-[#a6aab2] border border-[#43454c] bg-[#1f2026] pointer-events-none">/</kbd>
+                    <kbd class="mono absolute right-2 hidden md:flex items-center justify-center w-5 h-5 text-[10px] text-[#8b9099] border border-[#43454c] rounded-[2px] pointer-events-none">/</kbd>
                 </div>
                 <div id="searchResults" class="surface absolute z-50 left-0 right-0 top-full mt-1 max-h-[280px] overflow-y-auto empty:hidden"></div>
             </div>
 
             <!-- Icons -->
             <div class="icons surface top-menu relative ml-auto flex items-center min-w-fit">
-                <span class="flex items-center px-1.5">{{template "unitstoggle" "compact"}}</span>
-                <a href="/about" class="desktop-only icon-button" title="About">
-                    <svg xmlns="http://www.w3.org/2000/svg" 
-                         viewBox="0 0 24 24" fill="none" stroke="currentColor" 
-                                                         width="20" height="20" class="md:w-6 md:h-6">
-                        <path stroke-linecap="round" 
-                              stroke-linejoin="round" 
-                              stroke-width="2" 
-                              d="M13 16h-1v-4h-1m1-4h.01
-                                 M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </a>
-                <a href="https://github.com/open-swells/open-swells-app" class="desktop-only icon-button" title="GitHub">
-                    <svg xmlns="http://www.w3.org/2000/svg" 
-                         viewBox="0 0 24 24" fill="currentColor"
-                                             width="20" height="20" class="md:w-6 md:h-6">
-                        <path d="M12 0C5.374 0 0 5.373 0 12c0
-                                 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577
-                                 v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756
-                                 -1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237
-                                 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604
-                                 -2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221
-                                 -.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487
-                                 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23
-                                 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221
-                                 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293
-                                 c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
-                    </svg>
-                </a>
-                <a href="#" id="signInBtn" class="desktop-only toolbar-button profile-control border-0 bg-transparent">
-                    Sign In
+                <!-- Options: units, map layers, and the site links -->
+                <div class="options" data-menu-root>
+                    <button type="button" class="options-trigger icon-button" data-menu-trigger aria-haspopup="true" aria-expanded="false" aria-label="Map options" title="Map options">{{template "optionsicon"}}</button>
+                    <div class="menu" data-menu hidden>
+                        <div class="menu-label">Display</div>
+                        {{template "unitsrow"}}
+                        <div class="menu-sep"></div>
+                        <div class="menu-label">Map layers</div>
+                        <label class="menu-item">
+                            <input type="checkbox" id="arrowsToggle" checked>
+                            Swell arrows
+                        </label>
+                        <label class="menu-item" title="Off shows stepped height bands instead">
+                            <input type="checkbox" id="heatmapToggle" checked>
+                            Smooth shading
+                        </label>
+                        <div class="menu-sep"></div>
+                        <a href="/about" class="menu-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+                            About OpenSwells
+                        </a>
+                        <a href="https://github.com/open-swells/open-swells-app" class="menu-item">
+                            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.487 11.487 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+                            GitHub
+                            <span class="menu-hint">↗</span>
+                        </a>
+                    </div>
+                </div>
+                <a href="#" id="signInBtn" class="desktop-only toolbar-button profile-control">
+                    Sign in
                 </a>
                 <button id="mobileAccountBtn" class="compact-only icon-button mobile-account-button" onclick="openMobileAccount()" aria-label="Sign in" title="Sign in">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
@@ -436,7 +444,7 @@
 
                 <!-- User Popup -->
                 <div id="userPopup"
-                     class="surface absolute top-full right-0 mt-2 w-56 overflow-hidden z-10 hidden">
+                     class="surface absolute top-full right-[-1px] mt-2 w-56 overflow-hidden z-10 hidden">
                     <div class="px-3 py-2.5 border-b border-[#2f3137] flex items-start justify-between gap-2">
                         <div class="min-w-0">
                             <p id="userName" class="text-[13px] font-medium text-white truncate"></p>
@@ -471,40 +479,30 @@
             <div class="legend surface absolute bottom-3 left-3 z-20 hidden lg:block">
                 <div class="legend-head">
                     <span class="legend-title">Swell height</span>
-                    <span class="legend-unit mono" data-u="HU">FT</span>
+                    <span class="legend-unit mono" data-u="hu">ft</span>
                 </div>
                 <div id="legendBands" class="legend-scale"></div>
                 <div id="legendReadout" class="legend-readout mono"></div>
-                <div class="legend-toggles">
-                    <label class="legend-toggle">
-                        <input type="checkbox" id="arrowsToggle" checked>
-                        Swell arrows
-                    </label>
-                    <label class="legend-toggle">
-                        <input type="checkbox" id="heatmapToggle" checked>
-                        Smooth PNG layer
-                    </label>
-                </div>
             </div>
 
             <!-- 5) Bottom Controls (overlay at bottom) -->
             <div class="bottom-controls absolute bottom-3 left-3 right-3 flex flex-col sm:flex-row items-stretch sm:items-end justify-end gap-2 z-10">
                 <!-- Metadata Container -->
-                <div class="surface h-10 px-3 hidden lg:flex items-center gap-2 min-w-fit">
-                    <span class="text-[10px] font-medium uppercase text-[#a6aab2]">Updated</span>
-                    <span id="metadataTimestamp" class="mono text-[10px] text-white"></span>
+                <div class="surface map-status hidden lg:flex min-w-fit">
+                    <span>Updated</span>
+                    <span id="metadataTimestamp" class="mono"></span>
                 </div>
 
                 <!-- Forecast timeline scrubber -->
-                <div class="surface flex items-center gap-3 pl-2 pr-4 py-1.5 text-white w-full sm:max-w-[760px]">
+                <div class="surface timeline-bar flex items-center text-white w-full sm:max-w-[760px]">
                     <button id="playButton" class="icon-button shrink-0" title="Play forecast">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M8 5v14l11-7z"/>
                         </svg>
                     </button>
-                    <div class="flex flex-col shrink-0 min-w-[92px] pr-3 border-r border-[#2f3137]">
-                        <span id="timeDay" class="text-[13px] font-semibold leading-tight text-white">--</span>
-                        <span id="timeClock" class="mono text-[11px] leading-tight text-[#60a5fa] mt-0.5">--:--</span>
+                    <div class="timeline-now">
+                        <span id="timeDay">--</span>
+                        <span id="timeClock" class="mono">--:--</span>
                     </div>
                     <div id="timelineTrack" class="timeline-track">
                         <div id="timelineTicks" class="absolute inset-0 pointer-events-none"></div>
@@ -704,7 +702,7 @@
                         const profileImage = document.createElement('img');
                         profileImage.src = user.photoURL;
                         profileImage.alt = 'Profile';
-                        profileImage.className = 'md:w-8 md:h-8 w-6 h-6 rounded-full';
+                        profileImage.className = 'rounded-full';
                         signInBtn.appendChild(profileImage);
                     } else {
                         signInBtn.textContent = 'Account';
@@ -725,7 +723,7 @@
                 } else {
                     // User is signed out
                     signInBtn.classList.remove('is-user');
-                    signInBtn.innerHTML = 'Sign In';
+                    signInBtn.innerHTML = 'Sign in';
                     signInBtn.onclick = () => document.getElementById('signInModal').classList.remove('hidden');
                     mobileAccountBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
                     mobileAccountBtn.setAttribute('aria-label', 'Sign in');

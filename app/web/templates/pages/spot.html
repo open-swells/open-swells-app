@@ -98,7 +98,7 @@
             </div>
 
             <div class="station-header-actions">
-                {{template "unitstoggle" ""}}
+                {{template "optionsmenu" "page-header-action page-open-button"}}
                 <button type="button" class="page-header-action page-open-button spot-info-button" aria-label="Forecast information" aria-expanded="false" aria-controls="spot-information">i</button>
                 <a class="page-header-action page-open-button popup-only" href="/surf-spots/{{.SwellReport.StationId}}" target="_top" aria-label="Open full forecast" title="Open full forecast">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg><span>Full page</span>
