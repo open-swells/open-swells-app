@@ -13,6 +13,12 @@
 # already exists at the destination is skipped and reported. Old env files
 # are renamed to .env.migrated (app/.env is copied, not moved, because it
 # still holds SERVER_IP for deploys). Don't run it during a forecast run.
+#
+# The user database (main.db) is never moved or modified: it is copied,
+# only while no process has it open (stop the app first), together with
+# any -wal/-shm files, and each copy is checked against its original by
+# SHA-256. The original stays where it was, so rolling back is just
+# running the old code again; delete it yourself once the app runs well.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -101,6 +107,49 @@ move_contents() {
   rmdir "$src" 2>/dev/null && echo "removed empty $src" || true
 }
 
+# copy_db SRC DEST: copy a SQLite database (and its -wal/-shm files)
+# without touching the original. Refuses while anything has it open: a
+# copy taken mid-write could miss committed data still in the WAL.
+copy_db() {
+  local src="$1" dest="$2" suffix
+  [[ -e "$src" ]] || return 0
+  if [[ -e "$dest" ]]; then
+    echo "skip: $dest exists (left $src in place)"
+    skipped=$((skipped + 1))
+    return 0
+  fi
+  if command -v fuser >/dev/null 2>&1; then
+    if fuser "$src" "$src-wal" >/dev/null 2>&1; then
+      echo "Error: $src is open (is the app running?). Stop it and rerun; nothing was copied." >&2
+      exit 1
+    fi
+  elif pgrep -f 'open-swells-app|go-build.*/server|go run \./server' >/dev/null; then
+    echo "Error: the app looks like it is running (fuser is not installed to check $src). Stop it and rerun." >&2
+    exit 1
+  fi
+  for suffix in "" -wal -shm; do
+    [[ -e "$src$suffix" ]] || continue
+    cp -p "$src$suffix" "$dest$suffix.migrating"
+  done
+  for suffix in "" -wal -shm; do
+    [[ -e "$src$suffix" ]] || continue
+    if [[ "$(sha256sum < "$src$suffix")" != "$(sha256sum < "$dest$suffix.migrating")" ]]; then
+      rm -f "$dest.migrating" "$dest-wal.migrating" "$dest-shm.migrating"
+      echo "Error: the copy of $src$suffix does not match the original (did it change during the copy?). Nothing was kept." >&2
+      exit 1
+    fi
+  done
+  # The -wal/-shm files go into place before the database itself, so the
+  # database never appears without its log.
+  for suffix in -wal -shm ""; do
+    [[ -e "$dest$suffix.migrating" ]] || continue
+    mv "$dest$suffix.migrating" "$dest$suffix"
+    chown "$OWNER:$GROUP" "$dest$suffix" 2>/dev/null || true
+    chmod 0640 "$dest$suffix"
+  done
+  echo "copied: $src -> $dest (SHA-256 verified; the original is untouched, delete it once the app runs well)"
+}
+
 # migrate_env SRC DEST: copy an env file into the config dir without the
 # path settings the new layout derives on its own.
 migrate_env() {
@@ -124,9 +173,7 @@ migrate_env() {
 if [[ -n "$APP_DIR" ]]; then
   echo "== app ($APP_DIR)"
   migrate_env "$APP_DIR/.env" "$CONFIG_DIR/open-swells-app.env"
-  for suffix in "" -wal -shm; do
-    move_file "$APP_DIR/main.db$suffix" "$DATA_DIR/main.db$suffix"
-  done
+  copy_db "$APP_DIR/main.db" "$DATA_DIR/main.db"
   move_contents "$APP_DIR/data/forecast" "$DATA_DIR/forecast"
   move_file "$APP_DIR/data/spot_forecast_history.json.gz" "$DATA_DIR/spot_forecast_history.json.gz"
 fi

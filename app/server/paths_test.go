@@ -48,3 +48,28 @@ func TestRequireWritableDir(t *testing.T) {
 		t.Fatalf("missing dir: got %v, want a pointer to setup-dirs.sh", err)
 	}
 }
+
+func TestLegacyDBGuard(t *testing.T) {
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+	newDB := filepath.Join(t.TempDir(), "main.db")
+
+	if err := legacyDBGuard(newDB, false); err != nil {
+		t.Fatalf("fresh machine: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cwd, "main.db"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := legacyDBGuard(newDB, false); err == nil || !strings.Contains(err.Error(), "refusing") {
+		t.Fatalf("legacy db present, new missing: got %v, want refusal", err)
+	}
+	if err := legacyDBGuard(newDB, true); err != nil {
+		t.Fatalf("explicit DB_PATH: %v", err)
+	}
+	if err := os.WriteFile(newDB, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := legacyDBGuard(newDB, false); err != nil {
+		t.Fatalf("both present (migrated): %v", err)
+	}
+}

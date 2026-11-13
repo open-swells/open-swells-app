@@ -1168,6 +1168,9 @@ func run() {
 	if err := requireWritableDir(filepath.Dir(dbPath)); err != nil {
 		log.Fatal(err)
 	}
+	if err := legacyDBGuard(dbPath, os.Getenv("DB_PATH") != ""); err != nil {
+		log.Fatal(err)
+	}
 	log.Printf("database %s, forecasts %s", dbPath, forecastDir)
 	go runForecastCacheWarmer(context.Background(), forecastDir)
 	port := getenvDefault("PORT", "8081")

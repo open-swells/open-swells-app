@@ -58,7 +58,11 @@ The app server's directories are owned by its service account; see
 `ops/migrate-legacy-layout.sh` moves everything it finds into place without
 overwriting anything, writes the env files to `/etc/open-swells` with the
 now-derived path settings dropped, and repoints the FES2022 config at the
-moved atlas.
+moved atlas. The user database is the exception: it is copied, never moved
+or modified, only while nothing has it open (stop the app first), and the
+copy is checked by SHA-256; delete the original yourself once the app runs
+well. The app also refuses to start if it would create a new, empty
+database while an old `./main.db` is still beside it.
 
 ```sh
 # dev machine, from the repository root

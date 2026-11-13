@@ -62,3 +62,25 @@ func requireWritableDir(dir string) error {
 	}
 	return fmt.Errorf("data directory %s is not usable (%v); create it once with `sudo ops/setup-dirs.sh` from the repository root, or set OPENSWELLS_DATA_DIR to a directory you own", dir, err)
 }
+
+// legacyDBGuard refuses to start when the app would create a new, empty
+// database while one from the old layout (./main.db beside the binary, the
+// pre-/var/lib default) still exists: that would hide every user's
+// favorites behind a fresh file. Moving the old file (see
+// ops/migrate-legacy-layout.sh) or setting DB_PATH resolves it.
+func legacyDBGuard(dbPath string, dbPathSet bool) error {
+	if dbPathSet {
+		return nil
+	}
+	if _, err := os.Stat(dbPath); err == nil {
+		return nil
+	}
+	legacy, err := filepath.Abs("main.db")
+	if err != nil {
+		return nil
+	}
+	if _, err := os.Stat(legacy); err != nil {
+		return nil
+	}
+	return fmt.Errorf("refusing to create a new database at %s while %s exists (the old default location); copy it there with ops/migrate-legacy-layout.sh, or set DB_PATH=%s to keep using it", dbPath, legacy, legacy)
+}
