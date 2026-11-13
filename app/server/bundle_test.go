@@ -134,27 +134,33 @@ func randomField(r *rand.Rand, land []bool, scale, max float64) []float64 {
 	return out
 }
 
-// writeLegacyPoints writes the same lattice as old-format GeoJSON points:
-// one feature per cell where keep is true, row-major like the pipeline.
-func writeLegacyPoints(t *testing.T, path string, lat, lon []float64, keep func(cell int) bool, props func(cell int) string) {
-	t.Helper()
-	var features []string
+// bruteNearest scans every lattice cell row-major for the nearest one
+// where valid holds, by the wrapped squared-degree metric; ties go to the
+// first cell scanned. It returns -1 when no valid cell is within maxDist2.
+func bruteNearest(lat, lon []float64, valid func(cell int) bool, qLat, qLon, maxDist2 float64) (int, float64) {
+	best, bestDist := -1, math.MaxFloat64
 	for i, la := range lat {
 		for j, lo := range lon {
 			cell := i*len(lon) + j
-			if !keep(cell) {
+			if !valid(cell) {
 				continue
 			}
-			features = append(features, fmt.Sprintf(`{"type":"Feature","geometry":{"type":"Point","coordinates":[%g,%g]},"properties":{%s}}`, lo, la, props(cell)))
+			dlng := math.Abs(lo - qLon)
+			if dlng > 180 {
+				dlng = 360 - dlng
+			}
+			if dist := dlng*dlng + (la-qLat)*(la-qLat); dist < bestDist {
+				best, bestDist = cell, dist
+			}
 		}
 	}
-	doc := `{"type":"FeatureCollection","features":[` + strings.Join(features, ",") + `]}`
-	if err := os.WriteFile(path, []byte(doc), 0o644); err != nil {
-		t.Fatal(err)
+	if bestDist > maxDist2 {
+		return -1, 0
 	}
+	return best, bestDist
 }
 
-func TestSwellBundleMatchesLegacyNearest(t *testing.T) {
+func TestSwellBundleFindsNearestWetCell(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	lat := axis(85, -5.0/3, 40) // north -> south, like the composite
 	lon := axis(0, 5.0/3, 216)  // 0..360
@@ -180,36 +186,36 @@ func TestSwellBundleMatchesLegacyNearest(t *testing.T) {
 		fields[fmt.Sprintf("d%d", k)] = randomField(r, partLand, 1, 359)
 	}
 
-	legacyDir, bundleDir := t.TempDir(), t.TempDir()
-	writeLegacyPoints(t, filepath.Join(legacyDir, "swell_partitions_000.geojson"), lat, lon,
-		func(c int) bool {
-			return !math.IsNaN(fields["h1"][c]) || !math.IsNaN(fields["h2"][c]) || !math.IsNaN(fields["h3"][c])
-		},
-		func(c int) string {
-			var props []string
-			for k := 1; k <= 3; k++ {
-				if h := fields[fmt.Sprintf("h%d", k)][c]; !math.IsNaN(h) {
-					props = append(props, fmt.Sprintf(`"h%d":%g,"p%d":%g,"d%d":%g`, k, h, k, fields[fmt.Sprintf("p%d", k)][c], k, fields[fmt.Sprintf("d%d", k)][c]))
-				}
-			}
-			return strings.Join(props, ",")
-		})
+	bundleDir := t.TempDir()
 	writeTestBundle(t, filepath.Join(bundleDir, "swell_r.bin"), lat, lon, []int{0}, vars, map[int]map[string][]float64{0: fields})
 	writeMetadata(t, bundleDir, `{"bundles":{"swell":"swell_r.bin"}}`)
+	wet := func(c int) bool {
+		return !math.IsNaN(fields["h1"][c]) || !math.IsNaN(fields["h2"][c]) || !math.IsNaN(fields["h3"][c])
+	}
 
 	for i := 0; i < 2000; i++ {
 		qLat := r.Float64()*170 - 85
 		qLon := r.Float64()*360 - 180
-		want, wantOK, err := swellNearest(legacyDir, 0, qLat, qLon)
-		if err != nil {
-			t.Fatal(err)
-		}
 		got, gotOK, err := swellNearest(bundleDir, 0, qLat, qLon)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if gotOK != wantOK || (wantOK && !swellPointsClose(got, want)) {
-			t.Fatalf("(%.3f, %.3f): bundle %+v %v, legacy %+v %v", qLat, qLon, got, gotOK, want, wantOK)
+		cell, _ := bruteNearest(lat, lon, wet, qLat, qLon, 9)
+		if gotOK != (cell >= 0) {
+			t.Fatalf("(%.3f, %.3f): found %v, want %v", qLat, qLon, gotOK, cell >= 0)
+		}
+		if !gotOK {
+			continue
+		}
+		want := swellPoint{Lat: lat[cell/len(lon)], Lon: lon[cell%len(lon)]}
+		for k := 0; k < 3; k++ {
+			if h := fields[fmt.Sprintf("h%d", k+1)][cell]; !math.IsNaN(h) {
+				want.H[k], want.P[k], want.D[k] = h, fields[fmt.Sprintf("p%d", k+1)][cell], fields[fmt.Sprintf("d%d", k+1)][cell]
+				want.Has[k] = true
+			}
+		}
+		if !swellPointsClose(got, want) {
+			t.Fatalf("(%.3f, %.3f): bundle %+v, want %+v", qLat, qLon, got, want)
 		}
 	}
 	if _, _, err := swellNearest(bundleDir, 3, 0, 0); err == nil {
@@ -229,7 +235,7 @@ func swellPointsClose(a, b swellPoint) bool {
 	return true
 }
 
-func TestWindAndNwpsBundlesMatchLegacyNearest(t *testing.T) {
+func TestWindAndNwpsBundlesFindNearestWetCell(t *testing.T) {
 	r := rand.New(rand.NewSource(2))
 	lat := axis(31.5, 0.03, 60) // NWPS-like: ascending, fine
 	lon := axis(239.0, 0.03, 80)
@@ -248,38 +254,30 @@ func TestWindAndNwpsBundlesMatchLegacyNearest(t *testing.T) {
 	}
 	wet := func(c int) bool { return !land[c] }
 
-	legacyDir, bundleDir := t.TempDir(), t.TempDir()
-	writeLegacyPoints(t, filepath.Join(legacyDir, "wind_006.geojson"), lat, lon, wet, func(c int) string {
-		return fmt.Sprintf(`"s":%g,"d":%g,"u":%g,"v":%g`, wind["s"][c], wind["d"][c], wind["u"][c], wind["v"][c])
-	})
-	writeLegacyPoints(t, filepath.Join(legacyDir, "nwps_points_lox_cg1_006.geojson"), lat, lon, wet, func(c int) string {
-		return fmt.Sprintf(`"h":%g,"s":%g,"p":%g,"d":%g`, nwps["h"][c], nwps["s"][c], nwps["p"][c], nwps["d"][c])
-	})
+	bundleDir := t.TempDir()
 	writeTestBundle(t, filepath.Join(bundleDir, "wind_r.bin"), lat, lon, []int{6},
 		[]bundleVar{{"s", 0.1}, {"d", 1}, {"u", 0.1}, {"v", 0.1}}, map[int]map[string][]float64{6: wind})
 	writeTestBundle(t, filepath.Join(bundleDir, "nwps_points_lox_cg1_r.bin"), lat, lon, []int{6},
 		[]bundleVar{{"h", 0.01}, {"s", 0.01}, {"p", 0.1}, {"d", 1}}, map[int]map[string][]float64{6: nwps})
 	writeMetadata(t, bundleDir, `{"bundles":{"wind":"wind_r.bin"}}`)
 
-	legacyDomain := nwpsDomain{WFO: "lox", Grid: "cg1", Hours: []int{6}}
-	domain := legacyDomain
-	domain.File = "nwps_points_lox_cg1_r.bin"
+	domain := nwpsDomain{WFO: "lox", Grid: "cg1", Hours: []int{6}, File: "nwps_points_lox_cg1_r.bin"}
 	for i := 0; i < 2000; i++ {
 		qLat := 31.4 + r.Float64()*2
 		qLon := -121.1 + r.Float64()*2.6
-		wantW, wantOK, _ := windNearest(legacyDir, 6, qLat, qLon)
 		gotW, gotOK, err := windNearest(bundleDir, 6, qLat, qLon)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if gotOK != wantOK || (wantOK && (math.Abs(gotW.S-wantW.S) > 1e-9 || gotW.D != wantW.D || gotW.Lat != wantW.Lat)) {
-			t.Fatalf("wind (%.3f, %.3f): bundle %+v %v, legacy %+v %v", qLat, qLon, gotW, gotOK, wantW, wantOK)
+		cell, _ := bruteNearest(lat, lon, wet, qLat, qLon, 9)
+		if gotOK != (cell >= 0) || (gotOK && (math.Abs(gotW.S-wind["s"][cell]) > 1e-9 || gotW.D != wind["d"][cell] || gotW.Lat != lat[cell/len(lon)])) {
+			t.Fatalf("wind (%.3f, %.3f): bundle %+v %v, want cell %d", qLat, qLon, gotW, gotOK, cell)
 		}
-		wantN, wantDist, wantNOK := nwpsNearest(legacyDir, legacyDomain, 6, qLat, qLon)
 		gotN, gotDist, gotNOK := nwpsNearest(bundleDir, domain, 6, qLat, qLon)
-		if gotNOK != wantNOK || (wantNOK && (math.Abs(gotN.H-wantN.H) > 1e-9 || math.Abs(gotN.S-wantN.S) > 1e-9 ||
-			math.Abs(gotN.P-wantN.P) > 1e-9 || gotN.D != wantN.D || math.Abs(gotDist-wantDist) > 1e-9)) {
-			t.Fatalf("nwps (%.3f, %.3f): bundle %+v %v, legacy %+v %v", qLat, qLon, gotN, gotNOK, wantN, wantNOK)
+		cell, dist := bruteNearest(lat, lon, wet, qLat, qLon, nwpsMaxDist2)
+		if gotNOK != (cell >= 0) || (gotNOK && (math.Abs(gotN.H-nwps["h"][cell]) > 1e-9 || math.Abs(gotN.S-nwps["s"][cell]) > 1e-9 ||
+			math.Abs(gotN.P-nwps["p"][cell]) > 1e-9 || gotN.D != nwps["d"][cell] || math.Abs(gotDist-dist) > 1e-9)) {
+			t.Fatalf("nwps (%.3f, %.3f): bundle %+v %v, want cell %d", qLat, qLon, gotN, gotNOK, cell)
 		}
 	}
 }

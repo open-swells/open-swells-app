@@ -45,7 +45,7 @@ import numpy as np
 MAGIC = b"OSB1"
 NODATA = -32768
 FORMAT_VERSION = 1
-# Compression level 6 matches the per-hour .geojson.gz siblings it replaces.
+# Compression level 6: gzip's default speed/size tradeoff.
 COMPRESS_LEVEL = 6
 
 

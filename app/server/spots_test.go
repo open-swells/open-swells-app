@@ -2,27 +2,44 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
+// writeSwellGrid publishes a swell bundle on a 2x2 lattice (lat and lon 0
+// and 10) whose hours each hold one wet cell, at row-major index cell[hour].
+func writeSwellGrid(t *testing.T, dir string, cell map[int]int) {
+	t.Helper()
+	var hours []int
+	values := map[int]map[string][]float64{}
+	var vars []bundleVar
+	for k := 1; k <= 3; k++ {
+		vars = append(vars, bundleVar{fmt.Sprintf("h%d", k), 0.01}, bundleVar{fmt.Sprintf("p%d", k), 0.1}, bundleVar{fmt.Sprintf("d%d", k), 1})
+	}
+	for hour := 0; hour <= 3*len(cell); hour += 3 {
+		c, ok := cell[hour]
+		if !ok {
+			continue
+		}
+		hours = append(hours, hour)
+		fields := map[string][]float64{}
+		for _, v := range vars {
+			fields[v.Name] = []float64{math.NaN(), math.NaN(), math.NaN(), math.NaN()}
+		}
+		fields["h1"][c], fields["p1"][c], fields["d1"][c] = 1.2, 10, 270
+		values[hour] = fields
+	}
+	writeTestBundle(t, filepath.Join(dir, "swell_r.bin"), []float64{0, 10}, []float64{0, 10}, hours, vars, values)
+	writeMetadata(t, dir, `{"forecast_start":"20260720_00Z","bundles":{"swell":"swell_r.bin"}}`)
+}
+
 func TestSpotForecastKeepsLeadingRunWhenLaterGridMisses(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "metadata.json"), []byte(`{"forecast_start":"20260720_00Z"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	writeGrid := func(hour, coordinates string) {
-		t.Helper()
-		body := `{"features":[{"geometry":{"coordinates":` + coordinates + `},"properties":{"h1":1.2,"p1":10,"d1":270}}]}`
-		if err := os.WriteFile(filepath.Join(dir, "swell_partitions_"+hour+".geojson"), []byte(body), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	writeGrid("000", `[0,0]`)
-	writeGrid("003", `[10,10]`)
+	writeSwellGrid(t, dir, map[int]int{0: 0, 3: 3}) // (0, 0), then only (10, 10)
 
 	forecast, hours := gridSpotForecast(dir, 0, 0)
 	if got := len(forecast.Forecast); got != 1 {
@@ -35,13 +52,7 @@ func TestSpotForecastKeepsLeadingRunWhenLaterGridMisses(t *testing.T) {
 
 func TestSpotForecastRejectsInitialDistantGrid(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "metadata.json"), []byte(`{"forecast_start":"20260720_00Z"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	body := `{"features":[{"geometry":{"coordinates":[10,10]},"properties":{"h1":1.2,"p1":10,"d1":270}}]}`
-	if err := os.WriteFile(filepath.Join(dir, "swell_partitions_000.geojson"), []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeSwellGrid(t, dir, map[int]int{0: 3}) // only (10, 10)
 
 	forecast, hours := gridSpotForecast(dir, 0, 0)
 	if len(forecast.Forecast) != 0 || len(hours) != 0 {

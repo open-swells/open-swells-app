@@ -15,7 +15,7 @@ draws hard rectangle seams. Instead all domains of a grid tier are
 mosaicked onto one lattice per forecast hour — finer grids win overlaps —
 and rendered as a single nwps_<grid>_<HHH>.png whose offshore edge is
 alpha-feathered so it blends into the global heatmap underneath. The PNG
-shows the same instant as the global heatmap_<HHH>.png and overlays it
+shows the same instant as the global heatmap_<HHH>.webp and overlays it
 directly; hours no domain covers are simply absent from the metadata.
 
 For beach point forecasts each domain also emits one

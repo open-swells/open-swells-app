@@ -14,15 +14,9 @@ echo "Deleting files from $FILES_DIR"
 find "$FILES_DIR" -type f -name '*.grib2' -delete
 echo "All .grib2 files have been deleted."
 find "$FILES_DIR" -type f -name '*.grib2.part' -delete
-find "$FILES_DIR" -type f -name '*.geojson' -delete
-find "$FILES_DIR" -type f -name '*.geojson.gz' -delete
 # Bundles stay (each publish keeps the previous run's; the pipeline prunes
 # older ones); only partial writes go.
 find "$FILES_DIR" -type f -name '*.bin.part' -delete
-echo "All .geojson files have been deleted."
-find "$FILES_DIR" -type f -name 'heatmap_*.png' -delete
 find "$FILES_DIR" -type f -name 'heatmap_*.webp' -delete
 find "$FILES_DIR" -type f -name 'nwps_*.png' -delete
 echo "All heatmap image files have been deleted."
-find "$FILES_DIR" -type f -name '*.csv' -delete
-echo "All .csv files have been deleted."

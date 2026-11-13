@@ -763,9 +763,9 @@
             // Check auth state on page load
             // Initialize MapLibre map
 
-            // Hourly to f120 (5 days), then 3-hourly to f384 — the fallback
-            // for runs whose metadata.json predates its "hours" list (the
-            // hours that were actually published; fetchMetadata swaps it in).
+            // Hourly to f120 (5 days), then 3-hourly to f384 — the timeline
+            // until fetchMetadata swaps in the run's "hours" (the hours
+            // that were actually published).
             const forecastHours = [
                 ...Array.from({ length: 121 }, (_, i) => i),
                 ...Array.from({ length: 88 }, (_, i) => 123 + i * 3),
@@ -806,9 +806,7 @@
             }
 
             // Each product is one bundle per run (see forecastbundle), named
-            // in metadata.json's "bundles" (set by fetchMetadata). The
-            // per-hour filenames below are the format before the bundles,
-            // still read when a run lists none.
+            // in metadata.json's "bundles" (set by fetchMetadata).
             const forecastBundles = window.createForecastBundles();
             let bundleFiles = {};
             function openBundle(product) {
@@ -817,23 +815,8 @@
             }
             const SWELL_SYSTEM_VARS = ['h1', 'p1', 'd1', 'h2', 'p2', 'd2', 'h3', 'p3', 'd3'];
 
-            function hourToFilename(hour) {
-                return runUrl(`/static/contours_${String(hour).padStart(3, '0')}.geojson`);
-            }
-
-            function hourToArrowsFilename(hour) {
-                return runUrl(`/static/arrows_${String(hour).padStart(3, '0')}.geojson`);
-            }
-
-            // metadata.json's heatmap_format ("webp"); runs from before it
-            // was published wrote PNGs.
-            let heatmapFormat = 'png';
             function hourToHeatmapFilename(hour) {
-                return runUrl(`/static/heatmap_${String(hour).padStart(3, '0')}.${heatmapFormat}`);
-            }
-
-            function hourToPartitionsFilename(hour) {
-                return runUrl(`/static/swell_partitions_${String(hour).padStart(3, '0')}.geojson`);
+                return runUrl(`/static/heatmap_${String(hour).padStart(3, '0')}.webp`);
             }
 
             // Height bands in meters — must match FIXED_LEVELS and the
@@ -994,8 +977,8 @@
 
             // --- Heatmap rendering -------------------------------------------
             // The pipeline pre-renders each hour's height field as a Mercator
-            // image (heatmap_XXX.webp, .png in older runs); metadata.json
-            // carries the corner bounds.
+            // image (heatmap_XXX.webp); metadata.json carries the corner
+            // bounds.
             // Two image sources ping-pong with an opacity transition so frame
             // changes crossfade instead of popping. The contour polygons stay
             // as a fallback when a run has no heatmaps.
@@ -1364,14 +1347,7 @@
             // [{h, p, d}], or null when there is none.
             async function swellSystemsAt(hour, lngLat) {
                 const bundle = await openBundle('swell');
-                if (!bundle) {
-                    const fc = await loadFrame(hourToPartitionsFilename(hour));
-                    const f = fc.features && nearestPointFeature(fc.features, lngLat);
-                    if (!f) return null;
-                    return [1, 2, 3]
-                        .filter(k => f.properties[`h${k}`] !== undefined)
-                        .map(k => ({ h: f.properties[`h${k}`], p: f.properties[`p${k}`], d: f.properties[`d${k}`] }));
-                }
+                if (!bundle) return null;
                 const grid = await cachedFrame(`${bundle.url}#${hour}`,
                     () => forecastBundles.grid(bundle, hour, SWELL_SYSTEM_VARS), null);
                 if (!grid) return null;
@@ -1381,21 +1357,6 @@
                 return [1, 2, 3]
                     .filter(k => grid.value(`h${k}`, cell) !== null)
                     .map(k => ({ h: grid.value(`h${k}`, cell), p: grid.value(`p${k}`, cell), d: grid.value(`d${k}`, cell) }));
-            }
-
-            function nearestPointFeature(features, lngLat, maxDist2 = 4) {
-                let best = null;
-                let bestDist = maxDist2; // squared degrees
-                for (const f of features) {
-                    const [flng, flat] = f.geometry.coordinates;
-                    const dlng = Math.min(Math.abs(flng - lngLat.lng), 360 - Math.abs(flng - lngLat.lng));
-                    const dist = dlng * dlng + (flat - lngLat.lat) * (flat - lngLat.lat);
-                    if (dist < bestDist) {
-                        bestDist = dist;
-                        best = f;
-                    }
-                }
-                return best;
             }
 
             // Hovering an arrow shows the full swell reading; the individual
@@ -1438,8 +1399,8 @@
                 updateMap(currentIndex);
             });
 
-            // Missing flag preserves compatibility with older pipeline metadata.
-            let tideStationsAvailable = true;
+            // Whether this run published tides.json (metadata's tide_stations).
+            let tideStationsAvailable = false;
 
             // Fetch metadata and initialize time display
             async function fetchMetadata() {
@@ -1449,7 +1410,7 @@
                         throw new Error('Failed to fetch metadata');
                     }
                     const metadata = await response.json();
-                    tideStationsAvailable = metadata.tide_stations !== false;
+                    tideStationsAvailable = metadata.tide_stations === true;
                     const timestamp = new Date(metadata.timestamp);
                     
                     const [datePart, timePart] = metadata.forecast_start.split('_');
@@ -1474,7 +1435,6 @@
                     }
 
                     if (metadata.heatmap_bounds) {
-                        heatmapFormat = metadata.heatmap_format === 'webp' ? 'webp' : 'png';
                         heatmapBounds = metadata.heatmap_bounds;
                         maybeAddHeatmapLayers();
                     }
@@ -1593,17 +1553,6 @@
                 return promise;
             }
 
-            function fetchJson(url) {
-                return fetch(url).then(r => {
-                    if (!r.ok) throw new Error(`${r.status} for ${url}`);
-                    return r.json();
-                });
-            }
-
-            function loadFrame(url) {
-                return cachedFrame(url, () => fetchJson(url));
-            }
-
             // Swell arrows: partition 1 of the swell bundle. The compact
             // int16 grid is what's prefetched and cached; point features are
             // built from it on demand (a few ms) and only the last few kept.
@@ -1611,8 +1560,7 @@
             function loadArrowGrid(hour) {
                 return cachedFrame(runUrl(`arrowgrid#${hour}`), async () => {
                     const bundle = await openBundle('swell');
-                    if (!bundle) return { features: await fetchJson(hourToArrowsFilename(hour)) }; // run from before the bundles
-                    return forecastBundles.grid(bundle, hour, ['h1', 'p1', 'd1']);
+                    return bundle ? forecastBundles.grid(bundle, hour, ['h1', 'p1', 'd1']) : null;
                 }, null, arrowGridCache, FRAME_CACHE_MAX);
             }
 
@@ -1620,15 +1568,14 @@
                 return cachedFrame(runUrl(`arrows#${hour}`), async () => {
                     const grid = await loadArrowGrid(hour);
                     if (!grid) return null;
-                    return grid.features || forecastBundles.gridFeatures(grid, { h1: 'h', p1: 'p', d1: 'd' });
+                    return forecastBundles.gridFeatures(grid, { h1: 'h', p1: 'p', d1: 'd' });
                 }, EMPTY_FC, arrowFeatureCache, 8);
             }
 
             function loadContours(hour) {
                 return cachedFrame(runUrl(`contours#${hour}`), async () => {
                     const bundle = await openBundle('contours');
-                    if (!bundle) return fetchJson(hourToFilename(hour));
-                    return forecastBundles.documentAt(bundle, hour);
+                    return bundle ? forecastBundles.documentAt(bundle, hour) : null;
                 });
             }
 
@@ -1700,8 +1647,7 @@
                     wantHeatmap ? loadImageFrame(hourToHeatmapFilename(hours)) : null,
                     loadArrows(hours),
                 ]);
-                // Contours are the fallback when there is no heatmap (older
-                // pipeline runs, or a missing hour in the current one).
+                // Contours are the fallback when an hour has no heatmap.
                 let contours = null;
                 if (!wantHeatmap || !heatUrl) {
                     contours = await loadContours(hours);
@@ -2288,12 +2234,11 @@
             async function loadTideStations() {
                 try {
                     await metadataReady;
-                    // New runs explicitly advertise whether the optional
-                    // station file exists. Missing metadata keeps legacy
-                    // runs compatible; false avoids an expected 404.
+                    // Skip the fetch (an expected 404) when the run has no
+                    // station file.
                     if (!tideStationsAvailable) return;
                     const response = await fetch(runUrl('/static/tides.json'));
-                    if (!response.ok) return; // older pipeline run: no tides
+                    if (!response.ok) return;
                     const payload = await response.json();
                     for (const st of payload.stations || []) {
                         if (typeof st.lat !== 'number' || typeof st.lon !== 'number') continue;

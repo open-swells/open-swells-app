@@ -1007,9 +1007,9 @@ func currentRunID(staticDir string) string {
 	return runIDValue
 }
 
-// staticHandler serves the static dir with cache headers. For geojson it
-// serves a precompressed .gz sibling to gzip-capable clients, generating
-// (and caching) the sibling on demand when the pipeline didn't ship one.
+// staticHandler serves the static dir with cache headers. tides.json (~100KB
+// of hourly series) goes to gzip-capable clients as a .gz sibling,
+// generated and cached on demand.
 func staticHandler(staticDir string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		clean := path.Clean("/" + c.Param("filepath"))
@@ -1017,17 +1017,10 @@ func staticHandler(staticDir string) gin.HandlerFunc {
 
 		c.Header("Cache-Control", staticCacheControl(clean, c.Query("run"), currentRunID(staticDir)))
 
-		// tides.json is ~100KB of hourly series; worth compressing like the
-		// geojson layers.
-		if (strings.HasSuffix(clean, ".geojson") || strings.HasSuffix(clean, "tides.json")) &&
-			strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
+		if strings.HasSuffix(clean, "tides.json") && strings.Contains(c.GetHeader("Accept-Encoding"), "gzip") {
 			if gzPath, err := ensureGzipSibling(full); err == nil {
 				c.Header("Content-Encoding", "gzip")
-				if strings.HasSuffix(clean, ".geojson") {
-					c.Header("Content-Type", "application/geo+json")
-				} else {
-					c.Header("Content-Type", "application/json")
-				}
+				c.Header("Content-Type", "application/json")
 				c.Header("Vary", "Accept-Encoding")
 				c.File(gzPath)
 				return
@@ -1166,12 +1159,7 @@ func run() {
 	}
 
 	dbPath := getenvDefault("DB_PATH", "./main.db")
-	forecastDir := os.Getenv("FORECAST_DIR")
-	if forecastDir == "" {
-		// STATIC_DIR is retained as a compatibility fallback for existing
-		// deployments while they switch their forecast rsync destination.
-		forecastDir = getenvDefault("STATIC_DIR", "./data/forecast")
-	}
+	forecastDir := getenvDefault("FORECAST_DIR", "./data/forecast")
 	go runForecastCacheWarmer(context.Background(), forecastDir)
 	port := getenvDefault("PORT", "8081")
 
