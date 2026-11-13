@@ -36,6 +36,15 @@ class DomainConfigTests(unittest.TestCase):
             self.assertEqual(nwps.grids_from_env(), ["CG1", "CG2"])
 
 
+class GribUrlTests(unittest.TestCase):
+    def test_url_matches_nomads_layout(self):
+        self.assertEqual(
+            nwps._grib_url("wr", "lox", "CG1", "20261113", "06"),
+            "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nwps/prod/"
+            "wr.20261113/lox/06/CG1/nwps.t06z.cg1.lox.grib2",
+        )
+
+
 class SelectFramesTests(unittest.TestCase):
     START = dt.datetime(2026, 7, 16, 12)
     STEPS = set(range(145))  # hourly f000-f144
