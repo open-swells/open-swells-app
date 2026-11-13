@@ -6,13 +6,7 @@ package main
 // file changes, so lookups are cheap after the first hit per run.
 
 import (
-	"encoding/json"
-	"fmt"
-	"math"
 	"net/http"
-	"os"
-	"path/filepath"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 )
@@ -24,101 +18,16 @@ type windPoint struct {
 	S, D     float64
 }
 
-type windGridEntry struct {
-	modTime int64
-	points  []windPoint
-}
-
-var (
-	windGridMu    sync.Mutex
-	windGridCache = map[string]windGridEntry{}
-)
-
 type WindSample struct {
 	Hour  int     `json:"h"`
 	Speed float64 `json:"s"` // m/s
 	Dir   float64 `json:"d"` // direction wind comes from, degrees true
 }
 
-func windGridPoints(path string) ([]windPoint, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	windGridMu.Lock()
-	defer windGridMu.Unlock()
-	cached, ok := windGridCache[path]
-	if ok && cached.modTime == info.ModTime().UnixNano() {
-		return cached.points, nil
-	}
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var doc struct {
-		Features []struct {
-			Geometry struct {
-				Coordinates [2]float64 `json:"coordinates"`
-			} `json:"geometry"`
-			Properties struct {
-				S float64 `json:"s"`
-				D float64 `json:"d"`
-			} `json:"properties"`
-		} `json:"features"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, err
-	}
-	points := make([]windPoint, 0, len(doc.Features))
-	for _, f := range doc.Features {
-		points = append(points, windPoint{
-			Lon: f.Geometry.Coordinates[0],
-			Lat: f.Geometry.Coordinates[1],
-			S:   f.Properties.S,
-			D:   f.Properties.D,
-		})
-	}
-
-	windGridCache[path] = windGridEntry{modTime: info.ModTime().UnixNano(), points: points}
-	return points, nil
-}
-
-// nearestWind picks the grid point closest to (lat, lon), tolerant of the
-// grid using 0..360 longitudes while stations use -180..180.
-func nearestWind(points []windPoint, lat, lon float64) (windPoint, bool) {
-	best := windPoint{}
-	bestDist := math.MaxFloat64
-	for _, p := range points {
-		dlng := math.Abs(p.Lon - lon)
-		if dlng > 180 {
-			dlng = 360 - dlng
-		}
-		dist := dlng*dlng + (p.Lat-lat)*(p.Lat-lat)
-		if dist < bestDist {
-			bestDist = dist
-			best = p
-		}
-	}
-	// A grid point more than ~3 degrees away is not this station's wind.
-	return best, bestDist <= 9
-}
-
 // windNearest is the wind grid's nearest valid cell within ~3 deg of
 // (lat, lon) at a forecast hour; the error means the run has no such hour.
-// Runs from before the bundles fall back to per-hour GeoJSON.
 func windNearest(staticDir string, hour int, lat, lon float64) (windPoint, bool, error) {
-	path := runBundlePath(staticDir, "wind")
-	if path == "" {
-		points, err := windGridPoints(filepath.Join(staticDir, fmt.Sprintf("wind_%03d.geojson", hour)))
-		if err != nil {
-			return windPoint{}, false, err
-		}
-		p, ok := nearestWind(points, lat, lon)
-		return p, ok, nil
-	}
-	b, err := loadGridBundle(path)
+	b, err := loadRunBundle(staticDir, "wind")
 	if err != nil {
 		return windPoint{}, false, err
 	}

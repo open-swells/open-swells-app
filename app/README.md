@@ -37,7 +37,7 @@ Configuration (all optional):
 | `FIREBASE_CREDENTIALS` | (unset: sign-in and favorites disabled) | Path to the Firebase service account key; if unset or the file is missing, the app runs without sign-in and favorites |
 | `PORT` | `8081` | Listen port |
 | `DB_PATH` | `./main.db` | SQLite database path (created automatically; see `ops/migrations/001_initial.sql`) |
-| `FORECAST_DIR` | `./data/forecast` | Generated forecast GeoJSON, PNG, tide, and metadata files |
+| `FORECAST_DIR` | `./data/forecast` | Generated forecast bundles, heatmap images, tide, and metadata files |
 | `SPOTS_PATH` | `./data/spots.json` | Tracked surf-spot reference data |
 | `TEMPLATE_DIR` | `./web/templates` | Go HTML page and component templates |
 | `SITE_URL` | `https://openswells.com` | Public origin used for canonical URLs, Open Graph metadata, robots.txt, and sitemaps |
@@ -59,8 +59,7 @@ The ignored `data/forecast/` directory contains generated forecast products.
 For local development it is populated by `../pipeline/run.sh --local`.
 In production, the pipeline on the forecast host delivers those files to
 this directory over rsync. They remain available to the browser under the
-existing `/static/` URL path. Existing deployments may temporarily use
-`STATIC_DIR` as a fallback for `FORECAST_DIR`.
+existing `/static/` URL path.
 
 The app writes `spot_forecast_history.json.gz` beside (not inside) the
 forecast directory, e.g. `/var/lib/open-swells/`, so it isn't served or

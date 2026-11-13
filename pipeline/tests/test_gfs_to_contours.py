@@ -12,30 +12,30 @@ import gfs_to_contours
 
 
 class MetadataTests(unittest.TestCase):
-    def test_optional_tide_availability_is_published_when_provided(self):
+    def test_tide_availability_is_published(self):
         with tempfile.TemporaryDirectory() as files_dir:
             path = gfs_to_contours.write_metadata(
-                files_dir, "20261028", "18", tide_stations=False
+                files_dir, "20261028", "18", tide_stations=True
             )
             with open(path) as f:
                 metadata = json.load(f)
-        self.assertIs(metadata["tide_stations"], False)
+        self.assertIs(metadata["tide_stations"], True)
 
-    def test_legacy_call_does_not_claim_tide_availability(self):
+    def test_tide_availability_defaults_to_false(self):
         with tempfile.TemporaryDirectory() as files_dir:
             path = gfs_to_contours.write_metadata(files_dir, "20261028", "18")
             with open(path) as f:
                 metadata = json.load(f)
-        self.assertNotIn("tide_stations", metadata)
+        self.assertIs(metadata["tide_stations"], False)
 
-    def test_heatmap_format_is_published_with_bounds(self):
+    def test_heatmap_bounds_are_published(self):
         with tempfile.TemporaryDirectory() as files_dir:
             path = gfs_to_contours.write_metadata(
                 files_dir, "20261028", "18", heatmap_bounds={"north": 85.0}
             )
             with open(path) as f:
                 metadata = json.load(f)
-        self.assertEqual(metadata["heatmap_format"], "webp")
+        self.assertEqual(metadata["heatmap_bounds"], {"north": 85.0})
 
 
 class RenderHeatmapTests(unittest.TestCase):

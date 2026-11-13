@@ -2,15 +2,13 @@ package main
 
 // Forecast bundles: the pipeline writes one file per map product per run
 // (swell_<run>.bin, wind_<run>.bin, nwps_points_<wfo>_<grid>_<run>.bin,
-// listed in metadata.json; layout documented in pipeline/bundle.py) instead
-// of one GeoJSON file per forecast hour. A grid
+// listed in metadata.json; layout documented in pipeline/bundle.py). A grid
 // bundle is a JSON header with the lattice axes, forecast hours and vars,
 // followed by one gzipped row-major int16 array per (hour, var).
 //
 // Only the header is read when a bundle is opened. An hour's arrays are
 // decoded on first use and kept until the file changes, as 2 bytes per cell
-// per var: a lookup is index math over the lattice instead of a scan of
-// decoded GeoJSON points.
+// per var: a lookup is index math over the lattice.
 
 import (
 	"bytes"
@@ -135,14 +133,13 @@ func currentRunBundles(staticDir string) runBundles {
 	return value
 }
 
-// runBundlePath is this run's bundle for a product ("swell", "wind"), or ""
-// for a run from before the bundles.
-func runBundlePath(staticDir, product string) string {
+// loadRunBundle opens this run's bundle for a product ("swell", "wind").
+func loadRunBundle(staticDir, product string) (*gridBundle, error) {
 	name := currentRunBundles(staticDir).Bundles[product]
 	if name == "" {
-		return ""
+		return nil, fmt.Errorf("metadata.json lists no %s bundle", product)
 	}
-	return filepath.Join(staticDir, name)
+	return loadGridBundle(filepath.Join(staticDir, name))
 }
 
 // loadGridBundle returns the bundle at path, re-reading the header only
@@ -321,7 +318,7 @@ func (f *gridFrame) value(v, cell int) (float64, bool) {
 }
 
 // gridCell is a lattice cell near a query point; Dist is in squared
-// degrees with longitude wrapped, the metric the GeoJSON scans used.
+// degrees with longitude wrapped.
 type gridCell struct {
 	Index    int
 	Lat, Lon float64
@@ -329,9 +326,9 @@ type gridCell struct {
 }
 
 // nearbyCells lists the cells within sqrt(maxDist2) degrees of (lat, lon),
-// nearest first. Ties keep row-major (file) order, so the first valid cell
-// in the list is the one the old nearest-point scans picked. The grid may
-// use 0..360 longitudes while callers use -180..180.
+// nearest first. Ties keep row-major (file) order, so lookups are
+// deterministic. The grid may use 0..360 longitudes while callers use
+// -180..180.
 func (b *gridBundle) nearbyCells(lat, lon, maxDist2 float64) []gridCell {
 	radius := math.Sqrt(maxDist2)
 	var cols []int

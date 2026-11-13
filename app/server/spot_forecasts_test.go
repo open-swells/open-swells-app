@@ -245,12 +245,11 @@ func TestSpotForecastIgnoresStaleFile(t *testing.T) {
 func TestSpotForecastFallsBackToGridsForUnknownSpot(t *testing.T) {
 	dir := t.TempDir()
 	writeSpotForecastFixture(t, dir, "20260720_00Z", "20260720_00Z", map[string]any{"a": fixtureSpot()})
-	grid := `{"features":[{"geometry":{"coordinates":[0,0]},"properties":{"h1":0.7,"p1":9,"d1":200}}]}`
-	for _, hour := range []string{"000", "003"} {
-		if err := os.WriteFile(filepath.Join(dir, "swell_partitions_"+hour+".geojson"), []byte(grid), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
+	vars := []bundleVar{{"h1", 0.01}, {"p1", 0.1}, {"d1", 1}}
+	cell := map[string][]float64{"h1": {0.7}, "p1": {9}, "d1": {200}}
+	writeTestBundle(t, filepath.Join(dir, "swell_r.bin"), []float64{0}, []float64{0}, []int{0, 3}, vars,
+		map[int]map[string][]float64{0: cell, 3: cell})
+	writeMetadata(t, dir, `{"forecast_start":"20260720_00Z","bundles":{"swell":"swell_r.bin"}}`)
 
 	forecast, _ := spotForecast(dir, Spot{ID: "not-in-file"})
 	if got := len(forecast.Forecast); got != 4 {

@@ -8,8 +8,7 @@ package main
 // carry hourly predictions, which the curve follows instead. Spots with no
 // station nearby may instead have an FES2022 model site (type "M", always
 // hourly), whose heights are above a modeled MLLW rather than NOAA's; each
-// station names its source and datum, and older files without them are
-// NOAA CO-OPS and MLLW.
+// station names its source and datum.
 //
 // Predictions are astronomical and don't belong to a model run, so unlike
 // spot_forecasts.json.gz the file isn't checked against metadata.json; the
@@ -187,20 +186,13 @@ func spotTide(staticDir, spotID string, from, to time.Time) (SpotTide, bool) {
 		return SpotTide{}, false // the file's events don't reach this window
 	}
 	events := st.HiLo[first : last+1]
-	source, datum := st.Source, st.Datum
-	if source == "" {
-		source = "NOAA CO-OPS"
-	}
-	if datum == "" {
-		datum = "MLLW"
-	}
 	return SpotTide{
 		StationID:   match.Station,
 		StationName: st.Name,
 		Km:          match.Km,
 		Subordinate: st.Type == "S",
-		Source:      source,
-		Datum:       datum,
+		Source:      st.Source,
+		Datum:       st.Datum,
 		Events:      events,
 		Hourly:      hourlySpan(st, events[0].T, events[len(events)-1].T),
 	}, true

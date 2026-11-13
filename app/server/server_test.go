@@ -517,24 +517,39 @@ MALFORMED_LINE
 }
 
 func TestStaticHandlerServesPrecompressed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	serve := func(dir string, gzipOK bool, url string) *httptest.ResponseRecorder {
+		router := gin.New()
+		router.GET("/static/*filepath", staticHandler(dir))
+		req := httptest.NewRequest("GET", url, nil)
+		if gzipOK {
+			req.Header.Set("Accept-Encoding", "gzip")
+		}
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+	gunzip := func(w *httptest.ResponseRecorder) []byte {
+		t.Helper()
+		zr, err := gzip.NewReader(w.Body)
+		if err != nil {
+			t.Fatalf("bad gzip body: %v", err)
+		}
+		got, _ := io.ReadAll(zr)
+		return got
+	}
+
 	dir := t.TempDir()
-	plain := []byte(`{"type":"FeatureCollection","features":[]}`)
+	plain := []byte(`{"stations":[]}`)
 	var gz bytes.Buffer
 	zw := gzip.NewWriter(&gz)
 	zw.Write(plain)
 	zw.Close()
-	os.WriteFile(filepath.Join(dir, "contours_000.geojson"), plain, 0o644)
-	os.WriteFile(filepath.Join(dir, "contours_000.geojson.gz"), gz.Bytes(), 0o644)
-
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.GET("/static/*filepath", staticHandler(dir))
+	os.WriteFile(filepath.Join(dir, "tides.json"), plain, 0o644)
+	os.WriteFile(filepath.Join(dir, "tides.json.gz"), gz.Bytes(), 0o644)
 
 	// gzip-capable client gets the precompressed file
-	req := httptest.NewRequest("GET", "/static/contours_000.geojson", nil)
-	req.Header.Set("Accept-Encoding", "gzip")
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	w := serve(dir, true, "/static/tides.json")
 	if w.Code != 200 || w.Header().Get("Content-Encoding") != "gzip" {
 		t.Errorf("expected gzip response, got code=%d enc=%q", w.Code, w.Header().Get("Content-Encoding"))
 	}
@@ -543,9 +558,7 @@ func TestStaticHandlerServesPrecompressed(t *testing.T) {
 	}
 
 	// client without gzip support gets the plain file
-	req = httptest.NewRequest("GET", "/static/contours_000.geojson", nil)
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	w = serve(dir, false, "/static/tides.json")
 	if w.Code != 200 || w.Header().Get("Content-Encoding") != "" {
 		t.Errorf("expected plain response, got code=%d enc=%q", w.Code, w.Header().Get("Content-Encoding"))
 	}
@@ -553,52 +566,38 @@ func TestStaticHandlerServesPrecompressed(t *testing.T) {
 		t.Error("plain body mismatch")
 	}
 
-	// a geojson without a shipped .gz sibling gets compressed on demand
-	plain2 := []byte(`{"type":"FeatureCollection","features":[],"note":"no sibling"}`)
-	os.WriteFile(filepath.Join(dir, "contours_001.geojson"), plain2, 0o644)
-	req = httptest.NewRequest("GET", "/static/contours_001.geojson", nil)
-	req.Header.Set("Accept-Encoding", "gzip")
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
+	// without a .gz sibling the file is compressed on demand
+	onDemand := t.TempDir()
+	plain2 := []byte(`{"stations":[],"note":"no sibling"}`)
+	os.WriteFile(filepath.Join(onDemand, "tides.json"), plain2, 0o644)
+	w = serve(onDemand, true, "/static/tides.json")
 	if w.Code != 200 || w.Header().Get("Content-Encoding") != "gzip" {
 		t.Fatalf("expected on-demand gzip, got code=%d enc=%q", w.Code, w.Header().Get("Content-Encoding"))
 	}
-	zr, err := gzip.NewReader(w.Body)
-	if err != nil {
-		t.Fatalf("bad gzip body: %v", err)
-	}
-	got, _ := io.ReadAll(zr)
-	if !bytes.Equal(got, plain2) {
+	if got := gunzip(w); !bytes.Equal(got, plain2) {
 		t.Errorf("on-demand gzip roundtrip mismatch: %q", got)
 	}
 	// and the sibling is cached on disk for the next request
-	if _, err := os.Stat(filepath.Join(dir, "contours_001.geojson.gz")); err != nil {
+	if _, err := os.Stat(filepath.Join(onDemand, "tides.json.gz")); err != nil {
 		t.Errorf("gz sibling not cached: %v", err)
 	}
 
 	// a stale .gz (older than its source) is rebuilt, not served
-	stale := filepath.Join(dir, "contours_002.geojson")
-	staleGz := stale + ".gz"
-	os.WriteFile(staleGz, gz.Bytes(), 0o644) // gzip of the old contours_000 body
+	staleDir := t.TempDir()
+	staleGz := filepath.Join(staleDir, "tides.json.gz")
+	os.WriteFile(staleGz, gz.Bytes(), 0o644) // gzip of the old body
 	past := time.Now().Add(-time.Hour)
 	os.Chtimes(staleGz, past, past)
-	fresh := []byte(`{"type":"FeatureCollection","features":[],"note":"fresh"}`)
-	os.WriteFile(stale, fresh, 0o644)
-	req = httptest.NewRequest("GET", "/static/contours_002.geojson", nil)
-	req.Header.Set("Accept-Encoding", "gzip")
-	w = httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-	zr, err = gzip.NewReader(w.Body)
-	if err != nil {
-		t.Fatalf("bad gzip body for rebuilt sibling: %v", err)
-	}
-	got, _ = io.ReadAll(zr)
-	if !bytes.Equal(got, fresh) {
+	fresh := []byte(`{"stations":[],"note":"fresh"}`)
+	os.WriteFile(filepath.Join(staleDir, "tides.json"), fresh, 0o644)
+	if got := gunzip(serve(staleDir, true, "/static/tides.json")); !bytes.Equal(got, fresh) {
 		t.Errorf("stale gz served instead of rebuilt: %q", got)
 	}
 
 	// path traversal stays inside the static dir
-	req = httptest.NewRequest("GET", "/static/../main.go", nil)
+	router := gin.New()
+	router.GET("/static/*filepath", staticHandler(dir))
+	req := httptest.NewRequest("GET", "/static/../main.go", nil)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 	if w.Code == 200 && bytes.Contains(w.Body.Bytes(), []byte("package main")) {
@@ -608,7 +607,7 @@ func TestStaticHandlerServesPrecompressed(t *testing.T) {
 
 func TestStaticHandlerCachesByRun(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "heatmap_000.png"), []byte("png"), 0o644)
+	os.WriteFile(filepath.Join(dir, "heatmap_000.webp"), []byte("png"), 0o644)
 	writeMeta := func(start string, mod time.Time) {
 		path := filepath.Join(dir, "metadata.json")
 		os.WriteFile(path, []byte(`{"forecast_start":"`+start+`"}`), 0o644)
@@ -626,10 +625,10 @@ func TestStaticHandlerCachesByRun(t *testing.T) {
 		return w.Header().Get("Cache-Control")
 	}
 
-	if got := cacheControl("/static/heatmap_000.png?run=20261008_12Z"); got != "public, max-age=604800, immutable" {
+	if got := cacheControl("/static/heatmap_000.webp?run=20261008_12Z"); got != "public, max-age=604800, immutable" {
 		t.Errorf("current-run URL: Cache-Control = %q, want immutable", got)
 	}
-	if got := cacheControl("/static/heatmap_000.png"); got != "public, max-age=300" {
+	if got := cacheControl("/static/heatmap_000.webp"); got != "public, max-age=300" {
 		t.Errorf("bare URL: Cache-Control = %q, want a short max-age", got)
 	}
 	if got := cacheControl("/static/metadata.json"); got != "public, max-age=60" {
@@ -639,10 +638,10 @@ func TestStaticHandlerCachesByRun(t *testing.T) {
 	// A new run lands: the old run's URL now serves the new run's file
 	// and must not be cached under the old name.
 	writeMeta("20261008_18Z", time.Now())
-	if got := cacheControl("/static/heatmap_000.png?run=20261008_12Z"); got != "no-store" {
+	if got := cacheControl("/static/heatmap_000.webp?run=20261008_12Z"); got != "no-store" {
 		t.Errorf("superseded-run URL: Cache-Control = %q, want no-store", got)
 	}
-	if got := cacheControl("/static/heatmap_000.png?run=20261008_18Z"); got != "public, max-age=604800, immutable" {
+	if got := cacheControl("/static/heatmap_000.webp?run=20261008_18Z"); got != "public, max-age=604800, immutable" {
 		t.Errorf("new-run URL: Cache-Control = %q, want immutable", got)
 	}
 }

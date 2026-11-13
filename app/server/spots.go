@@ -24,7 +24,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -270,113 +269,12 @@ type waveTrain struct {
 	H, P, D float64
 }
 
-type swellGridEntry struct {
-	modTime int64
-	points  []swellPoint
-}
-
-var (
-	swellGridMu    sync.Mutex
-	swellGridCache = map[string]swellGridEntry{}
-)
-
-func swellGridPoints(path string) ([]swellPoint, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	swellGridMu.Lock()
-	defer swellGridMu.Unlock()
-	cached, ok := swellGridCache[path]
-	if ok && cached.modTime == info.ModTime().UnixNano() {
-		return cached.points, nil
-	}
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var doc struct {
-		Features []struct {
-			Geometry struct {
-				Coordinates [2]float64 `json:"coordinates"`
-			} `json:"geometry"`
-			Properties struct {
-				H1 *float64 `json:"h1"`
-				P1 *float64 `json:"p1"`
-				D1 *float64 `json:"d1"`
-				H2 *float64 `json:"h2"`
-				P2 *float64 `json:"p2"`
-				D2 *float64 `json:"d2"`
-				H3 *float64 `json:"h3"`
-				P3 *float64 `json:"p3"`
-				D3 *float64 `json:"d3"`
-			} `json:"properties"`
-		} `json:"features"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, err
-	}
-	points := make([]swellPoint, 0, len(doc.Features))
-	for _, f := range doc.Features {
-		pt := swellPoint{
-			Lon: f.Geometry.Coordinates[0],
-			Lat: f.Geometry.Coordinates[1],
-		}
-		parts := [3][3]*float64{
-			{f.Properties.H1, f.Properties.P1, f.Properties.D1},
-			{f.Properties.H2, f.Properties.P2, f.Properties.D2},
-			{f.Properties.H3, f.Properties.P3, f.Properties.D3},
-		}
-		for i, p := range parts {
-			if p[0] != nil && p[1] != nil && p[2] != nil {
-				pt.H[i], pt.P[i], pt.D[i] = *p[0], *p[1], *p[2]
-				pt.Has[i] = true
-			}
-		}
-		points = append(points, pt)
-	}
-
-	swellGridCache[path] = swellGridEntry{modTime: info.ModTime().UnixNano(), points: points}
-	return points, nil
-}
-
-// nearestSwell picks the grid point closest to (lat, lon), tolerant of the
-// grid using 0..360 longitudes while spots use -180..180. The partitions
-// grid is ~1.67 deg spaced, so anything beyond ~3 deg is not this spot's
-// water.
-func nearestSwell(points []swellPoint, lat, lon float64) (swellPoint, bool) {
-	best := swellPoint{}
-	bestDist := math.MaxFloat64
-	for _, p := range points {
-		dlng := math.Abs(p.Lon - lon)
-		if dlng > 180 {
-			dlng = 360 - dlng
-		}
-		dist := dlng*dlng + (p.Lat-lat)*(p.Lat-lat)
-		if dist < bestDist {
-			bestDist = dist
-			best = p
-		}
-	}
-	return best, bestDist <= 9
-}
-
 // swellNearest is the coarse swell grid's nearest wet cell within ~3 deg of
-// (lat, lon) at a forecast hour; the error means the run has no such hour.
-// Runs from before the bundles fall back to per-hour GeoJSON.
+// (lat, lon) at a forecast hour (the partitions grid is ~1.67 deg spaced,
+// so anything farther is not this spot's water); the error means the run
+// has no such hour.
 func swellNearest(staticDir string, hour int, lat, lon float64) (swellPoint, bool, error) {
-	path := runBundlePath(staticDir, "swell")
-	if path == "" {
-		points, err := swellGridPoints(filepath.Join(staticDir, fmt.Sprintf("swell_partitions_%03d.geojson", hour)))
-		if err != nil {
-			return swellPoint{}, false, err
-		}
-		p, ok := nearestSwell(points, lat, lon)
-		return p, ok, nil
-	}
-	b, err := loadGridBundle(path)
+	b, err := loadRunBundle(staticDir, "swell")
 	if err != nil {
 		return swellPoint{}, false, err
 	}
@@ -422,99 +320,15 @@ type nwpsPoint struct {
 	Lon, Lat, H, S, P, D float64
 }
 
-type nwpsGridEntry struct {
-	modTime int64
-	points  []nwpsPoint
-}
-
-var (
-	nwpsGridMu    sync.Mutex
-	nwpsGridCache = map[string]nwpsGridEntry{}
-)
-
-func nwpsGridPoints(path string) ([]nwpsPoint, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
-
-	nwpsGridMu.Lock()
-	defer nwpsGridMu.Unlock()
-	cached, ok := nwpsGridCache[path]
-	if ok && cached.modTime == info.ModTime().UnixNano() {
-		return cached.points, nil
-	}
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var doc struct {
-		Features []struct {
-			Geometry struct {
-				Coordinates [2]float64 `json:"coordinates"`
-			} `json:"geometry"`
-			Properties struct {
-				H float64 `json:"h"`
-				S float64 `json:"s"`
-				P float64 `json:"p"`
-				D float64 `json:"d"`
-			} `json:"properties"`
-		} `json:"features"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, err
-	}
-	points := make([]nwpsPoint, 0, len(doc.Features))
-	for _, f := range doc.Features {
-		points = append(points, nwpsPoint{
-			Lon: f.Geometry.Coordinates[0],
-			Lat: f.Geometry.Coordinates[1],
-			H:   f.Properties.H,
-			S:   f.Properties.S,
-			P:   f.Properties.P,
-			D:   f.Properties.D,
-		})
-	}
-
-	nwpsGridCache[path] = nwpsGridEntry{modTime: info.ModTime().UnixNano(), points: points}
-	return points, nil
-}
-
-// nearestNwps mirrors nearestSwell but with a ~0.1 deg tolerance: NWPS cells
-// are a few km apart, so a nearest cell farther than that means the spot is
-// outside the domain, not that its cell is offshore.
-func nearestNwps(points []nwpsPoint, lat, lon float64) (nwpsPoint, float64, bool) {
-	best := nwpsPoint{}
-	bestDist := math.MaxFloat64
-	for _, p := range points {
-		dlng := math.Abs(p.Lon - lon)
-		if dlng > 180 {
-			dlng = 360 - dlng
-		}
-		dist := dlng*dlng + (p.Lat-lat)*(p.Lat-lat)
-		if dist < bestDist {
-			bestDist = dist
-			best = p
-		}
-	}
-	return best, bestDist, bestDist <= nwpsMaxDist2
-}
-
-// nwpsMaxDist2 is how far (squared degrees) a spot's NWPS cell may be.
+// nwpsMaxDist2 is how far (squared degrees) a spot's NWPS cell may be:
+// cells are a few km apart, so a nearest cell farther than ~0.1 deg means
+// the spot is outside the domain, not that its cell is offshore.
 const nwpsMaxDist2 = 0.01
 
 // nwpsNearest is a domain's nearest wet cell within ~0.1 deg at an hour,
-// with its squared-degree distance. Fields missing at that cell read 0, as
-// they did in the GeoJSON points.
+// with its squared-degree distance. Fields other than h missing at that
+// cell read 0.
 func nwpsNearest(staticDir string, d nwpsDomain, hour int, lat, lon float64) (nwpsPoint, float64, bool) {
-	if d.File == "" { // a run from before the bundles
-		points, err := nwpsGridPoints(filepath.Join(staticDir, fmt.Sprintf("nwps_points_%s_%s_%03d.geojson", d.WFO, d.Grid, hour)))
-		if err != nil {
-			return nwpsPoint{}, 0, false
-		}
-		return nearestNwps(points, lat, lon)
-	}
 	b, err := loadGridBundle(filepath.Join(staticDir, d.File))
 	if err != nil {
 		return nwpsPoint{}, 0, false
@@ -541,7 +355,7 @@ type nwpsDomain struct {
 	WFO   string `json:"wfo"`
 	Grid  string `json:"grid"`
 	Hours []int  `json:"hours"`
-	File  string `json:"file"` // the domain's bundle; "" before the bundles
+	File  string `json:"file"` // the domain's bundle
 }
 
 // nwpsPointDomains is the nwps_points index from the run's metadata.
@@ -556,10 +370,8 @@ func nwpsPointDomains(staticDir string) []nwpsDomain {
 func nwpsDomainsNear(staticDir string, domains []nwpsDomain, lat, lon float64) []nwpsDomain {
 	var near []nwpsDomain
 	for _, d := range domains {
-		if d.File != "" {
-			if b, err := loadGridBundle(filepath.Join(staticDir, d.File)); err == nil && !b.reaches(lat, lon, nwpsMaxDist2) {
-				continue
-			}
+		if b, err := loadGridBundle(filepath.Join(staticDir, d.File)); err == nil && !b.reaches(lat, lon, nwpsMaxDist2) {
+			continue
 		}
 		near = append(near, d)
 	}

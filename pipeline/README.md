@@ -63,9 +63,7 @@ it keeps reading the files it started with: the runner leaves bundles in
 - `heatmap_XXX.webp` — continuous-color combined wind-wave-and-swell height
   field in Web Mercator with transparent land; the app's primary wave layer.
   Lossless WebP with a 128-step ramp (`HEATMAP_STEPS`), ~200 KB a frame.
-  Corner coordinates are published as `heatmap_bounds` in `metadata.json`,
-  and the extension as `heatmap_format` (runs from before it wrote `.png`
-  and have no `heatmap_format`).
+  Corner coordinates are published as `heatmap_bounds` in `metadata.json`.
   Colors come from `HEATMAP_COLORS` in `gfs_to_contours.py`, matched by
   `SWELL_BANDS` in the web app's `pages/today.html` — change them together.
 - `nwps_<grid>_XXX.png` (e.g. `nwps_cg1_012.png`) — nearshore combined
@@ -150,8 +148,7 @@ results for a few spots without writing anything.
   Set `TIDE_STATIONS` to comma-separated CO-OPS station IDs to generate it,
   for example `TIDE_STATIONS=9410230,9410840`. Metadata publishes
   `tide_stations: false` when disabled or no stations succeed, so the map
-  skips the optional file request. Successful stations set it to `true`;
-  older metadata without the flag retains the legacy loading behavior.
+  skips the optional file request. Successful stations set it to `true`.
 - `spot_tides.json.gz` — predicted highs and lows (meters MLLW, UTC) at the
   NOAA CO-OPS station nearest each spot within 50 km, plus hourly
   predictions for reference stations, for the tide panel on spot pages.

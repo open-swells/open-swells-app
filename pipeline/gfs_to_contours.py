@@ -84,8 +84,7 @@ HEATMAP_COLORS = [
 # with lossless WebP each frame is ~200 KB instead of ~380 KB as a 255-step
 # PNG. 64 steps showed banding rings in the open ocean.
 HEATMAP_STEPS = 128
-# The global heatmap's file format; published as "heatmap_format" in
-# metadata.json so the web app knows which extension to request.
+# The global heatmap's file format; the web app requests heatmap_<HHH>.webp.
 HEATMAP_FORMAT = "webp"
 
 
@@ -578,7 +577,7 @@ def write_metadata(
     nwps: dict | None = None,
     spot_forecasts: dict | None = None,
     hours: list[int] | None = None,
-    tide_stations: bool | None = None,
+    tide_stations: bool = False,
     bundles: dict | None = None,
 ) -> str:
     metadata_path = os.path.join(files_dir, "metadata.json")
@@ -604,8 +603,6 @@ def write_metadata(
     if heatmap_bounds is not None:
         # The web app pins the heatmap images to these corner coordinates.
         metadata["heatmap_bounds"] = heatmap_bounds
-        # heatmap_<HHH>.<format>; metadata without it means .png.
-        metadata["heatmap_format"] = HEATMAP_FORMAT
     if nwps:
         if nwps.get("layers"):
             # Nearshore mosaic overlays: per-grid-tier bounds and which
@@ -618,10 +615,8 @@ def write_metadata(
     if spot_forecasts:
         # Per-spot hourly series sampled at full grid resolution.
         metadata["spot_forecasts"] = spot_forecasts
-    if tide_stations is not None:
-        # Explicitly advertise the optional map tide layer. Older metadata
-        # lacks this field, so the frontend retains its legacy behavior.
-        metadata["tide_stations"] = tide_stations
+    # Whether this run published tides.json for the map's tide layer.
+    metadata["tide_stations"] = tide_stations
     with open(metadata_path, "w") as f:
         json.dump(metadata, f, indent=2)
     logger.info("Saved metadata to %s", metadata_path)

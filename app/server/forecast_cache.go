@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"path/filepath"
 	"sync"
@@ -59,34 +58,18 @@ func warmForecastCachesOnce(forecastDir string) forecastCacheWarmResult {
 
 	go func() {
 		defer wg.Done()
-		result.swell = warmGrid(runBundlePath(forecastDir, "swell"), mapHours(), func(hour int) error {
-			_, err := swellGridPoints(filepath.Join(forecastDir, "swell_partitions_"+forecastHour(hour)+".geojson"))
-			return err
-		})
+		result.swell = warmRunBundle(forecastDir, "swell")
 	}()
 
 	go func() {
 		defer wg.Done()
-		result.wind = warmGrid(runBundlePath(forecastDir, "wind"), mapHours(), func(hour int) error {
-			_, err := windGridPoints(filepath.Join(forecastDir, "wind_"+forecastHour(hour)+".geojson"))
-			return err
-		})
+		result.wind = warmRunBundle(forecastDir, "wind")
 	}()
 
 	go func() {
 		defer wg.Done()
 		for _, domain := range nwpsPointDomains(forecastDir) {
-			bundle := ""
-			if domain.File != "" {
-				bundle = filepath.Join(forecastDir, domain.File)
-			}
-			result.nwps += warmGrid(bundle, domain.Hours, func(hour int) error {
-				_, err := nwpsGridPoints(filepath.Join(
-					forecastDir,
-					"nwps_points_"+domain.WFO+"_"+domain.Grid+"_"+forecastHour(hour)+".geojson",
-				))
-				return err
-			})
+			result.nwps += warmGrid(filepath.Join(forecastDir, domain.File), domain.Hours)
 		}
 	}()
 
@@ -105,19 +88,18 @@ func mapHours() []int {
 	return hours
 }
 
-// warmGrid decodes the given hours of a grid bundle, or for runs from
-// before the bundles (path "") loads the per-hour GeoJSON through legacy.
-// Returns how many hours are ready.
-func warmGrid(path string, hours []int, legacy func(hour int) error) int {
-	if path == "" {
-		warmed := 0
-		for _, hour := range hours {
-			if legacy(hour) == nil {
-				warmed++
-			}
-		}
-		return warmed
+// warmRunBundle warms this run's bundle for a product at the map hours.
+func warmRunBundle(forecastDir, product string) int {
+	name := currentRunBundles(forecastDir).Bundles[product]
+	if name == "" {
+		return 0
 	}
+	return warmGrid(filepath.Join(forecastDir, name), mapHours())
+}
+
+// warmGrid decodes the given hours of a grid bundle and returns how many
+// hours are ready.
+func warmGrid(path string, hours []int) int {
 	b, err := loadGridBundle(path)
 	if err != nil {
 		log.Printf("forecast cache: %v", err)
@@ -135,8 +117,4 @@ func warmGrid(path string, hours []int, legacy func(hour int) error) int {
 		warmed++
 	}
 	return warmed
-}
-
-func forecastHour(hour int) string {
-	return fmt.Sprintf("%03d", hour)
 }

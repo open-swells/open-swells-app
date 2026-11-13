@@ -123,7 +123,7 @@
         }
 
         // Nearest cell within sqrt(maxDist2) degrees where hasData(cell), by
-        // the same wrapped squared-degree metric as the point scan; -1 if none.
+        // wrapped squared-degree distance (longitude wraps at 180); -1 if none.
         function nearestCell(g, hasData, lngLat, maxDist2 = 4) {
             let best = -1;
             let bestDist = maxDist2;
