@@ -138,6 +138,16 @@ class MosaicTests(unittest.TestCase):
         self.assertTrue(np.isnan(grid[row, overlap_col]))
         self.assertEqual(grid[row, int(np.abs(mosaic.lon - 3.0).argmin())], 1.0)
 
+    def test_coarse_domain_is_bilinearly_resampled(self):
+        coarse, _, mosaic = self.make_mosaic()
+        ch, cm = self.full_fields(coarse, 0.0)
+        ch[:] = coarse["lon"][None, :]  # height == lon: a linear ramp
+        grid, _ = mosaic.compose([("aaa", ch, cm)])
+        row = int(np.abs(mosaic.lat - 2.0).argmin())
+        col = int(np.abs(mosaic.lon - 3.5).argmin())
+        # Halfway between coarse cells, not a copy of either neighbor.
+        self.assertAlmostEqual(float(grid[row, col]), 3.5, places=5)
+
     def test_alpha_feathers_edges_and_tracks_contributing_domains(self):
         coarse, fine, mosaic = self.make_mosaic()
         ch, cm = self.full_fields(coarse, 1.0)

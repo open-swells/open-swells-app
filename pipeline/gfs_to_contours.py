@@ -166,6 +166,14 @@ def _hex_to_rgb(color: str) -> tuple[int, int, int]:
     return (int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16))
 
 
+# Blur (in source cells) applied to filled land values only. Nearest-wet
+# filling alone leaves Voronoi-shaped blocks behind the coast; once the
+# image is bilinearly stretched those blocks bleed a stair-step pattern
+# into the adjacent ocean. Blurring just the land side smooths the seam
+# without touching any real (wet) model value.
+LAND_FILL_SIGMA = 1.5
+
+
 def _fill_nearest(grid: np.ndarray) -> np.ndarray:
     """Replace NaN cells with the value of the nearest finite cell."""
     missing = np.isnan(grid)
@@ -173,6 +181,26 @@ def _fill_nearest(grid: np.ndarray) -> np.ndarray:
         return grid
     indices = distance_transform_edt(missing, return_distances=False, return_indices=True)
     return grid[tuple(indices)]
+
+
+def _fill_land_smooth(grid: np.ndarray, sigma: float = LAND_FILL_SIGMA) -> np.ndarray:
+    """Fill NaN cells from nearby wet cells, smoothly; wet cells unchanged."""
+    missing = np.isnan(grid)
+    if not missing.any() or missing.all():
+        return grid
+    filled = _fill_nearest(grid)
+    blurred = gaussian_filter(filled, sigma=sigma, mode="nearest")
+    return np.where(missing, blurred, grid).astype(grid.dtype, copy=False)
+
+
+def _lerp_rows(array: np.ndarray, src_pos: np.ndarray) -> np.ndarray:
+    """Sample rows at fractional source positions by linear interpolation."""
+    last = array.shape[0] - 1
+    pos = np.clip(src_pos, 0.0, last)
+    r0 = np.floor(pos).astype(np.intp)
+    r1 = np.minimum(r0 + 1, last)
+    frac = (pos - r0).astype(np.float32)[:, None]
+    return array[r0, :] * (1.0 - frac) + array[r1, :] * frac
 
 
 def render_heatmap_png(
@@ -194,7 +222,7 @@ def render_heatmap_png(
     Mercator spacing; displaying the PNG at the returned bounds then puts
     every pixel at the correct latitude.
 
-    Land cells take the value of the nearest wet cell, so the image is
+    Land cells take a smoothed value from nearby wet cells, so the image is
     solid color with no coastline of its own: the model's land mask is a
     ~25 km grid that never matches the real coast, so the map draws vector
     land on top instead. Only an all-NaN grid stays transparent.
@@ -207,7 +235,7 @@ def render_heatmap_png(
     height = data["height"].astype(np.float32, copy=False)
     mask = data.get("height_mask")
     grid = np.where(mask, np.nan, height) if mask is not None else height
-    grid = _fill_nearest(grid)
+    grid = _fill_land_smooth(grid)
 
     lats = data["lat"][:, 0].astype(np.float64)
     lons = data["lon"][0, :].astype(np.float64)
@@ -223,9 +251,14 @@ def render_heatmap_png(
     n_rows = int(grid.shape[0] * rows_scale)
     y_targets = np.linspace(merc_y(lats[0]), merc_y(lats[-1]), n_rows)
     target_lats = np.degrees(2 * np.arctan(np.exp(y_targets)) - np.pi / 2)
-    # Nearest source row per target row (no blending across rows).
-    src_rows = np.abs(target_lats[:, None] - lats[None, :]).argmin(axis=1)
-    warped = grid[src_rows, :]
+    # Linear blend between the two bracketing source rows: picking the
+    # nearest row duplicated each source row ~rows_scale times, and those
+    # flat bands read as horizontal stair-steps once MapLibre stretches
+    # the image. lats run north -> south (descending), so interpolate on
+    # the reversed axis to get fractional row positions.
+    row_index = np.arange(lats.size, dtype=np.float64)
+    src_pos = np.interp(-target_lats, -lats, row_index)
+    warped = _lerp_rows(grid, src_pos)
 
     colors = np.array([_hex_to_rgb(c) for c in HEATMAP_COLORS], dtype=np.float64)
     values = np.clip(
@@ -255,7 +288,7 @@ def render_heatmap_png(
 
     if alpha is not None or png_path.lower().endswith(".webp"):
         if alpha is not None:
-            alpha_warped = np.clip(alpha, 0.0, 1.0)[src_rows, :]
+            alpha_warped = _lerp_rows(np.clip(alpha, 0.0, 1.0).astype(np.float32), src_pos)
             alpha_bytes = np.round(alpha_warped * 255).astype(np.uint8)
         else:
             alpha_bytes = np.full(indices.shape, 255, dtype=np.uint8)
