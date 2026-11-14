@@ -45,16 +45,33 @@ class RenderHeatmapTests(unittest.TestCase):
         height = np.array([[0.25, 12.0, np.nan], [5.0, 2.0, 1.0]], dtype=np.float32)
         return {"lat": lat, "lon": lon, "height": height}
 
-    def test_land_takes_nearest_wet_value(self):
+    def test_land_is_filled_from_wet_values(self):
         with tempfile.TemporaryDirectory() as directory:
             path = f"{directory}/heatmap.png"
             gfs_to_contours.render_heatmap_png(self.grid(), path, rows_scale=1.0, steps=128)
             with Image.open(path) as image:
                 indices = np.asarray(image)
-        # The NaN cell at [0, 2] copies a nearest wet neighbor (both
-        # [0, 1] and [1, 2] are at distance 1) and is opaque, not index 0.
-        self.assertIn(indices[0, 2], (indices[0, 1], indices[1, 2]))
+        # The NaN cell at [0, 2] takes a smoothed blend of nearby wet
+        # values (opaque, not index 0); wet cells keep their own colors.
+        wet = indices[~np.isnan(self.grid()["height"])]
+        self.assertTrue(wet.min() <= indices[0, 2] <= wet.max())
         self.assertTrue((indices > 0).all())
+        self.assertEqual(indices[0, 0], 1)
+        self.assertEqual(indices[0, 1], 128)
+
+    def test_rows_interpolate_between_source_rows(self):
+        data = {
+            "lat": np.array([[2.0, 2.0], [1.0, 1.0], [0.0, 0.0]]),
+            "lon": np.array([[0.0, 1.0]] * 3),
+            "height": np.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]], dtype=np.float32),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/heatmap.png"
+            gfs_to_contours.render_heatmap_png(data, path, rows_scale=3.0, steps=255)
+            with Image.open(path) as image:
+                column = np.asarray(image)[:, 0].astype(int)
+        # Upsampled rows ramp smoothly instead of repeating source rows.
+        self.assertTrue((np.diff(column) > 0).all())
 
     def test_all_nan_grid_stays_transparent(self):
         data = self.grid()

@@ -206,6 +206,44 @@ def select_frames(
     return frames
 
 
+def _bilinear_axis(src: np.ndarray, targets: np.ndarray):
+    """Lower index and 0..1 fraction of each target along a source axis.
+
+    The source axis may run ascending or descending.
+    """
+    src = np.asarray(src, dtype=np.float64)
+    index = np.arange(src.size, dtype=np.float64)
+    if src[0] > src[-1]:
+        pos = np.interp(-targets, -src, index)
+    else:
+        pos = np.interp(targets, src, index)
+    lo = np.minimum(np.floor(pos).astype(np.intp), max(src.size - 2, 0))
+    hi = np.minimum(lo + 1, src.size - 1)
+    frac = np.clip(pos - lo, 0.0, 1.0).astype(np.float32)
+    return lo, hi, frac
+
+
+def _sample_bilinear(grid: np.ndarray, row_axis, col_axis) -> np.ndarray:
+    r0, r1, fr = row_axis
+    c0, c1, fc = col_axis
+    fr = fr[:, None]
+    fc = fc[None, :]
+    top = grid[np.ix_(r0, c0)] * (1.0 - fc) + grid[np.ix_(r0, c1)] * fc
+    bottom = grid[np.ix_(r1, c0)] * (1.0 - fc) + grid[np.ix_(r1, c1)] * fc
+    return (top * (1.0 - fr) + bottom * fr).astype(np.float32)
+
+
+def _fill_land(height: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Copy each land cell's nearest wet value so interpolation near the
+    coast blends only real sea values (no NaN poisoning, no zeros)."""
+    grid = np.where(mask, np.nan, height).astype(np.float32)
+    missing = np.isnan(grid)
+    if not missing.any() or missing.all():
+        return grid
+    indices = distance_transform_edt(missing, return_distances=False, return_indices=True)
+    return grid[tuple(indices)]
+
+
 class _Mosaic:
     """Composites several office domains onto one shared lattice.
 
@@ -241,8 +279,16 @@ class _Mosaic:
             cols = np.nonzero(
                 (self.lon >= d["lon"].min() - 1e-9) & (self.lon <= d["lon"].max() + 1e-9)
             )[0]
+            # Nearest source cell decides the land mask; values are sampled
+            # bilinearly. Nearest-neighbor values blew each cell of a
+            # coarser domain up into a flat block of lattice cells, which
+            # read as visible pixelation along the coast.
             src_rows = np.abs(self.lat[rows][:, None] - d["lat"][None, :]).argmin(axis=1)
             src_cols = np.abs(self.lon[cols][:, None] - d["lon"][None, :]).argmin(axis=1)
+            bilinear = (
+                _bilinear_axis(d["lat"], self.lat[rows]),
+                _bilinear_axis(d["lon"], self.lon[cols]),
+            )
             # Blend weight: 0 at the domain's own bounding-box edge ramping
             # to 1 over FEATHER_CELLS, so where domains overlap the one
             # painted later fades in over the earlier one instead of
@@ -253,7 +299,7 @@ class _Mosaic:
                 np.minimum(row_dist[:, None], col_dist[None, :]) / FEATHER_CELLS,
                 0.0, 1.0,
             ).astype(np.float32)
-            self._index[d["wfo"]] = (rows, cols, src_rows, src_cols, weight)
+            self._index[d["wfo"]] = (rows, cols, src_rows, src_cols, bilinear, weight)
         self._alpha_cache: dict[frozenset, np.ndarray] = {}
 
     def compose(self, painted: list[tuple[str, np.ndarray, np.ndarray]]):
@@ -267,8 +313,9 @@ class _Mosaic:
         """
         grid = np.full(self.shape, np.nan, dtype=np.float32)
         for wfo, height, mask in painted:
-            rows, cols, src_rows, src_cols, weight = self._index[wfo]
-            values = np.where(mask, np.nan, height)[np.ix_(src_rows, src_cols)]
+            rows, cols, src_rows, src_cols, bilinear, weight = self._index[wfo]
+            values = _sample_bilinear(_fill_land(height, mask), *bilinear)
+            values[mask[np.ix_(src_rows, src_cols)]] = np.nan
             existing = grid[np.ix_(rows, cols)]
             grid[np.ix_(rows, cols)] = np.where(
                 np.isnan(existing),
