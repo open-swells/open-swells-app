@@ -566,9 +566,9 @@ type spotSample struct {
 // bulletins). It reads the spot's full-resolution series from
 // spot_forecasts.json.gz and falls back to the coarse map grids when the
 // file doesn't cover the spot.
-// The second return is the same hourly timeline as raw wave trains
-// (swell partitions plus wind sea — not NWPS combined seas, which would
-// count the wind sea twice), feeding the condition classifier.
+// The second return is the same hourly timeline as wave trains (swell
+// partitions plus wind sea, rescaled to the NWPS nearshore sea state where
+// there is one; see calibrateNearshore), feeding the condition classifier.
 func spotForecast(staticDir string, spot Spot) (ForecastData, []hourSwells) {
 	lat, lon := spot.samplePoint()
 	if set, series, ok := spotSeriesFor(staticDir, spot.ID); ok {
@@ -656,6 +656,7 @@ func buildSpotForecast(start time.Time, samples []spotSample) (ForecastData, []h
 	}
 	var rows []ForecastRow
 	var hours []hourSwells
+	var nearshore []*nwpsPoint
 	for i := 0; i < len(samples)-1; i++ {
 		gap := samples[i+1].hour - samples[i].hour
 		for sub := 0; sub < gap; sub++ {
@@ -666,12 +667,15 @@ func buildSpotForecast(start time.Time, samples []spotSample) (ForecastData, []h
 			t := start.Add(time.Duration(hour) * time.Hour)
 			rows = append(rows, swellRow(p, n, t))
 			hours = append(hours, hourSwells{Time: t, Comps: swellComps(p)})
+			nearshore = append(nearshore, n)
 		}
 	}
 	last := samples[len(samples)-1]
 	lastT := start.Add(time.Duration(last.hour) * time.Hour)
 	rows = append(rows, swellRow(last.p, last.nwps, lastT))
 	hours = append(hours, hourSwells{Time: lastT, Comps: swellComps(last.p)})
+	nearshore = append(nearshore, last.nwps)
+	calibrateNearshore(hours, nearshore)
 
 	return ForecastData{Forecast: rows, Date: start.Format("2006010215")}, hours
 }
