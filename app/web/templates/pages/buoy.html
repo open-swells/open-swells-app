@@ -2,6 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <html class="dark">
     <head>
+        <script>if (window.self !== window.top) document.documentElement.classList.add('embedded');</script>
         {{template "analytics"}}
         <script src="https://cdn.tailwindcss.com"></script>
         <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
@@ -47,6 +48,7 @@
     </head>
 
     <body>
+      {{template "stationnav" (printf "/map?buoy=%s" .SwellReport.StationId)}}
       <main class="station-shell">
         <div class="station-header flex items-start justify-between gap-4 mb-4">
             <!-- Buoy Name -->
@@ -56,7 +58,7 @@
             </div>
 
             <div class="station-header-actions">
-                {{template "optionsmenu" "page-header-action page-open-button"}}
+                <div class="popup-only">{{template "optionsmenu" "page-header-action page-open-button"}}</div>
                 <a class="page-header-action page-open-button popup-only" href="/forecast/{{.SwellReport.StationId}}" target="_top" aria-label="Open full forecast" title="Open full forecast">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg><span>Full page</span>
                 </a>

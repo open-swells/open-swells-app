@@ -1,0 +1,141 @@
+{{/* Top bar for the full-page spot and buoy forecasts: back to the map on
+     the left, a search across buoys and surf spots in the middle, and the
+     display options on the right. It is hidden when the page is embedded
+     in the map's forecast dialog, which has its own chrome. Pass the map
+     link to return to (centered on this station). Styles live in theme.css
+     under "Station nav". */}}
+{{define "stationnav"}}
+<header class="station-nav" data-station-nav>
+    <div class="station-nav-inner">
+        <a class="station-nav-back" href="{{.}}" target="_top" title="Back to map">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            <span>Map</span>
+        </a>
+        <div class="station-nav-search" data-nav-search>
+            <svg class="station-nav-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="search" autocomplete="off" spellcheck="false" placeholder="Search spots and buoys..." aria-label="Search spots and buoys" data-nav-search-input>
+            <kbd class="mono" aria-hidden="true">/</kbd>
+            <div class="station-nav-results" role="listbox" data-nav-search-results hidden></div>
+        </div>
+        {{template "optionsmenu" "page-header-action page-open-button"}}
+    </div>
+</header>
+<script>
+(function () {
+    // Same matching as the map's search: buoys by name or station id, spots
+    // by name or region, sorted by name. The station lists load on first
+    // focus so a page view that never searches costs nothing.
+    const LIMIT = 20;
+    const root = document.querySelector('[data-nav-search]');
+    if (!root) return;
+    const input = root.querySelector('[data-nav-search-input]');
+    const results = root.querySelector('[data-nav-search-results]');
+    let stations = null;
+    let loading = null;
+    let active = -1;
+
+    function load() {
+        if (!loading) {
+            const get = url => fetch(url).then(r => r.ok ? r.json() : []).catch(() => []);
+            loading = Promise.all([get('/api/buoys'), get('/api/spots')]).then(([buoys, spots]) => {
+                stations = [
+                    ...(buoys || []).map(b => ({
+                        type: 'buoy', name: b.name || b.stationId, sub: b.stationId,
+                        key: `${b.name || ''} ${b.stationId}`.toLowerCase(),
+                        href: `/forecast/${encodeURIComponent(b.stationId)}`,
+                    })),
+                    ...(spots || []).map(s => ({
+                        type: 'spot', name: s.name, sub: s.region || '',
+                        key: `${s.name || ''} ${s.region || ''}`.toLowerCase(),
+                        href: `/surf-spots/${encodeURIComponent(s.id)}`,
+                    })),
+                ];
+                render();
+            });
+        }
+        return loading;
+    }
+
+    function close() {
+        results.hidden = true;
+        results.innerHTML = '';
+        active = -1;
+    }
+
+    function setActive(i) {
+        const items = results.querySelectorAll('[role="option"]');
+        if (!items.length) return;
+        active = (i + items.length) % items.length;
+        items.forEach((el, n) => el.setAttribute('aria-selected', String(n === active)));
+        items[active].scrollIntoView({ block: 'nearest' });
+    }
+
+    function render() {
+        const term = input.value.trim().toLowerCase();
+        if (!term || document.activeElement !== input) { close(); return; }
+        results.hidden = false;
+        active = -1;
+        if (!stations) {
+            results.innerHTML = '<div class="station-nav-empty">Loading…</div>';
+            return;
+        }
+        const matches = stations
+            .filter(s => s.key.includes(term))
+            .sort((a, b) => Number(!a.name.toLowerCase().startsWith(term)) - Number(!b.name.toLowerCase().startsWith(term)) || a.name.localeCompare(b.name))
+            .slice(0, LIMIT);
+        results.innerHTML = '';
+        if (!matches.length) {
+            results.innerHTML = '<div class="station-nav-empty">No matches found</div>';
+            return;
+        }
+        for (const m of matches) {
+            const a = document.createElement('a');
+            a.href = m.href;
+            a.target = '_top';
+            a.setAttribute('role', 'option');
+            a.className = 'station-nav-result';
+            const name = document.createElement('span');
+            name.className = 'station-nav-result-name';
+            name.textContent = m.name;
+            const meta = document.createElement('span');
+            meta.className = 'station-nav-result-meta';
+            const badge = document.createElement('span');
+            badge.className = `search-badge search-badge-${m.type === 'buoy' ? 'buoy' : 'beach'}`;
+            badge.textContent = m.type === 'buoy' ? 'Buoy' : 'Beach';
+            const sub = document.createElement('span');
+            sub.className = 'mono';
+            sub.textContent = m.sub;
+            meta.append(badge, sub);
+            a.append(name, meta);
+            results.appendChild(a);
+        }
+    }
+
+    input.addEventListener('focus', () => { load(); render(); });
+    input.addEventListener('input', () => { load(); render(); });
+    input.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); setActive(active + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(active - 1); }
+        else if (e.key === 'Enter') {
+            const items = results.querySelectorAll('[role="option"]');
+            const pick = items[active >= 0 ? active : 0];
+            if (pick) { e.preventDefault(); window.location.assign(pick.href); }
+        } else if (e.key === 'Escape') {
+            input.value = '';
+            close();
+            input.blur();
+        }
+    });
+    document.addEventListener('click', e => { if (!root.contains(e.target)) close(); });
+    // "/" focuses the search from anywhere on the page
+    document.addEventListener('keydown', e => {
+        if (e.key !== '/' || e.defaultPrevented) return;
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (document.documentElement.classList.contains('embedded') || document.body.classList.contains('embedded')) return;
+        e.preventDefault();
+        input.focus();
+    });
+})();
+</script>
+{{end}}
