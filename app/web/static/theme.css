@@ -471,3 +471,86 @@ a.forecastcard { display: block; color: #fff; }
         transition-duration: .001ms !important;
     }
 }
+
+/* --- Station nav ------------------------------------------------------ */
+/* Top bar on the full-page spot and buoy forecasts (components/
+   stationnav.html): back to the map, search, options. The map's forecast
+   dialog embeds the same pages and supplies its own chrome. */
+/* No bar behind the controls: they sit at the top of the page and scroll
+   away with it, each lifted by its own shadow like the map's chrome. The
+   z-index keeps the search results and menu above the page below. */
+.station-nav { position: relative; z-index: 50; }
+.station-nav-back, .station-nav-search input, .station-nav .options-trigger {
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .38);
+}
+.station-nav .options-trigger { background: var(--raised); }
+html.embedded .station-nav, body.embedded .station-nav { display: none; }
+.station-nav-inner {
+    max-width: 1120px; margin: 0 auto; padding: 8px 24px;
+    display: grid; grid-template-columns: 1fr minmax(0, 440px) 1fr; align-items: center; gap: 12px;
+}
+.station-nav-inner > .options { justify-self: end; }
+.station-nav-back {
+    justify-self: start;
+    height: 36px; padding: 0 12px 0 8px; gap: 4px;
+    display: inline-flex; align-items: center;
+    border: 1px solid var(--line-strong); border-radius: var(--radius);
+    background: var(--raised); color: var(--text-1);
+    font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+.station-nav-back:hover { background: var(--hover); color: #fff; }
+.station-nav-back svg { width: 16px; height: 16px; }
+.station-nav-search { position: relative; width: 100%; }
+.station-nav-search input {
+    width: 100%; height: 36px; padding: 0 34px 0 34px;
+    border: 1px solid var(--line-strong); border-radius: var(--radius);
+    background: var(--raised); color: #fff; font-size: 13px; outline: none;
+    -webkit-appearance: none; appearance: none;
+}
+.station-nav-search input::-webkit-search-cancel-button { display: none; }
+.station-nav-search input::placeholder { color: var(--text-3); }
+.station-nav-search input:focus { border-color: var(--accent-bright); }
+.station-nav-search-icon {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 14px; height: 14px; color: var(--text-2); pointer-events: none;
+}
+.station-nav-search kbd {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--text-3);
+    border: 1px solid var(--line-strong); border-radius: 2px; pointer-events: none;
+}
+.station-nav-search input:focus ~ kbd { display: none; }
+.station-nav-results {
+    position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; right: 0;
+    max-height: min(60dvh, 340px); overflow-y: auto;
+    background: #1b1c20; border: 1px solid var(--line-strong); border-radius: var(--radius);
+    box-shadow: var(--shadow-pop);
+}
+.station-nav-results[hidden] { display: none; }
+.station-nav-result {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 8px 12px; border-bottom: 1px solid var(--line);
+}
+.station-nav-result:last-child { border-bottom: 0; }
+.station-nav-result:hover, .station-nav-result[aria-selected="true"] { background: var(--hover); }
+.station-nav-result-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-1); }
+.station-nav-result-meta { display: flex; align-items: center; gap: 8px; flex: none; max-width: 55%; min-width: 0; }
+.station-nav-result-meta .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--text-2); }
+.station-nav-empty { padding: 10px 12px; font-size: 12px; color: var(--text-2); }
+.search-badge {
+    flex: none; font-size: 9px; font-weight: 600; text-transform: uppercase;
+    padding: 1px 5px; border: 1px solid currentColor; line-height: 14px;
+}
+.search-badge-buoy { color: var(--kind-buoy); }
+.search-badge-beach { color: var(--kind-beach); }
+@media (max-width: 767px) {
+    .station-nav-inner { padding: 8px 12px; gap: 8px; grid-template-columns: auto minmax(0, 1fr) auto; }
+    .station-nav-search kbd { display: none; }
+    /* iOS zooms into inputs under 16px */
+    .station-nav-search input { font-size: 16px; }
+}
+@media (max-width: 420px) {
+    .station-nav-back { width: 36px; padding: 0; justify-content: center; }
+    .station-nav-back span { display: none; }
+}
