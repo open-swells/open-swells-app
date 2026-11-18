@@ -1,17 +1,13 @@
-## Systemd process to parse and store grib files
+## Scheduled runs to parse and store grib files
 
-**Start Service**: `sudo systemctl start grib_parse.service`   
-**View Logs**: `journalctl -u grib_parse.service `   
-**stop service**: sudo systemctl stop grib_parse.service  
-**status of service**: systemctl status grib_parse.service  
-**Verify timer**:`systemctl list-timers`  
-    
-**Reload the system and enable the timer (this happens in setup_service.sh)**:  
+Cron runs the pipeline on the forecast host four times a day, once per GFS
+cycle (times are in the host's local time zone):
 ```
-sudo systemctl daemon-reload
-sudo systemctl enable my_python_script.timer
-sudo systemctl start my_python_script.timer
+0 1,7,13,19 * * * <pipeline-dir>/run.sh
 ```
+Check it with `crontab -l`; `scripts/deploy.sh` warns if no entry runs
+`run.sh`. Follow a run with
+`tail -f /var/lib/open-swells/pipeline/logs/grib-run.log`.
 
 **Where things live**: the pipeline keeps nothing in its checkout. Config
 is `/etc/open-swells/open-swells-pipeline.env`; the work directory, logs
