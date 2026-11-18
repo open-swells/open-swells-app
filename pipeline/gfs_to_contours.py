@@ -139,7 +139,7 @@ def _print_progress(done: int, total: int, label: str) -> None:
     """Draw a progress bar on the controlling terminal when GRIB_PROGRESS=1.
 
     Writes to /dev/tty directly: run.sh redirects stdout/stderr into the run
-    log, and \\r control characters don't belong in a log file. Under systemd
+    log, and \\r control characters don't belong in a log file. Under cron
     (no terminal) this is a no-op.
     """
     global _progress_tty, _progress_tty_tried

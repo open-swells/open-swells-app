@@ -4,7 +4,7 @@
 # Syncs this directory to PIPELINE_DIR, refreshes the virtualenv from
 # uv.lock, and smoke-tests the result. Only code lives in PIPELINE_DIR: the
 # host's config (/etc/open-swells) and data (/var/lib/open-swells), its
-# .venv and its scheduling (cron or systemd timer) are left untouched.
+# .venv and its cron schedule are left untouched.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -118,10 +118,8 @@ fi
 
 if crontab -l 2>/dev/null | grep -v '^[[:space:]]*#' | grep -qF "$PIPELINE_DIR/run.sh"; then
   echo "Scheduled by cron: $(crontab -l | grep -v '^[[:space:]]*#' | grep -F "$PIPELINE_DIR/run.sh")"
-elif systemctl is-enabled --quiet grib_parse.timer 2>/dev/null; then
-  echo "Scheduled by grib_parse.timer."
 else
-  echo "Warning: no cron entry or enabled timer runs $PIPELINE_DIR/run.sh." >&2
+  echo "Warning: no cron entry runs $PIPELINE_DIR/run.sh." >&2
 fi
 REMOTE_SCRIPT
 
