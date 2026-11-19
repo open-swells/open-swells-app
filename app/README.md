@@ -154,9 +154,10 @@ Optional overrides:
 DEPLOY_USER=root DEPLOY_DIR=/opt/open-swells-app APP_NAME=open-swells-app APP_USER=openswells ./ops/deploy.sh
 ```
 
-The server must have Go installed and must build with Go 1.26.5 or newer (the
-module enforces this; Go's automatic toolchain download may need outbound
-access). Server configuration, Firebase credentials, SQLite state, and
+The server must have Go installed. The module pins `toolchain go1.27.4` (and
+`ops/deploy.sh` enforces it at build time) to pick up a net/http security fix;
+Go's automatic toolchain download may need outbound access if the installed
+Go is older. Server configuration, Firebase credentials, SQLite state, and
 forecast data live outside the deploy directory and remain unchanged.
 
 ### Resources and Tools

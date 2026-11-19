@@ -88,6 +88,17 @@ fi
 
 echo "Building with $GO_BIN..."
 "$GO_BIN" build -buildvcs=false -o "$APP_NAME" ./server
+
+# go.mod pins `toolchain go1.27.4` to pick up a net/http security fix
+# (GO-2026-6859). If GOTOOLCHAIN=local or a failed toolchain download let an
+# older Go build anyway, refuse to ship it instead of serving vulnerable code.
+BUILT_GO="$("$GO_BIN" version -m "$APP_NAME" | awk 'NR==1{print $2}' | sed 's/^go//')"
+if ! printf '%s\n%s\n' "1.27.4" "$BUILT_GO" | sort -V -C; then
+  echo "Built with Go $BUILT_GO, but go.mod requires 1.27.4 or newer (GO-2026-6859)." >&2
+  echo "Leave GOTOOLCHAIN=auto (the default) so Go downloads the pinned toolchain, or install Go 1.27.4+." >&2
+  exit 1
+fi
+
 chown root:"$APP_USER" "$APP_NAME"
 chmod 0750 "$APP_NAME"
 

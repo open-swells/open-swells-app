@@ -113,6 +113,7 @@ func securityHeaders() gin.HandlerFunc {
 			return
 		}
 		c.Header("Content-Security-Policy", "base-uri 'self'; object-src 'none'; frame-ancestors 'self'")
+		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "SAMEORIGIN")
