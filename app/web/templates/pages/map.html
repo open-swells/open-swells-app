@@ -394,7 +394,7 @@
                         <div class="menu-label">Map layers</div>
                         <label class="menu-item">
                             <input type="checkbox" id="arrowsToggle" checked>
-                            Swell arrows
+                            Swell flow
                         </label>
                         <label class="menu-item" title="Off shows stepped height bands instead">
                             <input type="checkbox" id="heatmapToggle" checked>
@@ -920,35 +920,396 @@
                 return { cancel: () => controller.abort() };
             });
 
-            function makeArrowImage(size = 44) {
-                const canvas = document.createElement('canvas');
-                canvas.width = canvas.height = size;
-                const ctx = canvas.getContext('2d');
-                ctx.translate(size / 2, size / 2);
-                // Arrow points up (north); icon-rotate spins it per feature.
-                const s = size / 2;
-                ctx.beginPath();
-                ctx.moveTo(0, -s * 0.8);
-                ctx.lineTo(s * 0.38, -s * 0.15);
-                ctx.lineTo(s * 0.12, -s * 0.15);
-                ctx.lineTo(s * 0.12, s * 0.8);
-                ctx.lineTo(-s * 0.12, s * 0.8);
-                ctx.lineTo(-s * 0.12, -s * 0.15);
-                ctx.lineTo(-s * 0.38, -s * 0.15);
-                ctx.closePath();
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.stroke();
-                ctx.fillStyle = 'rgba(11, 11, 11, 0.8)';
-                ctx.fill();
-                return ctx.getImageData(0, 0, size, size);
+            // --- Swell flow ----------------------------------------------------
+            // Animated particles drifting along the primary swell direction,
+            // drawn by a MapLibre custom WebGL layer. Living inside the
+            // layer stack (above the heatmap, below the land mask) keeps
+            // them crisp at the coastline and under the place labels.
+            //
+            // Particles live in Mercator world coordinates (0..1), so a pan
+            // or zoom never smears them. Each keeps a short history of
+            // positions drawn as an even-width strip that fades toward the tail. Speed follows the
+            // swell period (longer period, faster groups); brightness
+            // follows height. A new hour's field blends in from the old one,
+            // so playback shows the flow turning rather than jumping.
+            function createSwellFlow(map) {
+                const TRAIL = 10;             // history points per particle
+                const TRAIL_STEP_MS = 120;    // time between history points
+                const BLEND_MS = 700;         // field crossfade between hours
+                const MAX_PARTICLES = 5000;
+                const PX_PER_PARTICLE = 700;  // density: one per this many px²
+                const TRAIL_WIDTH_PX = 2;     // constant along the trail
+                const VERTS = (TRAIL + 1) * 2 + 2; // strip + degenerate joins
+                const FLOATS = 3;             // x, y, alpha
+
+                let field = null;
+                let prevField = null;
+                let blendStart = 0;
+                let enabled = true;
+                let particles = [];
+                let gl = null, program = null, buffer = null, locs = null;
+                let vertexData = new Float32Array(0);
+                let lastFrame = 0;
+                let lastZoom = null;
+
+                // Grid -> sampling arrays. Directions become unit vectors
+                // (where the swell is going) so interpolation never has to
+                // care about the 359°/0° seam.
+                function buildField(grid) {
+                    const nlat = grid.lat.length, nlon = grid.lon.length;
+                    const n = nlat * nlon;
+                    const u = new Float32Array(n), v = new Float32Array(n);
+                    const p = new Float32Array(n), h = new Float32Array(n);
+                    const ok = new Uint8Array(n);
+                    for (let c = 0; c < n; c++) {
+                        const d = grid.value('d1', c), per = grid.value('p1', c), hh = grid.value('h1', c);
+                        if (d === null || per === null || hh === null) continue;
+                        const to = (d + 180) * Math.PI / 180;
+                        u[c] = Math.sin(to);   // east
+                        v[c] = Math.cos(to);   // north
+                        p[c] = per;
+                        h[c] = hh;
+                        ok[c] = 1;
+                    }
+                    const lat0 = grid.lat[0], dlat = grid.lat[1] - grid.lat[0];
+                    const lon0 = grid.lon[0], dlon = grid.lon[1] - grid.lon[0];
+                    const global = Math.abs(nlon * dlon - 360) < dlon * 0.5;
+                    return { nlat, nlon, lat0, dlat, lon0, dlon, global, u, v, p, h, ok };
+                }
+
+                // Bilinear over whichever of the four corners have data, so
+                // particles reach right up to the coast (the land mask hides
+                // the bit that overshoots). Null with no data nearby.
+                const out = { u: 0, v: 0, p: 0, h: 0 };
+                function sampleOne(f, lng, lat, res) {
+                    const fi = (lat - f.lat0) / f.dlat;
+                    if (fi < 0 || fi > f.nlat - 1) return false;
+                    let x = ((lng - f.lon0) % 360 + 360) % 360;
+                    const fj = x / f.dlon;
+                    if (!f.global && fj > f.nlon - 1) return false;
+                    const i0 = Math.floor(fi), j0 = Math.floor(fj);
+                    const i1 = Math.min(i0 + 1, f.nlat - 1);
+                    const j1 = f.global ? (j0 + 1) % f.nlon : Math.min(j0 + 1, f.nlon - 1);
+                    const ti = fi - i0, tj = fj - j0;
+                    let wsum = 0, u = 0, v = 0, p = 0, h = 0;
+                    const corners = [
+                        [i0 * f.nlon + (j0 % f.nlon), (1 - ti) * (1 - tj)],
+                        [i0 * f.nlon + j1, (1 - ti) * tj],
+                        [i1 * f.nlon + (j0 % f.nlon), ti * (1 - tj)],
+                        [i1 * f.nlon + j1, ti * tj],
+                    ];
+                    for (const [c, w] of corners) {
+                        if (!f.ok[c] || w <= 0) continue;
+                        wsum += w;
+                        u += f.u[c] * w; v += f.v[c] * w; p += f.p[c] * w; h += f.h[c] * w;
+                    }
+                    // Mostly-land neighbourhood: let the particle die.
+                    if (wsum < 0.25) return false;
+                    res.u = u / wsum; res.v = v / wsum; res.p = p / wsum; res.h = h / wsum;
+                    return true;
+                }
+
+                const tmpA = { u: 0, v: 0, p: 0, h: 0 }, tmpB = { u: 0, v: 0, p: 0, h: 0 };
+                function sample(lng, lat, now) {
+                    if (!field || !sampleOne(field, lng, lat, tmpA)) return null;
+                    const t = prevField ? Math.min(1, (now - blendStart) / BLEND_MS) : 1;
+                    if (t < 1 && sampleOne(prevField, lng, lat, tmpB)) {
+                        out.u = tmpB.u + (tmpA.u - tmpB.u) * t;
+                        out.v = tmpB.v + (tmpA.v - tmpB.v) * t;
+                        out.p = tmpB.p + (tmpA.p - tmpB.p) * t;
+                        out.h = tmpB.h + (tmpA.h - tmpB.h) * t;
+                    } else {
+                        out.u = tmpA.u; out.v = tmpA.v; out.p = tmpA.p; out.h = tmpA.h;
+                    }
+                    if (t >= 1) prevField = null;
+                    const len = Math.hypot(out.u, out.v);
+                    if (len < 1e-3) return null; // opposing swells cancel: no flow
+                    out.u /= len; out.v /= len;
+                    return out;
+                }
+
+                function mercToLngLat(x, y) {
+                    const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180 / Math.PI;
+                    return [x * 360 - 180, lat];
+                }
+
+                // Visible Mercator box (axis-aligned; a superset when rotated).
+                function viewBox() {
+                    const b = map.getBounds();
+                    const sw = maplibregl.MercatorCoordinate.fromLngLat(b.getSouthWest());
+                    const ne = maplibregl.MercatorCoordinate.fromLngLat(b.getNorthEast());
+                    return { x0: sw.x, x1: ne.x, y0: ne.y, y1: sw.y };
+                }
+
+                // Occupancy of a coarse screen grid (one cell per particle's
+                // share of the view). New particles go to the emptiest of a
+                // few random cells, so they fill gaps instead of piling up
+                // where the flow converges.
+                let occ = new Uint16Array(0), occCols = 0, occRows = 0;
+                function occCell(x, y, box) {
+                    const c = Math.floor((x - box.x0) / (box.x1 - box.x0) * occCols);
+                    const r = Math.floor((y - box.y0) / (box.y1 - box.y0) * occRows);
+                    return c < 0 || r < 0 || c >= occCols || r >= occRows ? -1 : r * occCols + c;
+                }
+                function countOccupancy(box) {
+                    const canvas = map.getCanvas();
+                    const cell = Math.sqrt(PX_PER_PARTICLE);
+                    occCols = Math.max(1, Math.round(canvas.clientWidth / cell));
+                    occRows = Math.max(1, Math.round(canvas.clientHeight / cell));
+                    if (occ.length !== occCols * occRows) occ = new Uint16Array(occCols * occRows);
+                    else occ.fill(0);
+                    for (const pt of particles) {
+                        if (pt.dead) continue;
+                        const i = occCell(pt.x, pt.y, box);
+                        if (i >= 0) occ[i]++;
+                    }
+                }
+
+                function spawn(pt, box, now) {
+                    let best = null, bestCount = Infinity;
+                    for (let tries = 0; tries < 10 && bestCount > 0; tries++) {
+                        const cell = Math.floor(Math.random() * occCols * occRows);
+                        if (occ[cell] >= bestCount) continue;
+                        // jittered point inside the cell
+                        const x = box.x0 + ((cell % occCols) + Math.random()) / occCols * (box.x1 - box.x0);
+                        const y = box.y0 + (Math.floor(cell / occCols) + Math.random()) / occRows * (box.y1 - box.y0);
+                        const [lng, lat] = mercToLngLat(x, y);
+                        if (!sample(lng, lat, now)) continue;
+                        best = { x, y, cell };
+                        bestCount = occ[cell];
+                    }
+                    if (best) {
+                        const { x, y } = best;
+                        occ[best.cell]++;
+                        pt.x = x; pt.y = y;
+                        pt.hx.fill(x); pt.hy.fill(y);
+                        pt.head = 0;
+                        pt.age = 0;
+                        pt.life = 2500 + Math.random() * 3500;
+                        pt.lastStep = now;
+                        pt.alpha = 0;
+                        pt.dead = false;
+                        return;
+                    }
+                    pt.dead = true; // nothing to sample here (all land); retry next frame
+                    pt.hx.fill(0); pt.hy.fill(0);
+                }
+
+                function resizeParticles(box, now) {
+                    const canvas = map.getCanvas();
+                    const area = canvas.clientWidth * canvas.clientHeight;
+                    const want = Math.min(MAX_PARTICLES, Math.round(area / PX_PER_PARTICLE));
+                    while (particles.length < want) {
+                        const pt = { hx: new Float64Array(TRAIL), hy: new Float64Array(TRAIL) };
+                        spawn(pt, box, now);
+                        // Stagger lifetimes so they don't all respawn together.
+                        pt.age = Math.random() * pt.life * 0.8;
+                        particles.push(pt);
+                    }
+                    if (particles.length > want) particles.length = want;
+                }
+
+                function step(now, dt, box) {
+                    // px/s at the screen -> Mercator units per ms
+                    const worldSize = 512 * Math.pow(2, map.getZoom());
+                    for (const pt of particles) {
+                        if (pt.dead) { spawn(pt, box, now); continue; }
+                        pt.age += dt;
+                        // Thin out crowded cells (converging flow) gradually.
+                        const cell = occCell(pt.x, pt.y, box);
+                        if (cell >= 0 && occ[cell] > 2 && Math.random() < dt / 1000) {
+                            occ[cell]--;
+                            pt.age = pt.life;
+                        }
+                        const outside = pt.x < box.x0 || pt.x > box.x1 || pt.y < box.y0 || pt.y > box.y1;
+                        const [lng, lat] = mercToLngLat(pt.x, pt.y);
+                        const s = pt.age < pt.life && !outside ? sample(lng, lat, now) : null;
+                        if (!s) {
+                            // Fade out in place, then respawn.
+                            pt.alpha -= dt / 300;
+                            if (pt.alpha <= 0) spawn(pt, box, now);
+                            continue;
+                        }
+                        const pxPerSec = 8 + 1.4 * Math.min(s.p, 22);
+                        const dist = pxPerSec * dt / 1000 / worldSize;
+                        pt.x += s.u * dist;
+                        pt.y -= s.v * dist; // Mercator y grows southward
+                        pt.alpha = Math.min(Math.min(1, 0.6 + s.h / 5), pt.alpha + dt / 400);
+                        if (now - pt.lastStep >= TRAIL_STEP_MS) {
+                            pt.head = (pt.head + 1) % TRAIL;
+                            pt.hx[pt.head] = pt.x;
+                            pt.hy[pt.head] = pt.y;
+                            pt.lastStep = now;
+                        }
+                    }
+                }
+
+                // One triangle strip for everything; consecutive particles
+                // are joined by degenerate triangles.
+                function buildVertices() {
+                    const need = particles.length * VERTS * FLOATS;
+                    if (vertexData.length < need) vertexData = new Float32Array(need);
+                    const worldSize = 512 * Math.pow(2, map.getZoom());
+                    const halfW = TRAIL_WIDTH_PX / worldSize / 2;
+                    const px = new Float64Array(TRAIL + 1), py = new Float64Array(TRAIL + 1);
+                    let o = 0;
+                    for (const pt of particles) {
+                        // points ordered head (live position) -> tail
+                        px[0] = pt.x; py[0] = pt.y;
+                        for (let k = 0; k < TRAIL; k++) {
+                            const idx = (pt.head - k + TRAIL) % TRAIL;
+                            px[k + 1] = pt.hx[idx]; py[k + 1] = pt.hy[idx];
+                        }
+                        if (pt.dead || pt.alpha <= 0) continue;
+                        const a = pt.alpha;
+                        const lead = o; // degenerate join: first vertex twice
+                        o += FLOATS;
+                        for (let k = 0; k <= TRAIL; k++) {
+                            const k0 = Math.max(0, k - 1), k1 = Math.min(TRAIL, k + 1);
+                            const dx = px[k0] - px[k1], dy = py[k0] - py[k1];
+                            const len = Math.hypot(dx, dy) || 1;
+                            const t = k / TRAIL;
+                            const nx = -dy / len * halfW, ny = dx / len * halfW;
+                            const va = a * (1 - t);
+                            vertexData[o++] = px[k] + nx; vertexData[o++] = py[k] + ny; vertexData[o++] = va;
+                            vertexData[o++] = px[k] - nx; vertexData[o++] = py[k] - ny; vertexData[o++] = va;
+                        }
+                        vertexData.copyWithin(lead, lead + FLOATS, lead + 2 * FLOATS);
+                        vertexData.copyWithin(o, o - FLOATS, o); // ...and last twice
+                        o += FLOATS;
+                    }
+                    return o / FLOATS;
+                }
+
+                const layer = {
+                    id: 'swell-flow',
+                    type: 'custom',
+                    renderingMode: '2d',
+                    onAdd(m, context) {
+                        gl = context;
+                        const vs = `
+                            uniform mat4 u_matrix;
+                            attribute vec2 a_pos;
+                            attribute float a_alpha;
+                            varying float v_alpha;
+                            void main() {
+                                v_alpha = a_alpha;
+                                gl_Position = u_matrix * vec4(a_pos, 0.0, 1.0);
+                            }`;
+                        const fs = `
+                            precision mediump float;
+                            varying float v_alpha;
+                            void main() {
+                                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0) * v_alpha * 0.55;
+                            }`;
+                        const compile = (type, src) => {
+                            const s = gl.createShader(type);
+                            gl.shaderSource(s, src);
+                            gl.compileShader(s);
+                            return s;
+                        };
+                        program = gl.createProgram();
+                        gl.attachShader(program, compile(gl.VERTEX_SHADER, vs));
+                        gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fs));
+                        gl.linkProgram(program);
+                        locs = {
+                            matrix: gl.getUniformLocation(program, 'u_matrix'),
+                            pos: gl.getAttribLocation(program, 'a_pos'),
+                            alpha: gl.getAttribLocation(program, 'a_alpha'),
+                        };
+                        buffer = gl.createBuffer();
+                        particles = [];
+                        lastFrame = 0;
+                    },
+                    onRemove() {
+                        if (gl) {
+                            gl.deleteBuffer(buffer);
+                            gl.deleteProgram(program);
+                        }
+                        gl = null;
+                    },
+                    render(context, matrix) {
+                        if (!enabled || !field || !program) return;
+                        const now = performance.now();
+                        // Clamp dt: a backgrounded tab shouldn't teleport particles.
+                        const dt = lastFrame ? Math.min(now - lastFrame, 50) : 16;
+                        lastFrame = now;
+                        const box = viewBox();
+                        const zoom = map.getZoom();
+                        if (lastZoom !== null && Math.abs(zoom - lastZoom) > 0.75) {
+                            particles = []; // density was for another zoom
+                        }
+                        if (lastZoom === null || Math.abs(zoom - lastZoom) > 0.75) lastZoom = zoom;
+                        countOccupancy(box);
+                        resizeParticles(box, now);
+                        step(now, dt, box);
+                        const count = buildVertices();
+
+                        gl.useProgram(program);
+                        gl.uniformMatrix4fv(locs.matrix, false, matrix);
+                        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+                        gl.bufferData(gl.ARRAY_BUFFER, vertexData.subarray(0, count * FLOATS), gl.STREAM_DRAW);
+                        gl.enableVertexAttribArray(locs.pos);
+                        gl.vertexAttribPointer(locs.pos, 2, gl.FLOAT, false, FLOATS * 4, 0);
+                        gl.enableVertexAttribArray(locs.alpha);
+                        gl.vertexAttribPointer(locs.alpha, 1, gl.FLOAT, false, FLOATS * 4, 8);
+                        gl.enable(gl.BLEND);
+                        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); // premultiplied
+                        gl.disable(gl.STENCIL_TEST);
+                        // Opaque layers above this one (the land mask) were
+                        // drawn earlier, in MapLibre's opaque pass; they hide
+                        // what's beneath them through the depth buffer. Test
+                        // against it at this layer's own depth (read-only),
+                        // as built-in layers do, or particles show over land.
+                        const depthMode = map.painter?.depthModeForSublayer?.(0, false);
+                        if (depthMode) {
+                            gl.enable(gl.DEPTH_TEST);
+                            gl.depthFunc(depthMode.func);
+                            gl.depthMask(false);
+                            gl.depthRange(depthMode.range[0], depthMode.range[1]);
+                        } else {
+                            gl.disable(gl.DEPTH_TEST);
+                        }
+                        gl.drawArrays(gl.TRIANGLE_STRIP, 0, count);
+                        map.triggerRepaint(); // keep animating
+                    },
+                };
+
+                const fieldCache = new WeakMap();
+                return {
+                    layer,
+                    setGrid(grid) {
+                        if (!grid) { field = null; prevField = null; return; }
+                        let next = fieldCache.get(grid);
+                        if (!next) {
+                            next = buildField(grid);
+                            fieldCache.set(grid, next);
+                        }
+                        if (next === field) return;
+                        prevField = field;
+                        blendStart = performance.now();
+                        field = next;
+                        map.triggerRepaint();
+                    },
+                    setEnabled(on) {
+                        enabled = on;
+                        lastFrame = 0;
+                        if (map.getLayer(layer.id)) {
+                            map.setLayoutProperty(layer.id, 'visibility', on ? 'visible' : 'none');
+                        }
+                        if (on) map.triggerRepaint();
+                    },
+                    get enabled() { return enabled; },
+                };
             }
 
+            const swellFlow = createSwellFlow(map);
+
             function addSwellLayers() {
-                for (const layer of ['hillshade', 'land-mask', 'lake-mask', 'contour-fills', 'swell-arrows']) {
+                for (const layer of ['hillshade', 'land-mask', 'lake-mask', 'contour-fills', 'swell-flow']) {
                     if (map.getLayer(layer)) map.removeLayer(layer);
                 }
-                for (const source of ['terrain-dem', 'contours', 'arrows']) {
+                for (const source of ['terrain-dem', 'contours']) {
                     if (map.getSource(source)) map.removeSource(source);
                 }
 
@@ -975,7 +1336,6 @@
                 });
 
                 map.addSource('contours', { type: 'geojson', data: EMPTY_FC });
-                map.addSource('arrows', { type: 'geojson', data: EMPTY_FC });
 
                 map.addLayer({
                     id: 'contour-fills',
@@ -1015,30 +1375,11 @@
                     });
                 }
 
-                if (!map.hasImage('swell-arrow')) {
-                    map.addImage('swell-arrow', makeArrowImage(), { pixelRatio: 2 });
-                }
-                map.addLayer({
-                    id: 'swell-arrows',
-                    type: 'symbol',
-                    source: 'arrows',
-                    layout: {
-                        'icon-image': 'swell-arrow',
-                        // d = direction the swell comes FROM; point where it's going
-                        'icon-rotate': ['+', ['get', 'd'], 180],
-                        'icon-rotation-alignment': 'map',
-                        // collision detection thins arrows out at low zoom
-                        'icon-allow-overlap': false,
-                        'icon-padding': 4,
-                        'icon-size': ['interpolate', ['linear'], ['zoom'], 2, 0.45, 5, 0.7, 8, 1.0],
-                    },
-                    paint: { 'icon-opacity': 0.85 },
-                });
+                // Drawn between the swell colors and the land mask, so the
+                // mask trims particles to the real coastline.
+                map.addLayer(swellFlow.layer);
                 const arrowsToggle = document.getElementById('arrowsToggle');
-                if (arrowsToggle && !arrowsToggle.checked) {
-                    map.setLayoutProperty('swell-arrows', 'visibility', 'none');
-                }
-
+                if (arrowsToggle && !arrowsToggle.checked) swellFlow.setEnabled(false);
             }
 
             // --- Heatmap rendering -------------------------------------------
@@ -1353,32 +1694,23 @@
                 applyLandColor();
                 addSwellLayers();
                 swellLayersReady = true;
-                // Find the first symbol layer and slot the swell layers beneath
-                // it so place labels stay readable. Fills sit under arrows.
-                let firstSymbolId;
-                for (const layer of map.getStyle().layers) {
-                    if (layer.type === 'symbol') {
-                        firstSymbolId = layer.id;
-                        break;
-                    }
-                }
-                map.moveLayer('swell-arrows', firstSymbolId);
+                const firstSymbolId = map.getStyle().layers.find(l => l.type === 'symbol')?.id;
 
                 // Slot the swell stack right above the basemap's water fills,
                 // so roads draw over the land mask:
-                // water -> heatmap/NWPS -> contours -> land/lake mask ->
-                // hillshade -> rivers, boundaries, roads -> arrows -> labels.
+                // water -> heatmap/NWPS -> contours -> swell flow ->
+                // land/lake mask -> hillshade -> rivers, boundaries, roads -> labels.
                 const styleLayers = map.getStyle().layers;
                 let lastWaterIdx = -1;
                 styleLayers.forEach((layer, i) => {
                     if (layer.type === 'fill' && layer['source-layer'] === 'water') lastWaterIdx = i;
                 });
-                const swellStack = ['contour-fills', 'land-mask', 'lake-mask', 'hillshade']
+                const swellStack = ['contour-fills', 'swell-flow', 'land-mask', 'lake-mask', 'hillshade']
                     .filter(id => map.getLayer(id));
-                const stackIds = new Set([...swellStack, 'swell-arrows']);
-                // No basemap water layer (unexpected style): keep the old
-                // placement, just under the arrows.
-                const anchorId = lastWaterIdx < 0 ? 'swell-arrows' : styleLayers
+                const stackIds = new Set(swellStack);
+                // No basemap water layer (unexpected style): slot the stack
+                // just under the labels.
+                const anchorId = lastWaterIdx < 0 ? firstSymbolId : styleLayers
                     .slice(lastWaterIdx + 1)
                     .find(layer => !stackIds.has(layer.id))?.id;
                 for (const id of swellStack) map.moveLayer(id, anchorId);
@@ -1397,21 +1729,26 @@
             // fallback mode it comes from the hovered polygon's band.
             const legendReadout = document.getElementById('legendReadout');
 
-            map.on('mousemove', (e) => {
-                if (!legendReadout || !wantsHeatmap()) return;
-                const lng = e.lngLat.lng;
-                const lat = e.lngLat.lat;
+            // Nearest swell grid point within sqrt(maxDist2) degrees.
+            function nearestSwellPoint({ lng, lat }, maxDist2 = 4) {
                 let best = null;
-                let bestDist = 4; // squared degrees; ~2 deg search radius
+                let bestDist = maxDist2;
                 for (const f of currentArrows.features) {
                     const [flng, flat] = f.geometry.coordinates;
-                    const dlng = Math.min(Math.abs(flng - lng), 360 - Math.abs(flng - lng));
-                    const dist = dlng * dlng + (flat - lat) * (flat - lat);
+                    const dlng = Math.abs(flng - lng) % 360;
+                    const wrapped = Math.min(dlng, 360 - dlng);
+                    const dist = wrapped * wrapped + (flat - lat) * (flat - lat);
                     if (dist < bestDist) {
                         bestDist = dist;
                         best = f;
                     }
                 }
+                return best;
+            }
+
+            map.on('mousemove', (e) => {
+                if (!legendReadout || !wantsHeatmap()) return;
+                const best = nearestSwellPoint(e.lngLat); // ~2 deg search radius
                 legendReadout.textContent = best
                     ? `${Units.heightM(best.properties.h)} at cursor`
                     : '';
@@ -1446,16 +1783,26 @@
                     .map(k => ({ h: grid.value(`h${k}`, cell), p: grid.value(`p${k}`, cell), d: grid.value(`d${k}`, cell) }));
             }
 
-            // Hovering an arrow shows the full swell reading; the individual
-            // swell systems stream in once that hour of the swell bundle is cached.
+            // Resting the cursor on the water shows the full swell reading
+            // there; the individual swell systems stream in once that hour
+            // of the swell bundle is cached. A short dwell keeps the popup
+            // from chasing the cursor across the map.
+            const SWELL_POPUP_DWELL_MS = 450;
             const arrowPopup = new maplibregl.Popup({
                 closeButton: false,
                 closeOnClick: false,
                 offset: 12,
             });
-            map.on('mouseenter', 'swell-arrows', (e) => {
-                const p = e.features[0].properties;
-                const lngLat = e.lngLat;
+            let swellPopupTimer = null;
+            function hideSwellPopup() {
+                clearTimeout(swellPopupTimer);
+                swellPopupTimer = null;
+                arrowPopup.remove();
+            }
+            function showSwellPopup(lngLat) {
+                const best = nearestSwellPoint(lngLat, 1.5);
+                if (!best) return;
+                const p = best.properties;
                 const base = `<div class="text-xs">${Units.heightM(p.h)} @ ${p.p} s from ${p.d}&deg;</div>`;
                 arrowPopup.setLngLat(lngLat).setHTML(base).addTo(map);
 
@@ -1469,15 +1816,23 @@
                             rows.join(''));
                     }
                 });
+            }
+            map.on('mousemove', (e) => {
+                hideSwellPopup();
+                if (!swellFlow.enabled) return;
+                // Not over markers, popups or the clickable spot layers.
+                if (e.originalEvent.target !== map.getCanvas()) return;
+                const interactive = ['spot-clusters', 'spot-points'].filter(id => map.getLayer(id));
+                if (interactive.length && map.queryRenderedFeatures(e.point, { layers: interactive }).length) return;
+                const lngLat = e.lngLat;
+                swellPopupTimer = setTimeout(() => showSwellPopup(lngLat), SWELL_POPUP_DWELL_MS);
             });
-            map.on('mouseleave', 'swell-arrows', () => arrowPopup.remove());
+            map.getCanvas().addEventListener('mouseleave', hideSwellPopup);
+            map.on('movestart', hideSwellPopup);
 
-            // Wind arrows: hover shows speed (converted to mph) and origin
             document.getElementById('arrowsToggle').addEventListener('change', (e) => {
-                if (map.getLayer('swell-arrows')) {
-                    map.setLayoutProperty('swell-arrows', 'visibility',
-                        e.target.checked ? 'visible' : 'none');
-                }
+                swellFlow.setEnabled(e.target.checked);
+                if (!e.target.checked) hideSwellPopup();
             });
 
             document.getElementById('heatmapToggle').addEventListener('change', (e) => {
@@ -1730,9 +2085,10 @@
 
                 const token = ++updateToken;
                 const wantHeatmap = wantsHeatmap();
-                let [heatUrl, arrows] = await Promise.all([
+                let [heatUrl, arrows, arrowGrid] = await Promise.all([
                     wantHeatmap ? loadImageFrame(hourToHeatmapFilename(hours)) : null,
                     loadArrows(hours),
+                    loadArrowGrid(hours),
                 ]);
                 // Contours are the fallback when an hour has no heatmap.
                 let contours = null;
@@ -1747,8 +2103,7 @@
                 // in on first load), which silently dropped the first frame.
                 // setData/updateImage on our own sources are safe regardless.
                 if (swellLayersReady) {
-                    const arrowSource = map.getSource('arrows');
-                    if (arrowSource) arrowSource.setData(arrows);
+                    swellFlow.setGrid(arrowGrid);
                     const contourSource = map.getSource('contours');
                     if (contourSource) contourSource.setData(contours || EMPTY_FC);
                     if (wantHeatmap && heatUrl) {
