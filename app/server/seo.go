@@ -108,7 +108,7 @@ func NewSEOIndex(siteURL string, store *SpotStore) (*SEOIndex, error) {
 		return nil, fmt.Errorf("spot store is required")
 	}
 	index := &SEOIndex{xmlDocs: make(map[string][]byte)}
-	index.robots = []byte("User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: " + siteURL + "/sitemap.xml\n")
+	index.robots = []byte("User-agent: OAI-SearchBot\nAllow: /\nDisallow: /api/\n\nUser-agent: *\nAllow: /\nDisallow: /api/\nSitemap: " + siteURL + "/sitemap.xml\n")
 
 	pages, err := xmlDocument(sitemapURLSet{
 		XMLNS: "http://www.sitemaps.org/schemas/sitemap/0.9",

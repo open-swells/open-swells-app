@@ -65,7 +65,8 @@ func TestSEOIndexAndRobots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(index.robots, []byte("Disallow: /api/")) ||
+	if !bytes.Contains(index.robots, []byte("User-agent: OAI-SearchBot\nAllow: /\n")) ||
+		!bytes.Contains(index.robots, []byte("Disallow: /api/")) ||
 		!bytes.Contains(index.robots, []byte("Sitemap: https://openswells.com/sitemap.xml")) {
 		t.Fatalf("unexpected robots.txt:\n%s", index.robots)
 	}
