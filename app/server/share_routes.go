@@ -286,31 +286,6 @@ func spotPreviewView(spot Spot) mercView {
 	return viewAt(spot.Lon, spot.Lat, previewSpanDeg, previewPx, previewPx, 0.5, 0.5)
 }
 
-// HeatmapPreview is what the page needs to overlay the image: its URL and
-// corner coordinates, northwest clockwise, as MapLibre's image source
-// takes them.
-type HeatmapPreview struct {
-	URL         string
-	Coordinates [4][2]float64
-}
-
-func spotHeatmapPreview(staticDir string, spot Spot) (HeatmapPreview, bool) {
-	v := imageVersion(staticDir, time.Now())
-	if v == "" {
-		return HeatmapPreview{}, false
-	}
-	view := spotPreviewView(spot)
-	n, s := view.North(), view.South()
-	round := func(x float64) float64 { return math.Round(x*1e6) / 1e6 }
-	return HeatmapPreview{
-		URL: "/surf-spots/" + spot.ID + "/heatmap.png?v=" + v,
-		Coordinates: [4][2]float64{
-			{round(view.X0), round(n)}, {round(view.X1), round(n)},
-			{round(view.X1), round(s)}, {round(view.X0), round(s)},
-		},
-	}, true
-}
-
 func spotHeatmapHandler(staticDir string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		spot, ok := spotStore.Get(c.Param("slug"))

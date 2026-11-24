@@ -1049,9 +1049,6 @@ type SpotPageData struct {
 	// for a spot without a region).
 	Crumbs []Crumb
 	Text   SpotText
-	// Heatmap is the swell heatmap overlay for the exposure map.
-	Heatmap    HeatmapPreview
-	HasHeatmap bool
 }
 
 // facingLabel renders a facing bearing as "SW 225°" for the page header.
@@ -1134,7 +1131,6 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 	seo.OGDescription = text.Summary
 	seo.ImageURL = siteURL + SpotCardPath(staticDir, spot.ID)
 	seo.ImageAlt = fmt.Sprintf("Swell height map around %s with the swells arriving there now", spotStore.SEOName(spot))
-	heatmap, hasHeatmap := spotHeatmapPreview(staticDir, spot)
 	return SpotPageData{
 		TimeZone:        loc.String(),
 		SEO:             seo,
@@ -1163,7 +1159,5 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 		HasTide:         hasTide,
 		Crumbs:          crumbs,
 		Text:            text,
-		Heatmap:         heatmap,
-		HasHeatmap:      hasHeatmap,
 	}
 }

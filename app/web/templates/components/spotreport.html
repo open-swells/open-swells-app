@@ -174,8 +174,8 @@
 
     {{if .HasExposure}}
     <section class="rp-map-col" aria-label="Swell exposure">
-        <div class="exposure-map" role="img" aria-label="Map of the beach with the swell height around it, the swell directions it is open to, and the swells arriving">
-            <div class="exposure-basemap" data-exposure-map data-lat="{{.Latitude}}" data-lon="{{.Longitude}}"{{if .HasHeatmap}} data-heatmap-url="{{.Heatmap.URL}}" data-heatmap-coords="{{json .Heatmap.Coordinates}}"{{end}}></div>
+        <div class="exposure-map" role="img" aria-label="Map of the beach showing the swell directions it is open to and the swells arriving">
+            <div class="exposure-basemap" data-exposure-map data-lat="{{.Latitude}}" data-lon="{{.Longitude}}"></div>
             <svg class="exposure-arc" viewBox="0 0 100 100" aria-hidden="true">
                 {{if .Exposure.ArcPath}}<path class="open" d="{{.Exposure.ArcPath}}"/>{{end}}
                 {{range .Exposure.Arrows}}<path class="swell-arrow {{.Kind}}" d="{{.Path}}"/>{{end}}
@@ -206,8 +206,8 @@
         // Compact attribution opens expanded once the map loads;
         // fold it back to the (i) button.
         map.once('load', () => el.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'));
-        // Darker land makes the coastline clearer in this small preview.
-        const LAND = '#999999';
+        // Match the main map's land color while keeping the basemap water.
+        const LAND = '#26282e';
         map.on('style.load', () => {
             const layers = map.getStyle().layers;
             for (const layer of layers) {
@@ -217,39 +217,7 @@
                     map.setLayoutProperty(layer.id, 'visibility', 'none');
                 }
             }
-            addHeatmap(layers);
         });
-        // The swell heatmap around the spot (the server crops the map's
-        // frame for this hour), colored like the main map. It sits over the
-        // water fills, with the basemap's land drawn back over it: the
-        // model grid's coast is far coarser than the real one.
-        function addHeatmap(layers) {
-            const url = el.dataset.heatmapUrl;
-            if (!url || !map.getSource('protomaps')) return;
-            let lastWater = -1;
-            layers.forEach((layer, i) => {
-                if (layer.type === 'fill' && layer['source-layer'] === 'water') lastWater = i;
-            });
-            const before = lastWater < 0 ? undefined : layers[lastWater + 1]?.id;
-            map.addSource('swell-heatmap', { type: 'image', url, coordinates: JSON.parse(el.dataset.heatmapCoords) });
-            map.addLayer({
-                id: 'swell-heatmap', type: 'raster', source: 'swell-heatmap',
-                paint: { 'raster-opacity': 0.85, 'raster-resampling': 'linear', 'raster-fade-duration': 0 },
-            }, before);
-            map.addLayer({
-                id: 'land-mask', type: 'fill', source: 'protomaps', 'source-layer': 'earth',
-                paint: { 'fill-color': LAND, 'fill-antialias': true },
-            }, before);
-            // Inland water sits inside "earth", so it is punched back out;
-            // bays, straits and lagoons are sea and keep their swell color.
-            const water = map.getLayer('water') ? map.getPaintProperty('water', 'fill-color') : null;
-            map.addLayer({
-                id: 'lake-mask', type: 'fill', source: 'protomaps', 'source-layer': 'water',
-                filter: ['all', ['==', ['geometry-type'], 'Polygon'],
-                    ['!', ['in', ['get', 'kind'], ['literal', ['ocean', 'sea', 'bay', 'strait', 'lagoon']]]]],
-                paint: { 'fill-color': water || '#b0d0d6' },
-            }, before);
-        }
     });
 </script>
 {{end}}
