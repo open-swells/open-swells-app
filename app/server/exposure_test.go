@@ -97,3 +97,17 @@ func TestCircularRunsWraps(t *testing.T) {
 		t.Errorf("runs %v, want one run 300..20", runs)
 	}
 }
+
+func TestSwellLabel(t *testing.T) {
+	for _, tt := range []struct{ ft, period, want string }{
+		{"2.3", "14.4", "2.3ft at 14s"},
+		{"1.0", "7.4", "1ft at 7s"},
+		{"10.4", "15.6", "10ft at 16s"},
+		{"3.2", "", "3.2ft"},
+		{"", "12", ""},
+	} {
+		if got := swellLabel(tt.ft, tt.period); got != tt.want {
+			t.Errorf("swellLabel(%q, %q) = %q, want %q", tt.ft, tt.period, got, tt.want)
+		}
+	}
+}

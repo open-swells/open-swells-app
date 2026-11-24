@@ -1133,7 +1133,7 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 	})
 	seo.OGDescription = text.Summary
 	seo.ImageURL = siteURL + SpotCardPath(staticDir, spot.ID)
-	seo.ImageAlt = fmt.Sprintf("Swell height map around %s with the surf forecast", spotStore.SEOName(spot))
+	seo.ImageAlt = fmt.Sprintf("Swell height map around %s with the swells arriving there now", spotStore.SEOName(spot))
 	heatmap, hasHeatmap := spotHeatmapPreview(staticDir, spot)
 	return SpotPageData{
 		TimeZone:        loc.String(),

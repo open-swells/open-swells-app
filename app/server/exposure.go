@@ -55,39 +55,54 @@ func arrowScale(heightFt float64) float64 {
 
 // newSwellArrow draws swell heightFt tall arriving from bearing deg (model
 // strings such as "2.3" and "210"), false when there is no direction or
-// height. The tip stays at the beach; length scales with height and width
-// half as much, so small arrows stay solid enough to see.
+// height.
 func newSwellArrow(deg, heightFt string) swellArrow {
+	pts, scale, ok := swellArrowShape(deg, heightFt)
+	if !ok {
+		return swellArrow{}
+	}
+	var path strings.Builder
+	for i, p := range pts {
+		cmd := "L"
+		if i == 0 {
+			cmd = "M"
+		}
+		fmt.Fprintf(&path, "%s%.2f %.2f ", cmd, p[0], p[1])
+	}
+	path.WriteString("Z")
+	return swellArrow{Path: path.String(), Scale: scale, Has: true}
+}
+
+// swellArrowShape is the arrow's outline in the 100x100 viewBox with the
+// beach at its center, and its size (arrowScale). The tip stays at the
+// beach; length scales with height and width half as much, so small
+// arrows stay solid enough to see. The share cards draw the same shape.
+func swellArrowShape(deg, heightFt string) ([][2]float64, float64, bool) {
 	d, err := strconv.ParseFloat(deg, 64)
 	if err != nil {
-		return swellArrow{}
+		return nil, 0, false
 	}
 	h, err := strconv.ParseFloat(heightFt, 64)
 	if err != nil {
-		return swellArrow{}
+		return nil, 0, false
 	}
 	length := arrowScale(h)
 	width := (1 + length) / 2
 	// offset(r, w) is the point at radius r along the bearing, w across it
 	// (positive clockwise)
 	rad := d * math.Pi / 180
-	offset := func(r, w float64) string {
-		x := 50 + r*math.Sin(rad) + w*math.Cos(rad)
-		y := 50 - r*math.Cos(rad) + w*math.Sin(rad)
-		return fmt.Sprintf("%.2f %.2f", x, y)
+	offset := func(r, w float64) [2]float64 {
+		return [2]float64{50 + r*math.Sin(rad) + w*math.Cos(rad), 50 - r*math.Cos(rad) + w*math.Sin(rad)}
 	}
 	tail := arrowTip + (arrowTail-arrowTip)*length
 	neck := arrowTip + arrowHeadLen*width
 	shaft, head := arrowShaft*width, arrowHeadHalf*width
-	return swellArrow{
-		Path: fmt.Sprintf("M%s L%s L%s L%s L%s L%s L%s Z",
-			offset(tail, -shaft), offset(tail, shaft),
-			offset(neck, shaft), offset(neck, head),
-			offset(arrowTip, 0),
-			offset(neck, -head), offset(neck, -shaft)),
-		Scale: length,
-		Has:   true,
-	}
+	return [][2]float64{
+		offset(tail, -shaft), offset(tail, shaft),
+		offset(neck, shaft), offset(neck, head),
+		offset(arrowTip, 0),
+		offset(neck, -head), offset(neck, -shaft),
+	}, length, true
 }
 
 // exposureRadius is how far the open-direction wedge reaches, in the arc's
