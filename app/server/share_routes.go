@@ -53,6 +53,18 @@ func (c *imageCache) put(key string, b []byte) {
 	c.data[key] = b
 }
 
+// renderSlots caps simultaneous image renders. Each holds ~25MB of
+// buffers and a core for 0.1-0.3s, and the app server has 1GB of RAM and
+// one CPU: a burst of uncached cards (a crawler, a shared link unfurling
+// in many places) waits its turn instead of exhausting memory.
+var renderSlots = make(chan struct{}, 2)
+
+func withRenderSlot(render func() ([]byte, error)) ([]byte, error) {
+	renderSlots <- struct{}{}
+	defer func() { <-renderSlots }()
+	return render()
+}
+
 // getOrRender returns the cached image, rendering it once on a miss.
 func (c *imageCache) getOrRender(key string, render func() ([]byte, error)) ([]byte, error) {
 	if b, ok := c.get(key); ok {
@@ -62,7 +74,7 @@ func (c *imageCache) getOrRender(key string, render func() ([]byte, error)) ([]b
 		if b, ok := c.get(key); ok {
 			return b, nil
 		}
-		b, err := render()
+		b, err := withRenderSlot(render)
 		if err == nil {
 			c.put(key, b)
 		}
@@ -83,7 +95,7 @@ func serveFrameImage(c *gin.Context, staticDir string, cache *imageCache, name, 
 	var body []byte
 	if err != nil {
 		log.Printf("%s without heatmap: %v", strings.ReplaceAll(name, "\x00", " "), err)
-		if body, err = render(nil); err != nil {
+		if body, err = withRenderSlot(func() ([]byte, error) { return render(nil) }); err != nil {
 			c.Status(http.StatusInternalServerError)
 			return
 		}
