@@ -274,6 +274,28 @@ func TestHeatmapSamplesAtPixelCenters(t *testing.T) {
 	}
 }
 
+func TestRolledGlobalHeatmapSamplesTheSame(t *testing.T) {
+	// The pipeline publishes global frames rolled to -180..180: columns at
+	// -180, -90, 0, 90 hold what 0..360 columns 180, 270, 0, 90 held.
+	shades := []uint8{0, 60, 120, 180} // at 0, 90, 180, 270 east
+	unrolled := image.NewNRGBA(image.Rect(0, 0, 4, 2))
+	rolled := image.NewNRGBA(image.Rect(0, 0, 4, 2))
+	for x := 0; x < 4; x++ {
+		for y := 0; y < 2; y++ {
+			unrolled.SetNRGBA(x, y, color.NRGBA{shades[x], 0, 0, 255})
+			rolled.SetNRGBA(x, y, color.NRGBA{shades[(x+2)%4], 0, 0, 255})
+		}
+	}
+	a := &heatmapFrame{layers: []heatmapLayer{newHeatmapLayer(unrolled, lonLatBounds{West: 0, East: 270, North: 10, South: -10}, true)}}
+	b := &heatmapFrame{layers: []heatmapLayer{newHeatmapLayer(rolled, lonLatBounds{West: -180, East: 90, North: 10, South: -10}, true)}}
+	for _, lon := range []float64{-170, -45, 0, 30, 135, 179} {
+		v := viewAt(lon, 0, 0.001, 1, 1, 0.5, 0.5)
+		if ra, rb := a.Render(v, false).RGBAAt(0, 0).R, b.Render(v, false).RGBAAt(0, 0).R; ra != rb {
+			t.Errorf("at %v° red = %d unrolled, %d rolled", lon, ra, rb)
+		}
+	}
+}
+
 func TestSnapshotsExpire(t *testing.T) {
 	store := &spotSnapshotStore{data: SnapshotSet{"a": {Rating: "fair"}}, builtAt: time.Now()}
 	if _, ok := store.Get("a"); !ok {

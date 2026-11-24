@@ -222,6 +222,9 @@ def render_heatmap_png(
     Mercator spacing; displaying the PNG at the returned bounds then puts
     every pixel at the correct latitude.
 
+    A global grid in 0..360 longitude is rolled to -180..180, so the
+    returned bounds run from -180 to the last column's longitude.
+
     Land cells take a smoothed value from nearby wet cells, so the image is
     solid color with no coastline of its own: the model's land mask is a
     ~25 km grid that never matches the real coast, so the map draws vector
@@ -239,6 +242,18 @@ def render_heatmap_png(
 
     lats = data["lat"][:, 0].astype(np.float64)
     lons = data["lon"][0, :].astype(np.float64)
+    # A global 0..360 grid is rolled to -180..180 so the frame lines up with
+    # the map's initial world copy as published (the browser used to redraw
+    # and re-encode every frame to do this). Regional grids are left alone.
+    if lons[-1] - lons[0] > 300 and lons[-1] > 180:
+        # The column nearest 180 starts the image: float32 grid longitudes
+        # can land a hair either side of it.
+        step = (lons[-1] - lons[0]) / (lons.size - 1)
+        split = int(np.searchsorted(lons, 180.0 - step / 2))
+        lons = np.concatenate([lons[split:] - 360.0, lons[:split]])
+        grid = np.concatenate([grid[:, split:], grid[:, :split]], axis=1)
+        if alpha is not None:
+            alpha = np.concatenate([alpha[:, split:], alpha[:, :split]], axis=1)
     if lats[0] < lats[-1]:  # rows must run north -> south for the image
         lats = lats[::-1]
         grid = grid[::-1, :]
