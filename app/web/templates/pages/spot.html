@@ -4,14 +4,7 @@
         <meta charset="UTF-8">
         {{template "forecastclock" .TimeZone}}
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{{.SEO.Title}}</title>
-        <meta name="description" content="{{.SEO.Description}}">
-        <link rel="canonical" href="{{.SEO.Canonical}}">
-        <meta property="og:title" content="{{.SEO.OpenGraphTitle}}">
-        <meta property="og:description" content="{{.SEO.Description}}">
-        <meta property="og:url" content="{{.SEO.Canonical}}">
-        <meta property="og:type" content="website">
-        <script type="application/ld+json">{{json .SEO.StructuredData}}</script>
+{{template "seometa" .SEO}}
         <script>if (window.self !== window.top) document.documentElement.classList.add('embedded');</script>
         {{template "analytics"}}
         <script src="https://cdn.tailwindcss.com"></script>
@@ -40,6 +33,12 @@
             .spot-breadcrumbs { margin-bottom: 12px; color: var(--text-3); font-size: 11px; }
             .spot-breadcrumbs a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
             html.embedded .spot-breadcrumbs { display: none; }
+            .spot-text { margin-top: 24px; max-width: 72ch; }
+            .spot-text h2, .spot-text h3 { color: #fff; font-size: 13px; font-weight: 600; }
+            .spot-text h3 { margin-top: 14px; }
+            .spot-text p { margin-top: 6px; color: var(--text-2); font-size: 13px; line-height: 1.6; }
+            .spot-text a { color: var(--accent-soft); text-decoration: underline; text-underline-offset: 2px; }
+            html.embedded .spot-text { display: none; }
             .spot-location { margin-top: 16px; padding: 14px; border: 1px solid var(--line); background: var(--raised); }
             .spot-location h2, .nearby-spots h2 { color: #fff; font-size: 13px; font-weight: 600; }
             .spot-location p { margin-top: 5px; color: var(--text-2); font-size: 12px; }
@@ -86,7 +85,7 @@
       {{template "stationnav" (printf "/map?spot=%s" .SwellReport.StationId)}}
       <main class="station-shell">
         <nav class="spot-breadcrumbs" aria-label="Breadcrumb">
-            <a href="/map?spot={{.SwellReport.StationId}}">Map</a> <span aria-hidden="true">›</span> <span aria-current="page">{{.SpotName}}</span>
+            {{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a> <span aria-hidden="true">›</span> {{end}}<span aria-current="page">{{.SpotName}}</span>
         </nav>
         <div class="station-header spot-header flex items-start justify-between gap-4 mb-4">
             <!-- Spot Name -->
@@ -174,6 +173,12 @@
                 has no data near it, or the forecast files are still being generated.
             </div>
         {{end}}
+        <section class="spot-text" aria-labelledby="spot-text-heading">
+            <h2 id="spot-text-heading">About {{.SpotName}}</h2>
+            {{range .Text.About}}<p>{{.}}</p>{{end}}
+            {{if .Text.Outlook}}<h3>Surf outlook</h3>{{range .Text.Outlook}}<p>{{.}}</p>{{end}}{{end}}
+            {{with $last := lastcrumb .Crumbs}}{{if ne $last.Name "Map"}}<p><a href="{{$last.URL}}" target="_top">More surf forecasts in {{$last.Name}}</a></p>{{end}}{{end}}
+        </section>
         <section class="spot-location" aria-labelledby="spot-location-heading">
             <h2 id="spot-location-heading">{{.SpotName}} location</h2>
             <p>{{if .Region}}{{.Region}} &middot; {{end}}Latitude {{printf "%.6f" .Latitude}}, longitude {{printf "%.6f" .Longitude}}</p>

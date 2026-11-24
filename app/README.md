@@ -48,6 +48,7 @@ Configuration (all optional):
 | `DB_PATH` | `$OPENSWELLS_DATA_DIR/main.db` | SQLite database path (created automatically; see `ops/migrations/001_initial.sql`) |
 | `FORECAST_DIR` | `$OPENSWELLS_DATA_DIR/forecast` | Generated forecast bundles, heatmap images, tide, and metadata files |
 | `SPOTS_PATH` | `./data/spots.json` | Tracked surf-spot reference data |
+| `LAND_PATH` | `./data/land_10m.bin.gz` | Natural Earth 1:10m land polygons drawn on the share cards (built by `ops/build-land.py`); without it cards have no land |
 | `TEMPLATE_DIR` | `./web/templates` | Go HTML page and component templates |
 | `SITE_URL` | `https://openswells.com` | Public origin used for canonical URLs, Open Graph metadata, robots.txt, and sitemaps |
 | `TRUSTED_PROXIES` | `127.0.0.1,::1` | Comma-separated reverse proxy IPs |
@@ -60,6 +61,24 @@ Configuration (all optional):
 | `RATE_LIMIT_MAX_CLIENTS` | `10000` | Maximum in-memory client buckets |
 | `EXPENSIVE_MAX_CONCURRENT` | `16` | Maximum simultaneous upstream/forecast requests |
 | `SUMMARY_MAX_CONCURRENT` | `4` | Maximum simultaneous forecast-summary builds |
+
+Pages for search and sharing:
+
+- `/surf-forecasts` and `/surf-forecasts/<country>/<region>/...` are hub
+  pages built from each spot's `region`, listing sub-regions and spots
+  with the current conditions. Regions with fewer than 3 spots render but
+  are `noindex` and left out of the sitemap.
+- Spot pages carry generated text (`server/spot_text.go`) written from the
+  spot's exposure and forecast.
+- `/surf-spots/<id>/card.jpg` and `/surf-forecasts/.../card.jpg` are
+  1200x630 Open Graph images: the current swell heatmap around the place,
+  with land drawn over it. `/surf-spots/<id>/heatmap.png` is the heatmap
+  crop under the spot page's exposure map.
+- Sitemap entries carry `lastmod`: the current run's publish time.
+
+The region pages read a snapshot of every spot's current hour and week,
+rebuilt in the background on each new run and each hour (about 10 s of one
+core).
 
 `GET /healthz` returns 200 when the database is reachable and the contour
 data is fresh (<24h), 503 otherwise — point uptime monitoring at it.
