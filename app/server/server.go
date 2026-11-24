@@ -843,6 +843,13 @@ func loadTemplates(templateDir string) *template.Template {
 		"formatcount": formatCount,
 		"bearing":     bearingLabel,
 		"buoyreport":  buoyReport,
+		// lastcrumb is a breadcrumb trail's last link (the spot's region)
+		"lastcrumb": func(crumbs []Crumb) *Crumb {
+			if len(crumbs) == 0 {
+				return nil
+			}
+			return &crumbs[len(crumbs)-1]
+		},
 		// themecss is the theme stylesheet's URL, versioned by its
 		// content so a deploy never pairs new markup with a cached
 		// stylesheet that lacks its rules
@@ -1192,7 +1199,16 @@ func run() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	seoIndex, err := NewSEOIndex(siteURL, spotStore)
+	regionTree = NewRegionTree(spotStore.All())
+	if err := regionTree.checkUniqueNames(); err != nil {
+		log.Printf("warning: %v", err)
+	}
+	go runSpotSnapshotWarmer(context.Background(), forecastDir, spotStore.All())
+	landPath := getenvDefault("LAND_PATH", "./data/land_10m.bin.gz")
+	if landStore, err = LoadLandStore(landPath); err != nil {
+		log.Printf("warning: share cards will have no land: %v", err)
+	}
+	seoIndex, err := NewSEOIndex(siteURL, spotStore, regionTree, forecastDir)
 	if err != nil {
 		log.Fatalf("failed to build SEO index: %v", err)
 	}
@@ -1278,6 +1294,11 @@ func run() {
 	router.GET("/api/beach/:zoneId", surfZoneStore.handleZone)
 	router.GET("/api/spots", spotStore.handleList)
 	router.GET("/surf-spots/:slug", expensiveConcurrency, spotPageHandler(tmpl, forecastDir, surfZoneStore, siteURL))
+	router.GET("/surf-spots/:slug/card.jpg", expensiveConcurrency, spotCardHandler(forecastDir))
+	router.GET("/surf-spots/:slug/heatmap.png", expensiveConcurrency, spotHeatmapHandler(forecastDir))
+	regionPages := regionHandler(tmpl, forecastDir, siteURL, regionTree)
+	router.GET(regionIndexPath, expensiveConcurrency, regionPages)
+	router.GET(regionIndexPath+"/*path", expensiveConcurrency, regionPages)
 
 	router.GET("/", func(c *gin.Context) {
 		renderTemplate(c, tmpl, "landing.html", LandingPageData{

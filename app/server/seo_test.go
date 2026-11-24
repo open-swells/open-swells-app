@@ -61,7 +61,16 @@ func TestSEOIndexAndRobots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	index, err := NewSEOIndex("https://openswells.com", store)
+	staticDir := t.TempDir()
+	metadata := `{"forecast_start":"20261116_12Z","timestamp":"2026-11-16T21:35:13.485817+00:00"}`
+	if err := os.WriteFile(filepath.Join(staticDir, "metadata.json"), []byte(metadata), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	index, err := NewSEOIndex("https://openswells.com", store, NewRegionTree(store.All()), staticDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	xmlDocs, err := index.documents()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +84,7 @@ func TestSEOIndexAndRobots(t *testing.T) {
 	router.GET("/robots.txt", index.handleRobots)
 	router.GET("/sitemap.xml", index.handleSitemapIndex)
 	router.GET("/sitemaps/:name", index.handleSitemap)
-	for _, path := range []string{"/robots.txt", "/sitemap.xml", "/sitemaps/pages.xml", "/sitemaps/spots-1.xml"} {
+	for _, path := range []string{"/robots.txt", "/sitemap.xml", "/sitemaps/pages.xml", "/sitemaps/regions.xml", "/sitemaps/spots-1.xml"} {
 		response := httptest.NewRecorder()
 		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
 		if response.Code != http.StatusOK {
@@ -84,16 +93,35 @@ func TestSEOIndexAndRobots(t *testing.T) {
 	}
 
 	var sitemapRoot sitemapIndexDocument
-	if err := xml.Unmarshal(index.xmlDocs["sitemap.xml"], &sitemapRoot); err != nil {
+	if err := xml.Unmarshal(xmlDocs["sitemap.xml"], &sitemapRoot); err != nil {
 		t.Fatal(err)
 	}
-	if len(sitemapRoot.Sitemaps) != 4 {
-		t.Errorf("sitemap index has %d children, want 4", len(sitemapRoot.Sitemaps))
+	if len(sitemapRoot.Sitemaps) != 5 {
+		t.Errorf("sitemap index has %d children, want 5", len(sitemapRoot.Sitemaps))
+	}
+	// Every page shows the current forecast: lastmod is the run's publish time.
+	const wantLastMod = "2026-11-16T21:35:13Z"
+	for _, child := range sitemapRoot.Sitemaps {
+		if child.LastMod != wantLastMod {
+			t.Errorf("sitemap %s lastmod = %q, want %q", child.Loc, child.LastMod, wantLastMod)
+		}
+	}
+	var regionSet sitemapURLSet
+	if err := xml.Unmarshal(xmlDocs["regions.xml"], &regionSet); err != nil {
+		t.Fatal(err)
+	}
+	if len(regionSet.URLs) == 0 || regionSet.URLs[0].LastMod != wantLastMod {
+		t.Errorf("regions.xml = %d URLs, first %+v", len(regionSet.URLs), regionSet.URLs)
+	}
+	for _, item := range regionSet.URLs {
+		if !strings.HasPrefix(item.Loc, "https://openswells.com/surf-forecasts/") {
+			t.Errorf("unexpected region URL %s", item.Loc)
+		}
 	}
 
 	allLocations := make(map[string]bool)
 	spotCount := 0
-	for name, document := range index.xmlDocs {
+	for name, document := range xmlDocs {
 		var root struct{ XMLName xml.Name }
 		if err := xml.Unmarshal(document, &root); err != nil {
 			t.Fatalf("%s is invalid XML: %v", name, err)
@@ -125,8 +153,8 @@ func TestSEOIndexAndRobots(t *testing.T) {
 	if spotCount != store.Count() {
 		t.Errorf("sitemaps contain %d spots, want %d", spotCount, store.Count())
 	}
-	if len(index.xmlDocs) != 5 { // root, pages, and three spot documents
-		t.Errorf("generated %d sitemap documents, want 5", len(index.xmlDocs))
+	if len(xmlDocs) != 6 { // root, pages, regions, and three spot documents
+		t.Errorf("generated %d sitemap documents, want 6", len(xmlDocs))
 	}
 }
 

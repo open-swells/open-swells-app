@@ -1045,6 +1045,13 @@ type SpotPageData struct {
 	NearbySpots    []NearbySpot
 	Tide           SpotTide
 	HasTide        bool
+	// Crumbs lead from the region pages down to the spot (Map alone
+	// for a spot without a region).
+	Crumbs []Crumb
+	Text   SpotText
+	// Heatmap is the swell heatmap overlay for the exposure map.
+	Heatmap    HeatmapPreview
+	HasHeatmap bool
 }
 
 // facingLabel renders a facing bearing as "SW 225°" for the page header.
@@ -1081,8 +1088,10 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 	forecastData, hours := spotForecast(staticDir, spot)
 	report, hasReport := spotReport(staticDir, spot, forecastData)
 	conditions := spotConditions(staticDir, spot, hours)
-	if c, ok := conditionNear(conditions, report.ValidUnixMs); ok && hasReport {
-		report.Surf = c.Surf
+	now, hasNow := conditionNear(conditions, report.ValidUnixMs)
+	hasNow = hasNow && hasReport
+	if hasNow {
+		report.Surf = now.Surf
 	}
 	// Summaries and browser charts share the beach's local calendar days.
 	loc := spotLocation(spot)
@@ -1109,6 +1118,23 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 			rows[0].Time.Add(-24*time.Hour), rows[len(rows)-1].Time.Add(24*time.Hour))
 	}
 	seo := spotSEOPage(siteURL, spotStore, spot)
+	nearby := spotStore.Nearby(spot, 6)
+	region, _ := regionTree.ForSpot(spot.ID)
+	crumbs := []Crumb{{Name: "Map", URL: "/map?spot=" + spot.ID}}
+	if region != nil {
+		crumbs = append(regionCrumbs(region), Crumb{Name: region.Name, URL: region.URL()})
+	}
+	clock := time.Now()
+	text := buildSpotText(spotTextInput{
+		Spot: spot, Name: spotStore.SEOName(spot), Region: region, Beach: b,
+		Report: report, HasReport: hasReport, Now: now, HasNow: hasNow,
+		Days: upcomingDays(forecastData, conditions, loc, clock), Today: clock.In(loc).Format("2006-01-02"),
+		Nearby: nearby, HasTide: hasTide, Loc: loc,
+	})
+	seo.OGDescription = text.Summary
+	seo.ImageURL = siteURL + SpotCardPath(staticDir, spot.ID)
+	seo.ImageAlt = fmt.Sprintf("Swell height map around %s with the surf forecast", spotStore.SEOName(spot))
+	heatmap, hasHeatmap := spotHeatmapPreview(staticDir, spot)
 	return SpotPageData{
 		TimeZone:        loc.String(),
 		SEO:             seo,
@@ -1132,8 +1158,12 @@ func spotPageData(staticDir string, zones *SurfZoneStore, siteURL string, spot S
 		Coordinates:     coordinateLabel(spot.Lat, spot.Lon),
 		Latitude:        spot.Lat,
 		Longitude:       spot.Lon,
-		NearbySpots:     spotStore.Nearby(spot, 6),
+		NearbySpots:     nearby,
 		Tide:            tide,
 		HasTide:         hasTide,
+		Crumbs:          crumbs,
+		Text:            text,
+		Heatmap:         heatmap,
+		HasHeatmap:      hasHeatmap,
 	}
 }

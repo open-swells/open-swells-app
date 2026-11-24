@@ -1,0 +1,155 @@
+{{/* Region hub pages (/surf-forecasts/...) and the country index
+     (/surf-forecasts). Takes RegionPageData. */}}
+<!DOCTYPE html>
+<html lang="en" class="dark">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{{template "seometa" .SEO}}
+        {{template "analytics"}}
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="{{themecss}}">
+        <script src="{{unitsjs}}"></script>
+        <style>
+            body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-sans); }
+            a { color: inherit; }
+            .region-crumbs { margin-bottom: 12px; color: var(--text-3); font-size: 11px; }
+            .region-crumbs a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+            .region-header { padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+            .region-header h1 { margin: 0; font-size: 22px; font-weight: 600; color: #fff; }
+            .region-header .station-meta { margin-top: 6px; }
+            .region-intro { max-width: 72ch; margin-top: 14px; }
+            .region-map { position: relative; display: block; margin-top: 16px; border: 1px solid var(--line); background: #1b2a3d; }
+            .region-map img { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 560; }
+            .region-map-legend { position: absolute; left: 8px; bottom: 8px; padding: 3px 7px; background: rgba(14, 15, 18, .82); color: var(--text-2); font-family: var(--font-mono); font-size: 10px; letter-spacing: .03em; }
+            .region-map:hover { border-color: var(--line-strong); }
+            .region-intro p { margin: 0 0 8px; color: var(--text-2); font-size: 13px; line-height: 1.6; }
+            .region-section { margin-top: 28px; }
+            .region-section h2 { margin: 0 0 10px; color: #fff; font-size: 13px; font-weight: 600; }
+            .region-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+            .region-card { display: block; height: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); background: var(--raised); text-decoration: none; }
+            .region-card:hover { border-color: var(--line-strong); background: var(--hover); }
+            .region-card-name { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 500; color: var(--text-1); }
+            .region-card-name .count { flex: none; font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
+            .region-card-best { margin-top: 5px; display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 11px; color: var(--text-2); }
+            .region-card-best .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .rating { flex: none; display: inline-block; padding: 1px 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: #0e0f12; }
+            .rating.poor { background: var(--cond-poor); }
+            .rating.fair { background: var(--cond-fair); }
+            .rating.good { background: var(--cond-good); color: #fff; }
+            .rating.epic { background: var(--cond-epic); }
+            .spots-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            .spots-table th { padding: 6px 8px; border-bottom: 1px solid var(--line-strong); text-align: left; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); }
+            .spots-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); color: var(--text-2); vertical-align: middle; }
+            .spots-table td.spot a { color: var(--text-1); font-weight: 500; text-decoration: none; }
+            .spots-table td.spot a:hover { color: #fff; text-decoration: underline; }
+            .spots-table .area { display: block; margin-top: 2px; font-size: 11px; color: var(--text-3); }
+            .spots-table .surf { color: var(--text); font-weight: 600; white-space: nowrap; }
+            .week { display: flex; gap: 2px; }
+            .week span { width: 10px; height: 14px; background: var(--line); }
+            .week .poor { background: var(--cond-poor); }
+            .week .fair { background: var(--cond-fair); }
+            .week .good { background: var(--cond-good); }
+            .week .epic { background: var(--cond-epic); }
+            .region-note { margin-top: 8px; font-size: 11px; color: var(--text-3); }
+            .region-links { margin-top: 28px; font-size: 12px; }
+            .region-links a { color: var(--accent-soft); text-decoration: underline; text-underline-offset: 2px; }
+            @media (max-width: 720px) {
+                .spots-table .col-swell, .spots-table .col-wind { display: none; }
+            }
+            @media (max-width: 480px) {
+                .spots-table .col-week { display: none; }
+            }
+        </style>
+    </head>
+    <body>
+      {{template "stationnav" (or .MapURL "/map")}}
+      <main class="station-shell">
+        <nav class="region-crumbs" aria-label="Breadcrumb">
+            {{range .Crumbs}}<a href="{{.URL}}">{{.Name}}</a> <span aria-hidden="true">›</span> {{end}}<span aria-current="page">{{if .IsIndex}}Surf forecasts{{else}}{{.SEO.OpenGraphTitle}}{{end}}</span>
+        </nav>
+        <header class="region-header">
+            <h1>{{.Heading}}</h1>
+            <div class="station-meta">{{formatcount .SpotCount}} SURF SPOTS &middot; GFS-WAVE MODEL FORECAST, UPDATED EVERY 6 HOURS</div>
+        </header>
+        {{if .MapImage}}
+        <a class="region-map" href="{{or .MapURL "/map"}}" title="Open the interactive swell map">
+            <img src="{{.MapImage}}" width="1600" height="560" alt="Map of the current swell height{{if not .IsIndex}} around {{.SEO.OpenGraphTitle}}{{end}} with each surf spot marked">
+            <span class="region-map-legend">Swell height now &middot; tap for the interactive map</span>
+        </a>
+        {{end}}
+        <div class="region-intro">
+            {{range .Intro}}<p>{{.}}</p>{{end}}
+        </div>
+
+        {{if .IsIndex}}
+        <section class="region-section" aria-labelledby="countries-heading">
+            <h2 id="countries-heading">Countries and territories</h2>
+            <ul class="region-grid">
+                {{range .Countries}}<li><a class="region-card" href="{{.URL}}"><span class="region-card-name"><span>{{.Name}} surf forecast</span><span class="count">{{.SpotCount}}</span></span></a></li>{{end}}
+            </ul>
+        </section>
+        {{end}}
+
+        {{if .Children}}
+        <section class="region-section" aria-labelledby="areas-heading">
+            <h2 id="areas-heading">Areas</h2>
+            <ul class="region-grid">
+                {{range .Children}}
+                <li><a class="region-card" href="{{.URL}}">
+                    <span class="region-card-name"><span>{{.Name}}</span><span class="count">{{.SpotCount}} {{if eq .SpotCount 1}}spot{{else}}spots{{end}}</span></span>
+                    {{if .HasBest}}<span class="region-card-best"><span class="rating {{.Best.Snap.Rating}}">{{.Best.Snap.Rating}}</span><span class="name">Best now: {{.Best.Name}}, <span data-u="surf">{{.Best.Snap.Surf}}</span></span></span>{{end}}
+                </a></li>
+                {{end}}
+            </ul>
+        </section>
+        {{end}}
+
+        {{if .Spots}}
+        <section class="region-section" aria-labelledby="spots-heading">
+            <h2 id="spots-heading">{{if .ListsAll}}Surf spots{{else}}Best surf right now{{end}}</h2>
+            <table class="spots-table">
+                <thead><tr>
+                    <th scope="col">Spot</th>
+                    <th scope="col">Surf now</th>
+                    <th scope="col">Rating</th>
+                    <th scope="col" class="col-swell">Swell</th>
+                    <th scope="col" class="col-wind">Wind</th>
+                    <th scope="col" class="col-week">Next 7 days</th>
+                </tr></thead>
+                <tbody>
+                {{range .Spots}}
+                <tr>
+                    <td class="spot"><a href="{{.URL}}">{{.Name}}</a>{{if .Area}}<span class="area">{{.Area}}</span>{{end}}</td>
+                    {{if and .HasSnap .Snap.HasNow}}
+                    <td class="surf" data-u="surf">{{.Snap.Surf}}</td>
+                    <td><span class="rating {{.Snap.Rating}}">{{.Snap.Rating}}</span></td>
+                    <td class="col-swell">{{if .Snap.SwellFt}}<span data-u="h" data-v="{{.Snap.SwellFt}}">{{.Snap.SwellFt}}ft</span>{{if .Snap.SwellPeriod}} &middot; {{.Snap.SwellPeriod}}s{{end}} {{bearing .Snap.SwellDir}}{{end}}</td>
+                    <td class="col-wind">{{if .Snap.WindMph}}<span data-u="s" data-v="{{.Snap.WindMph}}" data-sp>{{.Snap.WindMph}} mph</span> {{bearing .Snap.WindDir}}{{end}}</td>
+                    {{else}}
+                    <td class="surf">&ndash;</td><td></td><td class="col-swell"></td><td class="col-wind"></td>
+                    {{end}}
+                    <td class="col-week"><span class="week">{{range .Snap.Days}}<span class="{{.Condition}}" title="{{.DateAbv}}: {{.WaveHeight}}, {{.Condition}}"></span>{{end}}</span></td>
+                </tr>
+                {{end}}
+                </tbody>
+            </table>
+            {{if not .SnapshotsOK}}<p class="region-note">Current conditions are still loading after a restart; refresh in a minute.</p>{{end}}
+        </section>
+        {{end}}
+
+        {{if .Direct}}
+        <section class="region-section" aria-labelledby="direct-heading">
+            <h2 id="direct-heading">More spots</h2>
+            <ul class="region-grid">
+                {{range .Direct}}<li><a class="region-card" href="{{.URL}}"><span class="region-card-name"><span>{{.Name}}</span>{{if and .HasSnap .Snap.HasNow}}<span class="count" data-u="surf">{{.Snap.Surf}}</span>{{end}}</span></a></li>{{end}}
+            </ul>
+        </section>
+        {{end}}
+
+        <p class="region-links">
+            {{if .MapURL}}<a href="{{.MapURL}}">See these spots on the interactive swell map</a> &middot; {{end}}<a href="/surf-forecasts">All countries</a>
+        </p>
+      </main>
+    </body>
+</html>

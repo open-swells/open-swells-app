@@ -22168,7 +22168,7 @@
     "name": "Huntington Beach Pier",
     "lat": 33.6553,
     "lon": -118.0031,
-    "region": "Huntington Beach, CA, USA",
+    "region": "USA, California, Orange County",
     "swell_window": [170, 260],
     "tide_station": "9410660"
   },
@@ -28173,7 +28173,7 @@
     "name": "Malibu (First Point)",
     "lat": 34.0341,
     "lon": -118.6787,
-    "region": "Malibu, CA, USA",
+    "region": "USA, California, LA County",
     "swell_window": [165, 235],
     "tide_station": "9410840"
   },
@@ -36420,7 +36420,7 @@
     "name": "Trestles (Lower)",
     "lat": 33.3822,
     "lon": -117.5886,
-    "region": "San Clemente, CA, USA",
+    "region": "USA, California, San Diego County",
     "swell_window": [180, 280]
   },
   {
@@ -36428,7 +36428,7 @@
     "name": "Black's Beach",
     "lat": 32.8895,
     "lon": -117.2528,
-    "region": "San Diego, CA, USA",
+    "region": "USA, California, San Diego County",
     "swell_window": [200, 310],
     "tide_station": "9410230",
     "buoys": [
@@ -36440,7 +36440,7 @@
     "name": "Ocean Beach",
     "lat": 32.7494,
     "lon": -117.2519,
-    "region": "San Diego, CA, USA",
+    "region": "USA, California, San Diego County",
     "swell_window": [190, 300],
     "tide_station": "9410170"
   },
@@ -42202,7 +42202,7 @@
     "name": "Pine Cay",
     "lat": 21.863629578505,
     "lon": -72.110749483109,
-    "region": "Turks   Caicos, Pine Cay",
+    "region": "Turks and Caicos, Pine Cay",
     "id": "pine-cay",
     "facing": 332,
     "open_water": [[272, 22]]
