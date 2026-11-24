@@ -1,7 +1,7 @@
 ## OpenSwells research
 
 Experiments toward an OpenSwells wave forecast model. Nothing here is
-deployed: the deploy workflow only watches `app/` and `pipeline/`. Once a
+deployed: the deploy workflow only ships `app/` and `pipeline/`. Once a
 model works, its inference code gets rewritten into `pipeline/` with tests.
 The pipeline never imports from here.
 

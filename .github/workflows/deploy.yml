@@ -1,5 +1,7 @@
-# Deploy the pipeline and/or web app when main changes, using the same
-# scripts as ./deploy.sh. Credentials live only in the `production`
+# Deploy the pipeline and/or web app when a GitHub release is published,
+# using the same scripts as ./deploy.sh. Development happens on main; a
+# release (tag vYYYY.MM.DD, see DEPLOYING.md) ships the tagged commit.
+# Prereleases and drafts do not deploy. Credentials live only in the `production`
 # environment's secrets:
 #
 #   SSH_KNOWN_HOSTS    host keys for both servers (ssh-keyscan output)
@@ -10,14 +12,8 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "app/**"
-      - "pipeline/**"
-      - "deploy.sh"
-      - ".github/workflows/deploy.yml"
-      - ".github/scripts/setup-ssh.sh"
+  release:
+    types: [released]
   workflow_dispatch:
     inputs:
       target:
@@ -37,6 +33,9 @@ concurrency:
 jobs:
   changes:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read # to find the last successful release deploy
     outputs:
       app: ${{ steps.diff.outputs.app }}
       pipeline: ${{ steps.diff.outputs.pipeline }}
@@ -49,16 +48,26 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           TARGET: ${{ inputs.target }}
-          BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           app=false
           pipeline=false
+          before=""
+          if [[ "$EVENT" == release ]]; then
+            # Compare against what the last successful release deploy shipped,
+            # not the previous tag, so a failed deploy is retried by the next
+            # release instead of silently skipped.
+            before="$(gh run list --workflow deploy.yml --event release \
+              --status success --limit 1 --json headSha --jq '.[0].headSha // empty')" || before=""
+            echo "Last successful release deploy: ${before:-none}"
+          fi
           if [[ "$EVENT" == workflow_dispatch ]]; then
             [[ "$TARGET" == all || "$TARGET" == app ]] && app=true
             [[ "$TARGET" == all || "$TARGET" == pipeline ]] && pipeline=true
-          elif ! changed="$(git diff --name-only "$BEFORE" "$AFTER" 2>/dev/null)"; then
-            # Unknown base (first push, force push): deploy everything.
+          elif [[ -z "$before" ]] || ! changed="$(git diff --name-only "$before" "$AFTER" 2>/dev/null)"; then
+            # No earlier release deploy (or its commit is gone): deploy everything.
             app=true
             pipeline=true
           else

@@ -24,11 +24,25 @@ directory:
 
 ### Automatic deploys
 
-`.github/workflows/deploy.yml` runs the same scripts on every push to `main`
-that touches `app/` or `pipeline/` (and can be run by hand from the Actions
-tab). Only the part that changed is deployed; when both change, the pipeline
-goes first. A pipeline deploy that lands during a forecast run waits up to
-two hours for the run to finish (`WAIT_FOR_RUN`).
+Development happens on `main`; merging there deploys nothing. Production
+deploys when a GitHub release is published:
+
+```sh
+gh release create v2026.11.24 --target main --generate-notes
+```
+
+`.github/workflows/deploy.yml` then runs the same scripts against the tagged
+commit. It deploys only the parts (`app/`, `pipeline/`) that changed since the
+last successful release deploy, so a release whose deploy failed is picked up
+by the next one; the first release deploys both. When both change, the
+pipeline goes first. A pipeline deploy that lands during a forecast run waits
+up to two hours for the run to finish (`WAIT_FOR_RUN`). Prereleases and
+drafts do not deploy. The workflow can also be run by hand from the Actions
+tab to deploy a chosen branch or tag.
+
+Releases are named by date: `vYYYY.MM.DD`, with `.2`, `.3`, ... for further
+releases the same day (`v2026.11.24.2`). To roll back, run the workflow by
+hand on an earlier tag.
 
 Credentials are stored only as secrets in the repository's `production`
 environment: `SSH_KNOWN_HOSTS`, `APP_HOST`, `APP_SSH_KEY`, `PIPELINE_HOST`
