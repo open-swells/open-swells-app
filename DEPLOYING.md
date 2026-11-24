@@ -48,3 +48,7 @@ Credentials are stored only as secrets in the repository's `production`
 environment: `SSH_KNOWN_HOSTS`, `APP_HOST`, `APP_SSH_KEY`, `PIPELINE_HOST`
 and `PIPELINE_SSH_KEY`. Keys are loaded into an `ssh-agent`, not written to
 disk, and host keys are pinned.
+
+The `production` environment only accepts deploys from the `main` branch
+(manual runs) and from `v*` tags (release runs). A release whose tag doesn't
+match `v*` is rejected by the environment before any step runs.
