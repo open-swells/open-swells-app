@@ -45,6 +45,29 @@ class RenderHeatmapTests(unittest.TestCase):
         height = np.array([[0.25, 12.0, np.nan], [5.0, 2.0, 1.0]], dtype=np.float32)
         return {"lat": lat, "lon": lon, "height": height}
 
+    def test_global_grid_is_rolled_to_minus_180(self):
+        lon_row = np.arange(0.0, 360.0, 45.0)  # 0, 45, ..., 315
+        lat = np.repeat(np.array([[10.0], [0.0]]), 8, axis=1)
+        lon = np.repeat(lon_row[None, :], 2, axis=0)
+        height = np.array([[0.25] * 4 + [12.0] * 4] * 2, dtype=np.float32)
+        with tempfile.TemporaryDirectory() as directory:
+            path = f"{directory}/heatmap.png"
+            bounds = gfs_to_contours.render_heatmap_png(
+                {"lat": lat, "lon": lon, "height": height}, path, rows_scale=1.0, steps=128
+            )
+            with Image.open(path) as image:
+                indices = np.asarray(image)
+        self.assertEqual((bounds["west"], bounds["east"]), (-180.0, 135.0))
+        # 180..315 (now -180..-45) come first.
+        self.assertEqual(indices[0].tolist(), [128] * 4 + [1] * 4)
+
+    def test_regional_grid_is_not_rolled(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bounds = gfs_to_contours.render_heatmap_png(
+                self.grid(), f"{directory}/heatmap.png", rows_scale=1.0, steps=128
+            )
+        self.assertEqual((bounds["west"], bounds["east"]), (0.0, 2.0))
+
     def test_land_is_filled_from_wet_values(self):
         with tempfile.TemporaryDirectory() as directory:
             path = f"{directory}/heatmap.png"

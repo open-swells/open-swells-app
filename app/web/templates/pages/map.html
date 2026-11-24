@@ -523,8 +523,15 @@
                 // One modal serves station, beach and spot pages; only the
                 // iframe URL and accessible name differ.
                 let activeForecastFavorite = null;
+                // Bumped on every open, so an unload scheduled by an earlier
+                // close leaves a reopened popup alone.
+                let forecastOpenCount = 0;
+                // The modal's fade-out (#forecastModal transition) before the
+                // page inside it is unloaded.
+                const FORECAST_UNLOAD_DELAY_MS = 200;
 
                 function openModalFrame(url, title, favorite = null) {
+                    forecastOpenCount++;
                     const modal = document.getElementById('forecastModal');
                     const frame = document.getElementById('forecastFrame');
                     modal.setAttribute('aria-label', title);
@@ -570,10 +577,31 @@
                 }
 
                 function closeForecast() {
-                    document.getElementById('forecastModal').classList.remove('is-open');
+                    const modal = document.getElementById('forecastModal');
+                    modal.classList.remove('is-open');
                     // hand focus back to the map so its shortcuts work again
                     const frame = document.getElementById('forecastFrame');
                     if (document.activeElement === frame) frame.blur();
+                    // Hiding the modal keeps the page inside loaded (its DOM,
+                    // scripts and charts), so unload it once the fade ends.
+                    const openCount = forecastOpenCount;
+                    window.setTimeout(() => {
+                        if (openCount !== forecastOpenCount || modal.classList.contains('is-open')) return;
+                        unloadForecastFrame();
+                    }, FORECAST_UNLOAD_DELAY_MS);
+                }
+
+                // Swaps in a fresh, empty iframe rather than navigating the
+                // old one to about:blank, which would add a history entry
+                // (Back would then step the hidden iframe, not the map).
+                function unloadForecastFrame() {
+                    const frame = document.getElementById('forecastFrame');
+                    if (!frame.getAttribute('src')) return;
+                    const fresh = frame.cloneNode(false);
+                    fresh.removeAttribute('src');
+                    fresh.classList.add('opacity-0');
+                    frame.onload = null;
+                    frame.replaceWith(fresh);
                 }
 
                 function syncForecastPageFavorite() {
@@ -1392,6 +1420,8 @@
             const HEATMAP_OPACITY = 0.85;
             const HEATMAP_FADE_MS = 550;
             const HEATMAP_OVERLAP_MS = 180;
+            // Longest wait for a new frame's image before fading anyway.
+            const HEATMAP_LOAD_WAIT_MS = 600;
             const TRANSPARENT_PX =
                 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
             let heatmapBounds = null; // set from metadata.json
@@ -1406,17 +1436,28 @@
                 return swellRenderMode === 'heatmap' && heatmapReady;
             }
 
+            // A global frame's bounds are its first and last columns'
+            // longitudes; it covers 360 degrees, so the image is drawn one
+            // column wider to meet itself at the antimeridian.
+            function isGlobalHeatmap(bounds) {
+                return bounds && (bounds.east - bounds.west) > 300;
+            }
+
+            // Older runs publish global frames in 0..360, which the browser
+            // rolls to -180..180 (rollHeatmapBlob). The pipeline now does the
+            // roll itself, publishing west = -180.
             function isGlobalZeroTo360(bounds) {
-                return bounds && bounds.west >= 0 && bounds.east > 180 && (bounds.east - bounds.west) > 300;
+                return isGlobalHeatmap(bounds) && bounds.west >= 0 && bounds.east > 180;
             }
 
             function displayHeatmapBounds(bounds) {
-                if (!isGlobalZeroTo360(bounds)) {
+                if (!isGlobalHeatmap(bounds)) {
                     return bounds;
                 }
+                const west = isGlobalZeroTo360(bounds) ? -180 : bounds.west;
                 return {
-                    west: -180,
-                    east: 180,
+                    west,
+                    east: west + 360,
                     north: bounds.north,
                     south: bounds.south,
                 };
@@ -1436,7 +1477,7 @@
                     const halfWidth = Math.floor(bitmap.width / 2);
                     const rightWidth = bitmap.width - halfWidth;
 
-                    // Source PNGs are 0..360 longitude. Roll 180..360 to the left
+                    // Source images are 0..360 longitude. Roll 180..360 to the left
                     // so the image aligns with the map's -180..180 initial world.
                     ctx.drawImage(bitmap, halfWidth, 0, rightWidth, bitmap.height, 0, 0, rightWidth, bitmap.height);
                     ctx.drawImage(bitmap, 0, 0, halfWidth, bitmap.height, rightWidth, 0, halfWidth, bitmap.height);
@@ -1448,18 +1489,6 @@
                     console.warn('Unable to normalize heatmap longitude; using original PNG.', error);
                     return URL.createObjectURL(blob);
                 }
-            }
-
-            function decodeImageUrl(url) {
-                return new Promise(resolve => {
-                    const img = new Image();
-                    img.onload = () => resolve(url);
-                    img.onerror = () => resolve(url);
-                    img.src = url;
-                    if (img.decode) {
-                        img.decode().then(() => resolve(url)).catch(() => resolve(url));
-                    }
-                });
             }
 
             function hideHeatmapLayers() {
@@ -1512,7 +1541,6 @@
                         return r.blob();
                     })
                     .then(blob => URL.createObjectURL(blob))
-                    .then(objectUrl => decodeImageUrl(objectUrl))
                     .catch(() => null); // hour not covered: global shows through
                 nwpsImageCache.set(url, promise);
                 if (nwpsImageCache.size > FRAME_CACHE_MAX * Math.max(1, nwpsLayers.length)) {
@@ -1618,7 +1646,8 @@
 
             // Holds the prefetch window (PREFETCH_AHEAD + PREFETCH_BEHIND)
             // plus some recently viewed hours, so stepping back and forth
-            // doesn't refetch.
+            // doesn't refetch. Entries are compressed blobs, decoded only
+            // when shown (see the note at PREFETCH_AHEAD).
             const FRAME_CACHE_MAX = 48;
 
             // Heatmap frames are fetched as blobs into an LRU of object URLs.
@@ -1637,7 +1666,6 @@
                         return r.blob();
                     })
                     .then(blob => rollHeatmapBlob(blob))
-                    .then(url => decodeImageUrl(url))
                     .catch(() => null); // missing hour: fall back to contours
                 imageCache.set(url, promise);
                 if (imageCache.size > FRAME_CACHE_MAX) {
@@ -1663,9 +1691,20 @@
                     return;
                 }
 
-                // Keep the current frame visible briefly while the next image
-                // source is uploaded, then overlap the fades to avoid a flash.
-                requestAnimationFrame(() => {
+                // The image source keeps drawing its old texture until the
+                // new image has loaded, so wait for that (MapLibre fetches the
+                // object URL and decodes it with createImageBitmap) before
+                // fading in, then overlap the fades to avoid a flash.
+                const source = map.getSource(`heatmap-${next}`);
+                const startedAt = performance.now();
+                const fadeIn = () => {
+                    if (token !== heatmapTransitionToken) return;
+                    if (!source.loaded() && performance.now() - startedAt < HEATMAP_LOAD_WAIT_MS) {
+                        requestAnimationFrame(fadeIn);
+                        return;
+                    }
+                    // One more frame so the texture is uploaded and drawn
+                    // (at opacity 0) before it starts to show.
                     requestAnimationFrame(() => {
                         if (token !== heatmapTransitionToken) return;
                         map.setPaintProperty(`heatmap-${next}`, 'raster-opacity', HEATMAP_OPACITY);
@@ -1674,7 +1713,8 @@
                             map.setPaintProperty(`heatmap-${previous}`, 'raster-opacity', 0);
                         }, HEATMAP_OVERLAP_MS);
                     });
-                });
+                };
+                requestAnimationFrame(fadeIn);
                 activeHeatLayer = next;
             }
 
@@ -2023,8 +2063,12 @@
 
             // Prefetch a window around the playhead, nearest frames first:
             // PREFETCH_AHEAD hours ahead (wrapping, like playback) and
-            // PREFETCH_BEHIND behind. A heatmap frame is ~200 KB, so the
-            // window costs ~6 MB; the whole run would be ~45 MB. Each
+            // PREFETCH_BEHIND behind. Prefetched heatmap frames stay as the
+            // published WebP blobs (~0.3 MB each), not decoded images: the
+            // window is ~9 MB and the full cache (FRAME_CACHE_MAX) ~15 MB,
+            // where the whole run would be ~60 MB. Only the two image sources
+            // on the map hold decoded frames (2160x2042 RGBA, ~17 MB each,
+            // plus their GPU textures), whatever the window size. Each
             // updateMap re-centers what's still queued; cached frames
             // resolve immediately.
             const PREFETCH_AHEAD = 24;

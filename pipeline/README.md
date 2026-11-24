@@ -67,7 +67,9 @@ the work directory and the pipeline prunes all but the current and previous run'
 - `heatmap_XXX.webp` — continuous-color combined wind-wave-and-swell height
   field in Web Mercator with transparent land; the app's primary wave layer.
   Lossless WebP with a 128-step ramp (`HEATMAP_STEPS`), ~200 KB a frame.
-  Corner coordinates are published as `heatmap_bounds` in `metadata.json`.
+  Corner coordinates are published as `heatmap_bounds` in `metadata.json`:
+  the first and last samples, with longitude rolled to -180..180 (a global
+  0..360 grid is shifted in the pipeline so browsers draw it as published).
   Colors come from `HEATMAP_COLORS` in `gfs_to_contours.py`, matched by
   `SWELL_BANDS` in the web app's `pages/today.html` — change them together.
 - `nwps_<grid>_XXX.png` (e.g. `nwps_cg1_012.png`) — nearshore combined
