@@ -811,7 +811,6 @@
 
             let currentIndex = 0;
             let isPlaying = false;
-            let animationInterval;
             let forecastStartTime;
 
             // Every run reuses the same filenames, so per-run files carry the
@@ -1419,7 +1418,9 @@
             // as a fallback when a run has no heatmaps.
             const HEATMAP_OPACITY = 0.85;
             const HEATMAP_FADE_MS = 550;
-            const HEATMAP_OVERLAP_MS = 180;
+            // Frame-to-frame crossfade; shorter than a playback step so one
+            // finishes before the next starts.
+            const HEATMAP_CROSSFADE_MS = 400;
             // Longest wait for a new frame's image before fading anyway.
             const HEATMAP_LOAD_WAIT_MS = 600;
             const TRANSPARENT_PX =
@@ -1427,8 +1428,13 @@
             let heatmapBounds = null; // set from metadata.json
             let heatmapReady = false;
             let swellLayersReady = false;
+            // The a/b layer showing the current frame, and the hidden one a
+            // newer frame is loading into (null once its fade-in starts).
             let activeHeatLayer = 'b';
+            let pendingHeatLayer = null;
             let firstHeatmapFrameShown = false;
+            // The running crossfade: { next, raf }.
+            let heatCrossfade = null;
             let heatmapTransitionToken = 0;
             let swellRenderMode = 'heatmap';
 
@@ -1494,8 +1500,14 @@
             function hideHeatmapLayers() {
                 heatmapTransitionToken++;
                 firstHeatmapFrameShown = false;
+                pendingHeatLayer = null;
+                if (heatCrossfade) cancelAnimationFrame(heatCrossfade.raf);
+                heatCrossfade = null;
                 for (const layer of ['heatmap-a', 'heatmap-b']) {
                     if (map.getLayer(layer)) {
+                        // Fading out is the one heatmap opacity change left
+                        // to MapLibre's transitions (see setHeatmapWeights).
+                        setHeatmapFadeTransition(layer, HEATMAP_FADE_MS);
                         map.setPaintProperty(layer, 'raster-opacity', 0);
                     }
                 }
@@ -1630,7 +1642,7 @@
                         source: `heatmap-${key}`,
                         paint: {
                             'raster-opacity': 0,
-                            'raster-opacity-transition': { duration: HEATMAP_FADE_MS },
+                            'raster-opacity-transition': { duration: 0 },
                             'raster-resampling': 'linear',
                             'raster-fade-duration': 0,
                         },
@@ -1676,46 +1688,179 @@
                 return promise;
             }
 
-            function showHeatmapFrame(url) {
-                const next = activeHeatLayer === 'a' ? 'b' : 'a';
-                const previous = activeHeatLayer;
-                const token = ++heatmapTransitionToken;
+            // Playback decodes the next frame ahead into an ImageBitmap, and a
+            // step copies it into the hidden layer's existing GPU texture.
+            // Left to updateImage, MapLibre decodes the frame only once it's
+            // asked to show it, then builds a new 17 MB texture on the main
+            // thread mid-crossfade (and drops the old one without freeing
+            // it), so each step waited on a decode and then hitched.
+            // Decoded frames are ~17 MB each, so only DECODE_AHEAD are held,
+            // and only while playing.
+            const DECODE_AHEAD = 1;
+            const decodedFrames = new Map(); // frame url -> Promise<ImageBitmap|null>
 
-                map.getSource(`heatmap-${next}`).updateImage({ url });
+            function decodeFrame(frameUrl) {
+                let promise = decodedFrames.get(frameUrl);
+                if (!promise) {
+                    promise = loadImageFrame(frameUrl)
+                        .then(objectUrl => (objectUrl ? fetch(objectUrl).then(r => r.blob()) : null))
+                        .then(blob => (blob && typeof createImageBitmap === 'function' ? createImageBitmap(blob) : null))
+                        .catch(() => null);
+                    decodedFrames.set(frameUrl, promise);
+                }
+                return promise;
+            }
 
-                if (!firstHeatmapFrameShown) {
-                    map.setPaintProperty(`heatmap-${previous}`, 'raster-opacity', 0);
-                    map.setPaintProperty(`heatmap-${next}`, 'raster-opacity', HEATMAP_OPACITY);
-                    activeHeatLayer = next;
-                    firstHeatmapFrameShown = true;
+            // Hands the frame's bitmap to the caller, who must close it.
+            function takeDecodedFrame(frameUrl) {
+                const promise = decodeFrame(frameUrl);
+                decodedFrames.delete(frameUrl);
+                return promise;
+            }
+
+            function trimDecodedFrames(keep = new Set()) {
+                for (const [frameUrl, promise] of decodedFrames) {
+                    if (keep.has(frameUrl)) continue;
+                    decodedFrames.delete(frameUrl);
+                    promise.then(bitmap => bitmap && bitmap.close());
+                }
+            }
+
+            function decodeAhead(index) {
+                if (!isPlaying || !wantsHeatmap()) {
+                    trimDecodedFrames();
                     return;
                 }
+                const keep = new Set();
+                for (let d = 1; d <= Math.min(DECODE_AHEAD, forecastHours.length - 1); d++) {
+                    keep.add(hourToHeatmapFilename(forecastHours[(index + d) % forecastHours.length]));
+                }
+                trimDecodedFrames(keep);
+                for (const frameUrl of keep) decodeFrame(frameUrl);
+            }
 
+            // Copies bitmap into the source's texture in place. Relies on
+            // MapLibre 3.3.1 internals (ImageSource.texture, Texture.update),
+            // so anything unexpected falls back to updateImage. Only once the
+            // layer holds a full-size texture (its first frame still goes
+            // through updateImage) and has no load of its own in flight,
+            // which would overwrite this frame when it landed. Always closes
+            // the bitmap: the texture keeps its own copy.
+            function uploadHeatmapBitmap(source, bitmap) {
+                if (!bitmap) return false;
+                try {
+                    const texture = source.texture;
+                    if (!texture || !texture.size || typeof texture.update !== 'function' || !source.loaded()
+                        || texture.size[0] !== bitmap.width || texture.size[1] !== bitmap.height) {
+                        return false;
+                    }
+                    texture.update(bitmap);
+                    map.triggerRepaint();
+                    return true;
+                } catch (err) {
+                    return false;
+                } finally {
+                    bitmap.close();
+                }
+            }
+
+            const heatmapFadeTransition = { 'heatmap-a': 0, 'heatmap-b': 0 };
+            function setHeatmapFadeTransition(layer, ms) {
+                if (heatmapFadeTransition[layer] === ms) return;
+                heatmapFadeTransition[layer] = ms;
+                map.setPaintProperty(layer, 'raster-opacity-transition', { duration: ms });
+            }
+
+            // Shows frame a at weightA and frame b at 1 - weightA. Fading two
+            // layers both at HEATMAP_OPACITY overlaps them: midway the pair
+            // covers 1 - 0.15 * 0.15 = 98% of the basemap, not 85%, so the
+            // ocean flashed brighter at every step. heatmap-b draws above
+            // heatmap-a, so b's opacity is its own share and a's is scaled up
+            // to make up for what b covers: together they show
+            // weightA * a + (1 - weightA) * b at exactly HEATMAP_OPACITY.
+            // Driven per frame (transitions off) to keep that exact.
+            function setHeatmapWeights(weightA) {
+                const top = HEATMAP_OPACITY * (1 - weightA);
+                const bottom = HEATMAP_OPACITY * weightA / (1 - top);
+                for (const layer of ['heatmap-a', 'heatmap-b']) setHeatmapFadeTransition(layer, 0);
+                map.setPaintProperty('heatmap-b', 'raster-opacity', top);
+                map.setPaintProperty('heatmap-a', 'raster-opacity', bottom);
+            }
+
+            function setHeatmapShown(layer, weight) {
+                setHeatmapWeights(layer === 'a' ? weight : 1 - weight);
+            }
+
+            // Snaps a running crossfade to its end, so its outgoing layer is
+            // hidden before it's reused for a newer frame.
+            function finishHeatCrossfade() {
+                if (!heatCrossfade) return;
+                cancelAnimationFrame(heatCrossfade.raf);
+                setHeatmapShown(heatCrossfade.next, 1);
+                heatCrossfade = null;
+            }
+
+            function startHeatCrossfade(next) {
+                finishHeatCrossfade();
+                const startedAt = performance.now();
+                const step = () => {
+                    const t = Math.min(1, (performance.now() - startedAt) / HEATMAP_CROSSFADE_MS);
+                    setHeatmapShown(next, t * t * (3 - 2 * t)); // smoothstep
+                    if (t < 1) {
+                        heatCrossfade.raf = requestAnimationFrame(step);
+                    } else {
+                        heatCrossfade = null;
+                    }
+                };
+                heatCrossfade = { next, raf: requestAnimationFrame(step) };
+            }
+
+            function showHeatmapFrame(url, bitmap = null) {
+                const token = ++heatmapTransitionToken;
+                finishHeatCrossfade();
+                // If the last frame never got to fade in, the other layer is
+                // still the one on screen: load into the same hidden layer
+                // again. Flipping would swap the image on the visible layer,
+                // which shows as a hard jump (and skips a frame).
+                const next = pendingHeatLayer || (activeHeatLayer === 'a' ? 'b' : 'a');
+                const source = map.getSource(`heatmap-${next}`);
+
+                const uploaded = uploadHeatmapBitmap(source, bitmap);
+                if (!uploaded) source.updateImage({ url });
+
+                if (!firstHeatmapFrameShown) {
+                    setHeatmapShown(next, 1);
+                    activeHeatLayer = next;
+                    pendingHeatLayer = null;
+                    firstHeatmapFrameShown = true;
+                    return Promise.resolve();
+                }
+
+                pendingHeatLayer = next;
                 // The image source keeps drawing its old texture until the
                 // new image has loaded, so wait for that (MapLibre fetches the
                 // object URL and decodes it with createImageBitmap) before
-                // fading in, then overlap the fades to avoid a flash.
-                const source = map.getSource(`heatmap-${next}`);
-                const startedAt = performance.now();
-                const fadeIn = () => {
-                    if (token !== heatmapTransitionToken) return;
-                    if (!source.loaded() && performance.now() - startedAt < HEATMAP_LOAD_WAIT_MS) {
-                        requestAnimationFrame(fadeIn);
-                        return;
-                    }
-                    // One more frame so the texture is uploaded and drawn
-                    // (at opacity 0) before it starts to show.
-                    requestAnimationFrame(() => {
-                        if (token !== heatmapTransitionToken) return;
-                        map.setPaintProperty(`heatmap-${next}`, 'raster-opacity', HEATMAP_OPACITY);
-                        window.setTimeout(() => {
-                            if (token !== heatmapTransitionToken) return;
-                            map.setPaintProperty(`heatmap-${previous}`, 'raster-opacity', 0);
-                        }, HEATMAP_OVERLAP_MS);
-                    });
-                };
-                requestAnimationFrame(fadeIn);
-                activeHeatLayer = next;
+                // crossfading.
+                return new Promise(resolve => {
+                    const startedAt = performance.now();
+                    const fadeIn = () => {
+                        if (token !== heatmapTransitionToken) return resolve();
+                        if (!uploaded && !source.loaded() && performance.now() - startedAt < HEATMAP_LOAD_WAIT_MS) {
+                            requestAnimationFrame(fadeIn);
+                            return;
+                        }
+                        // One more frame so the texture is uploaded and drawn
+                        // (at opacity 0) before it starts to show.
+                        requestAnimationFrame(() => {
+                            if (token !== heatmapTransitionToken) return resolve();
+                            startHeatCrossfade(next);
+                            activeHeatLayer = next;
+                            pendingHeatLayer = null;
+                            resolve();
+                        });
+                    };
+                    requestAnimationFrame(fadeIn);
+                });
             }
 
             // Flat, darker gray land: recolor the basemap background and
@@ -2129,8 +2274,12 @@
 
                 const token = ++updateToken;
                 const wantHeatmap = wantsHeatmap();
-                let [heatUrl, arrows, arrowGrid] = await Promise.all([
-                    wantHeatmap ? loadImageFrame(hourToHeatmapFilename(hours)) : null,
+                let heatShown = null;
+                const heatFrame = hourToHeatmapFilename(hours);
+                let [heatUrl, heatBitmap, arrows, arrowGrid] = await Promise.all([
+                    wantHeatmap ? loadImageFrame(heatFrame) : null,
+                    // Already decoded during playback; decoded here otherwise.
+                    wantHeatmap ? takeDecodedFrame(heatFrame) : null,
                     loadArrows(hours),
                     loadArrowGrid(hours),
                 ]);
@@ -2138,6 +2287,10 @@
                 let contours = null;
                 if (!wantHeatmap || !heatUrl) {
                     contours = await loadContours(hours);
+                }
+                if (token !== updateToken || !swellLayersReady || !heatUrl) {
+                    if (heatBitmap) heatBitmap.close();
+                    heatBitmap = null;
                 }
                 if (token !== updateToken) return; // superseded by a newer frame
 
@@ -2151,7 +2304,7 @@
                     const contourSource = map.getSource('contours');
                     if (contourSource) contourSource.setData(contours || EMPTY_FC);
                     if (wantHeatmap && heatUrl) {
-                        showHeatmapFrame(heatUrl);
+                        heatShown = showHeatmapFrame(heatUrl, heatBitmap);
                     } else if (wantHeatmap) {
                         // missing frame: hide the stale image, contours took over
                         hideHeatmapLayers();
@@ -2165,18 +2318,39 @@
                     if (token !== updateToken) return;
                 }
                 prefetchFrames(index);
+                decodeAhead(index);
+                await heatShown;
             }
 
             function stepForward() {
                 const nextIndex = (currentIndex + 1) % forecastHours.length;
                 timeSlider.value = nextIndex;
-                updateMap(nextIndex);
+                return updateMap(nextIndex);
+            }
+
+            // Playback steps at most every PLAYBACK_STEP_MS, but never before
+            // the previous frame has started to show. A fixed interval kept
+            // replacing frames that were still loading, so playback stuttered
+            // whenever a frame took longer than a step to decode.
+            const PLAYBACK_STEP_MS = 500;
+            let playbackToken = 0;
+            async function runPlayback() {
+                const token = ++playbackToken;
+                let lastStep = performance.now();
+                while (isPlaying && token === playbackToken) {
+                    const wait = PLAYBACK_STEP_MS - (performance.now() - lastStep);
+                    if (wait > 0) await new Promise(r => window.setTimeout(r, wait));
+                    if (!isPlaying || token !== playbackToken) return;
+                    lastStep = performance.now();
+                    await stepForward();
+                }
             }
 
             function stopPlayback() {
                 if (!isPlaying) return;
-                clearInterval(animationInterval);
+                playbackToken++;
                 isPlaying = false;
+                trimDecodedFrames();
                 playButton.innerHTML = PLAY_ICON;
                 playButton.title = 'Play forecast';
             }
@@ -2190,11 +2364,10 @@
                 playButton.title = isPlaying ? 'Pause forecast' : 'Play forecast';
 
                 if (isPlaying) {
-                    animationInterval = setInterval(() => {
-                        stepForward();
-                    }, 500); // Update every 500ms
+                    runPlayback();
                 } else {
-                    clearInterval(animationInterval);
+                    playbackToken++;
+                    trimDecodedFrames();
                 }
             });
 
