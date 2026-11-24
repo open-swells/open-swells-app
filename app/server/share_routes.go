@@ -141,31 +141,57 @@ func SpotCardPath(staticDir, id string) string {
 	return path
 }
 
-func spotCardPanel(spot Spot, name string, snap SpotSnapshot, hasSnap bool, now time.Time) (cardPanel, *cardArrow) {
-	p := cardPanel{Title: name, Subtitle: strings.Join(regionPath(spot.Region), ", ")}
-	loc := spotLocation(spot)
-	p.Footer = "Forecast for " + now.In(loc).Format("Mon Jan 2, 3 PM MST")
-	var arrow *cardArrow
-	if hasSnap && snap.HasNow() {
-		p.Label = "SURF NOW"
-		p.Big = surfFeet(snap.Surf)
-		p.Rating = snap.Rating
-		if swell := snap.swellPhrase(); swell != "" {
-			p.Lines = append(p.Lines, "Swell "+swell)
-		}
-		if dir, err := strconv.ParseFloat(snap.SwellDir, 64); err == nil {
-			arrow = &cardArrow{Lon: spot.Lon, Lat: spot.Lat, From: dir}
-		}
-		if dir, err := strconv.ParseFloat(snap.WindDir, 64); err == nil && snap.WindMph != "" {
-			line := fmt.Sprintf("Wind %s mph from the %s", snap.WindMph, compassPoint(dir))
-			p.Lines = append(p.Lines, line)
-		}
-	} else {
-		p.Label = "16-DAY FORECAST"
-		p.Big = "Swell & wind"
+// spotCardArrows are the swells arriving at the spot now, as the spot
+// page's exposure map draws them: primary and secondary, the smaller on
+// top so the larger never hides it.
+func spotCardArrows(report SpotReport) []cardSwellArrow {
+	type train struct {
+		arrow cardSwellArrow
+		scale float64
 	}
-	return p, arrow
+	var trains []train
+	add := func(kind, deg, ft, period string) {
+		if pts, scale, ok := swellArrowShape(deg, ft); ok {
+			trains = append(trains, train{cardSwellArrow{Kind: kind, Points: pts, Label: swellLabel(ft, period)}, scale})
+		}
+	}
+	add("primary", report.PrimaryDegrees, report.PrimaryHeight, report.PrimaryPeriod)
+	if report.HasSecondary {
+		add("secondary", report.SecondaryDegrees, report.SecondaryHeight, report.SecondaryPeriod)
+	}
+	if len(trains) == 2 && trains[1].scale >= trains[0].scale {
+		trains[0], trains[1] = trains[1], trains[0]
+	}
+	arrows := make([]cardSwellArrow, len(trains))
+	for i, t := range trains {
+		arrows[i] = t.arrow
+	}
+	return arrows
 }
+
+// swellLabel is a train's height and period as a card shows them, e.g.
+// "2.3ft at 14s" (from "2.3" and "14.4"): whole feet from 10ft up and
+// whole seconds, so the label stays short.
+func swellLabel(ft, period string) string {
+	h, err := strconv.ParseFloat(ft, 64)
+	if err != nil {
+		return ""
+	}
+	label := strconv.FormatFloat(h, 'f', 1, 64)
+	if h >= 10 {
+		label = strconv.FormatFloat(math.Round(h), 'f', 0, 64)
+	}
+	label = strings.TrimSuffix(label, ".0") + "ft"
+	if p, err := strconv.ParseFloat(period, 64); err == nil && p > 0 {
+		label += fmt.Sprintf(" at %.0fs", p)
+	}
+	return label
+}
+
+// spotCardSpanDeg is how much longitude a spot card shows: the coast
+// around the beach, wide enough that the heatmap shows the swell's
+// structure rather than one flat color.
+const spotCardSpanDeg = 6
 
 func spotCardHandler(staticDir string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -175,14 +201,13 @@ func spotCardHandler(staticDir string) gin.HandlerFunc {
 			return
 		}
 		serveFrameImage(c, staticDir, cardCache, "spot\x00"+spot.ID, "image/jpeg", 3600, func(frame *heatmapFrame) ([]byte, error) {
-			now := time.Now()
-			snap, hasSnap := spotSnapshots.Get(spot.ID)
-			if !hasSnap {
-				snap, hasSnap = buildSpotSnapshot(staticDir, spot, now)
+			var arrows []cardSwellArrow
+			forecastData, _ := spotForecast(staticDir, spot)
+			if report, ok := spotReport(staticDir, spot, forecastData); ok {
+				arrows = spotCardArrows(report)
 			}
-			panel, arrow := spotCardPanel(spot, spotStore.SEOName(spot), snap, hasSnap, now)
-			view := viewAt(spot.Lon, spot.Lat, 8, cardW, cardH, (float64(cardPanelW)+float64(cardW-cardPanelW)/2)/cardW, 0.5)
-			return renderCard(frame, view, panel, []cardMarker{{Lon: spot.Lon, Lat: spot.Lat, R: 9}}, arrow)
+			view := viewAt(spot.Lon, spot.Lat, spotCardSpanDeg, cardW, cardH, 0.5, 0.5)
+			return renderSpotCard(frame, view, spot.Lon, spot.Lat, arrows)
 		})
 	}
 }
@@ -222,7 +247,7 @@ func regionCard(frame *heatmapFrame, n *RegionNode) ([]byte, error) {
 	if len(spots) > 60 {
 		r = 4
 	}
-	return renderCard(frame, view, p, regionMarkers(spots, view, r), nil)
+	return renderCard(frame, view, p, regionMarkers(spots, view, r))
 }
 
 type rankedSpot struct {

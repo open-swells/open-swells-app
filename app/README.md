@@ -72,7 +72,9 @@ Pages for search and sharing:
   spot's exposure and forecast.
 - `/surf-spots/<id>/card.jpg` and `/surf-forecasts/.../card.jpg` are
   1200x630 Open Graph images: the current swell heatmap around the place,
-  with land drawn over it. `/surf-spots/<id>/heatmap.png` is the heatmap
+  with land drawn over it. A spot's card has no text, just the swells
+  arriving at the beach drawn as the exposure map draws them; a region's
+  adds a panel with its name. `/surf-spots/<id>/heatmap.png` is the heatmap
   crop under the spot page's exposure map.
 - Sitemap entries carry `lastmod`: the current run's publish time.
 
