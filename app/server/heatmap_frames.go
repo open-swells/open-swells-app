@@ -135,9 +135,10 @@ var (
 	frameDecodeMu sync.Mutex
 )
 
-// maxFrameImages bounds the decoded-image cache: a global frame and a few
-// nearshore mosaics for the current hour, plus the hour before it.
-const maxFrameImages = 8
+// maxFrameImages bounds the decoded-image cache (~18MB per global frame;
+// the app server has 1GB of RAM): the current hour's global frame and its
+// nearshore mosaics, and room for the hour changing over.
+const maxFrameImages = 4
 
 // loadFrameImage decodes the image at path, with its modification time.
 func loadFrameImage(path string) (*image.NRGBA, int64, error) {
@@ -261,7 +262,7 @@ func containsInt(list []int, v int) bool {
 // read as boxes.
 func (f *heatmapFrame) Render(v mercView, nearshore bool) *image.RGBA {
 	out := image.NewRGBA(image.Rect(0, 0, v.W, v.H))
-	acc := make([]float64, 4*v.W*v.H)
+	acc := make([]float32, 4*v.W*v.H)
 	for i, layer := range f.layers {
 		if i > 0 && !nearshore {
 			break
@@ -269,10 +270,10 @@ func (f *heatmapFrame) Render(v mercView, nearshore bool) *image.RGBA {
 		layer.composite(acc, v)
 	}
 	for i := 0; i < len(acc); i += 4 {
-		out.Pix[i] = uint8(math.Round(acc[i] * 255))
-		out.Pix[i+1] = uint8(math.Round(acc[i+1] * 255))
-		out.Pix[i+2] = uint8(math.Round(acc[i+2] * 255))
-		out.Pix[i+3] = uint8(math.Round(acc[i+3] * 255))
+		out.Pix[i] = uint8(acc[i]*255 + 0.5)
+		out.Pix[i+1] = uint8(acc[i+1]*255 + 0.5)
+		out.Pix[i+2] = uint8(acc[i+2]*255 + 0.5)
+		out.Pix[i+3] = uint8(acc[i+3]*255 + 0.5)
 	}
 	return out
 }
@@ -283,7 +284,7 @@ func (f *heatmapFrame) Render(v mercView, nearshore bool) *image.RGBA {
 // reports its grid's end points), so pixel i sits at West + i*step. The
 // global frame's columns go once round the world: one more step past the
 // last column is the first again.
-func (l heatmapLayer) composite(acc []float64, v mercView) {
+func (l heatmapLayer) composite(acc []float32, v mercView) {
 	w, h := l.img.Rect.Dx(), l.img.Rect.Dy()
 	step := (l.bounds.East - l.bounds.West) / float64(w-1)
 	cols := make([]float64, v.W)
@@ -308,11 +309,11 @@ func (l heatmapLayer) composite(acc []float64, v mercView) {
 				continue
 			}
 			i := 4 * (y*v.W + x)
-			inv := 1 - a
-			acc[i] = r + acc[i]*inv
-			acc[i+1] = g + acc[i+1]*inv
-			acc[i+2] = b + acc[i+2]*inv
-			acc[i+3] = a + acc[i+3]*inv
+			inv := float32(1 - a)
+			acc[i] = float32(r) + acc[i]*inv
+			acc[i+1] = float32(g) + acc[i+1]*inv
+			acc[i+2] = float32(b) + acc[i+2]*inv
+			acc[i+3] = float32(a) + acc[i+3]*inv
 		}
 	}
 }

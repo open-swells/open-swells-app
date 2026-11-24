@@ -87,7 +87,13 @@ if [[ -z "$GO_BIN" || ! -x "$GO_BIN" ]]; then
 fi
 
 echo "Building with $GO_BIN..."
-"$GO_BIN" build -buildvcs=false -o "$APP_NAME" ./server
+# /tmp is a small in-memory tmpfs on the app server (half of 1GB of RAM),
+# and the linker's temporary files no longer fit in it. Build on disk.
+BUILD_TMP=/var/tmp/open-swells-build
+rm -rf "$BUILD_TMP"
+mkdir -p "$BUILD_TMP"
+TMPDIR="$BUILD_TMP" GOTMPDIR="$BUILD_TMP" "$GO_BIN" build -buildvcs=false -o "$APP_NAME" ./server
+rm -rf "$BUILD_TMP"
 
 # go.mod pins `toolchain go1.27.4` to pick up a net/http security fix
 # (GO-2026-6859). If GOTOOLCHAIN=local or a failed toolchain download let an
